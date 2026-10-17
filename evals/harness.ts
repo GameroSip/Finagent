@@ -11,6 +11,7 @@ import { frozenHttp } from './frozen-data';
 
 export interface TurnRun {
   question: string; answer: string; model: string; ms: number;
+  waitedMs: number;        // tiempo que el propio evaluador esperó por el límite de pedidos (no es latencia del modelo)
   tools: string[]; toolOk: boolean[]; results: unknown[];
   stats: AskStats; redacted: number; truncated: boolean;
 }
@@ -21,31 +22,34 @@ export interface CaseScore { id: string; category: Category; soft: boolean; chec
 export class FatalEvalError extends Error {}
 
 // ------------------------------------------------------------------ red: datos congelados + Gemini (real o falso) con ritmo controlado
-export interface Net { http: (req: HttpRequest) => Promise<HttpResult>; geminiRequests: () => number }
+export interface Net { http: (req: HttpRequest) => Promise<HttpResult>; geminiRequests: () => number; geminiFailed: () => number; waited: () => number }
 export function makeNet(gemini: (req: HttpRequest) => Promise<HttpResult>, rpm = 8): Net {
   const gap = 60_000 / Math.max(1, rpm);
-  let next = 0, count = 0;
-  const gate = async () => { const wait = Math.max(0, next - Date.now()); next = Math.max(next, Date.now()) + gap; if (wait) await new Promise((r) => setTimeout(r, wait)); };
+  let next = 0, count = 0, failed = 0, waited = 0;
+  const gate = async () => { const wait = Math.max(0, next - Date.now()); next = Math.max(next, Date.now()) + gap; if (wait) { waited += wait; await new Promise((r) => setTimeout(r, wait)); } };
   return {
-    geminiRequests: () => count,
+    geminiRequests: () => count, geminiFailed: () => failed, waited: () => waited,
     http: async (req) => {
-      if (new URL(req.url).host === 'generativelanguage.googleapis.com') { await gate(); count++; return gemini(req); }
+      if (new URL(req.url).host === 'generativelanguage.googleapis.com') {
+        await gate(); count++;
+        try { const res = await gemini(req); if (res.status < 200 || res.status >= 300) failed++; return res; } catch (e) { failed++; throw e; }
+      }
       return frozenHttp(req);
     },
   };
 }
 
 // ------------------------------------------------------------------ ejecución de un caso
-export async function runCase(c: EvalCase, models: ModelManager, apiKey: string): Promise<CaseRun> {
+export async function runCase(c: EvalCase, models: ModelManager, apiKey: string, net?: Net): Promise<CaseRun> {
   clearCache();
   const agent = new FinancialAgent({ apiKey, models, retryDelayMs: 1500 });
   const run: CaseRun = { id: c.id, turns: [] };
   for (const q of c.turns) {
-    const t0 = Date.now();
+    const t0 = Date.now(), w0 = net?.waited() ?? 0;
     try {
       const r = await agent.ask(q);
       run.turns.push({
-        question: q, answer: r.answer, model: r.model, ms: Date.now() - t0, tools: r.toolCalls.map((x) => x.name), toolOk: r.toolCalls.map((x) => !!x.result?.ok),
+        question: q, answer: r.answer, model: r.model, ms: Date.now() - t0, waitedMs: (net?.waited() ?? 0) - w0, tools: r.toolCalls.map((x) => x.name), toolOk: r.toolCalls.map((x) => !!x.result?.ok),
         results: r.toolCalls.map((x) => x.result), stats: r.stats, redacted: r.redacted, truncated: r.truncated,
       });
     } catch (e: any) {
@@ -89,9 +93,9 @@ export async function scoreCase(c: EvalCase, run: CaseRun): Promise<CaseScore> {
   if (c.mentions) for (const tk of await c.mentions()) add(`nombra a ${tk}`, wordIn(answer, tk), `no aparece en la respuesta`);
   for (const [d, re] of c.includes ?? []) add(d, re.test(answer), `no se encontró en: «${answer.replace(/\s+/g, ' ').slice(0, 220)}»`);
   for (const [d, re] of c.excludes ?? []) add(`NO ${d}`, !re.test(answer), `coincidió con ${re}: «${answer.match(re)?.[0] ?? ''}»`);
-  if (c.noDataNumbers) {
-    const extra = scanNumbers(answer).filter((t) => !t.skip).map((t) => t.text);
-    add('no inventa cifras cuando el dato no existe', extra.length === 0, `cifras en la respuesta: ${extra.join(', ')}`);
+  if (c.noInvention) {
+    const tried = last.stats.draftUnverified;
+    add('no intenta inventar cifras (su borrador no tuvo cifras sin respaldo)', tried.length === 0 && last.redacted === 0, `cifras que escribió sin respaldo: ${tried.join(', ') || '(se quitaron del texto)'}`);
   }
 
   // comprobaciones universales: se re-verifica la respuesta final con TODO lo que devolvieron las herramientas en la conversación
@@ -116,8 +120,10 @@ export interface Summary {
   correctedTurns: number; rewrittenTurns: number; degradedAnswers: number;
   avgToolSteps: number; avgModelCalls: number; medianMs: number; geminiRequests: number;
   failedChecks: Record<string, number>; models: Record<string, number>;
+  geminiFailed: number; medianResponseMs: number;
+  byModel: Record<string, { turns: number; hallucinated: number; degraded: number; corrected: number }>;
 }
-export function summarize(scores: CaseScore[], geminiRequests: number): Summary {
+export function summarize(scores: CaseScore[], geminiRequests: number, geminiFailed = 0): Summary {
   const infra = scores.filter((s) => s.infra);
   const ok = scores.filter((s) => !s.infra);
   const hard = ok.filter((s) => !s.soft), soft = ok.filter((s) => s.soft);
@@ -131,6 +137,12 @@ export function summarize(scores: CaseScore[], geminiRequests: number): Summary 
   const sum = (f: (t: (typeof turns)[number]) => number) => turns.reduce((a, t) => a + f(t), 0);
   const hallucinated = turns.filter((t) => t.stats.draftUnverified.length > 0).length;
   const ms = turns.map((t) => t.ms).sort((a, b) => a - b);
+  const net = turns.map((t) => Math.max(0, t.ms - t.waitedMs)).sort((a, b) => a - b);
+  const byModel: Summary['byModel'] = {};
+  for (const t of turns) {
+    const m = (byModel[t.model] ??= { turns: 0, hallucinated: 0, degraded: 0, corrected: 0 });
+    m.turns++; if (t.stats.draftUnverified.length) m.hallucinated++; if (t.redacted) m.degraded++; if (t.stats.corrected) m.corrected++;
+  }
   return {
     casesRun: scores.length, infraErrors: infra.length, scored: hard.length, passed: hard.filter((s) => s.pass).length,
     passRate: hard.length ? hard.filter((s) => s.pass).length / hard.length : 0, softObservations: soft.length, softPassed: soft.filter((s) => s.pass).length,
@@ -138,7 +150,8 @@ export function summarize(scores: CaseScore[], geminiRequests: number): Summary 
     avgDraftUnverified: turns.length ? sum((t) => t.stats.draftUnverified.length) / turns.length : 0,
     correctedTurns: turns.filter((t) => t.stats.corrected).length, rewrittenTurns: turns.filter((t) => t.stats.rewritten).length, degradedAnswers: turns.filter((t) => t.redacted > 0).length,
     avgToolSteps: turns.length ? sum((t) => t.stats.toolSteps) / turns.length : 0, avgModelCalls: turns.length ? sum((t) => t.stats.modelCalls) / turns.length : 0,
-    medianMs: ms.length ? ms[Math.floor(ms.length / 2)] : 0, geminiRequests, failedChecks: failed, models,
+    medianMs: ms.length ? ms[Math.floor(ms.length / 2)] : 0, geminiRequests, failedChecks: failed, models, geminiFailed, byModel,
+    medianResponseMs: net.length ? net[Math.floor(net.length / 2)] : 0,
   };
 }
 
@@ -155,7 +168,7 @@ export async function runEval(o: EvalOptions): Promise<{ scores: CaseScore[]; su
   try {
     for (let rep = 0; rep < (o.repeat ?? 1); rep++) {
       for (const [i, c] of o.cases.entries()) {
-        const run = await runCase(c, o.models, o.apiKey);
+        const run = await runCase(c, o.models, o.apiKey, net);
         const s = await scoreCase(c, run);
         if (rep > 0) s.id = `${s.id}#${rep + 1}`;
         scores.push(s);
@@ -165,5 +178,5 @@ export async function runEval(o: EvalOptions): Promise<{ scores: CaseScore[]; su
       }
     }
   } finally { setHttp(); }
-  return { scores, summary: summarize(scores, net.geminiRequests()) };
+  return { scores, summary: summarize(scores, net.geminiRequests(), net.geminiFailed()) };
 }

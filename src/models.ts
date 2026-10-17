@@ -20,7 +20,7 @@ function parseModel(m: RawModel): Parsed | null {
   const suffix = x[4];
   let preview = false;
   if (suffix !== undefined) {
-    if (/^preview(-[\w-]+)?$/.test(suffix)) preview = true;
+    if (/^preview(-\d[\w-]*)?$/.test(suffix)) preview = true; // solo fechas/versiones: 'preview-tts' o 'preview-native-audio-dialog' NO son modelos de chat
     else if (!/^\d{3}$/.test(suffix)) return null;
   }
   return { id, family: x[3] as Family, ver: [Number(x[1]), Number(x[2] ?? 0)], preview };

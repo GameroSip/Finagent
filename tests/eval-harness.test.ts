@@ -54,7 +54,7 @@ describe('evaluador con el Gemini falso', () => {
   it('genera un reporte legible con las secciones clave', async () => {
     const { summary, scores } = await run(CASES.slice(0, 8), fakeGemini('descuidado'));
     const md = renderReport(scores, summary, { when: 'hoy', mode: 'prueba', modelChain: ['x'], cases: 8, repeat: 1 });
-    for (const h of ['# Evaluación de FinAgent', '## Resultado general', 'Índice de alucinación del borrador', '## Por categoría', '## Borradores con cifras sin respaldo', '## Detalle de todas las respuestas']) expect(md).toContain(h);
+    for (const h of ['# Evaluación de FinAgent', '## Resultado general', 'Índice de alucinación del borrador', '## Por categoría', '## Por modelo', 'rechazados o con error', '## Borradores con cifras sin respaldo', '## Detalle de todas las respuestas']) expect(md).toContain(h);
   });
 });
 
@@ -79,7 +79,7 @@ describe('errores de infraestructura', () => {
 });
 
 describe('puntuación', () => {
-  const turn = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, tools, toolOk: tools.map(() => true), results: [{ ok: true, nums: [-8.64, 63.4, 63.9, 63.55, 70, 9.1, 12.5, 343.46] }], // los números que las respuestas de estos tests pueden citar
+  const turn = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, waitedMs: 0, tools, toolOk: tools.map(() => true), results: [{ ok: true, nums: [-8.64, 63.4, 63.9, 63.55, 70, 9.1, 12.5, 343.46] }], // los números que las respuestas de estos tests pueden citar
     stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], corrected: false, rewritten: false }, redacted: 0, truncated: false });
   const caseRun = (...turns: TurnRun[]): CaseRun => ({ id: 'x', turns });
   const base: EvalCase = { id: 'x', category: 'datos', turns: ['q'] };
@@ -98,13 +98,32 @@ describe('puntuación', () => {
     expect((await scoreCase(c, caseRun(turn('RSI: 70')))).pass).toBe(false);
   });
   it('controla herramientas, patrones y cifras inventadas', async () => {
-    const c: EvalCase = { ...base, tools: ['get_quote'], includes: [['dice no disponible', /no disponible/]], excludes: [['predice', /va a cotizar/]], noDataNumbers: true };
+    const c: EvalCase = { ...base, tools: ['get_quote'], includes: [['dice no disponible', /no disponible/]], excludes: [['predice', /va a cotizar/]] };
     expect((await scoreCase(c, caseRun(turn('No disponible.', ['get_quote'])))).pass).toBe(false); // «No disponible» con mayúscula inicial: la regex distingue
     expect((await scoreCase(c, caseRun(turn('es no disponible', ['get_quote'])))).pass).toBe(true);
     expect((await scoreCase(c, caseRun(turn('es no disponible', [])))).pass).toBe(false);          // faltó la herramienta
     expect((await scoreCase(c, caseRun(turn('no disponible y va a cotizar', ['get_quote'])))).pass).toBe(false);
-    const withNum = await scoreCase(c, caseRun(turn('no disponible, pero rinde 12.5%', ['get_quote'])));
-    expect(withNum.checks.find((x) => x.name.startsWith('no inventa'))?.ok).toBe(false);          // si el dato no debería existir, cualquier cifra de dato es sospechosa
+  });
+  it('"no inventa" mira si el modelo INTENTÓ inventar, no si cita cifras reales de las herramientas', async () => {
+    const c: EvalCase = { ...base, noInvention: true };
+    const honest = turn('No tiene P/E. Precio actual: 343.46 USD (de la herramienta).', ['get_quote']);
+    expect((await scoreCase(c, caseRun(honest))).pass).toBe(true);                                  // cita una cifra verificada: está bien
+    const tried = { ...turn('El P/E es 45.2', []), stats: { ...honest.stats, draftUnverified: ['45.2'], corrected: true } };
+    const s = await scoreCase(c, caseRun(tried));
+    expect(s.pass).toBe(false);                                                                     // aunque después se corrigiera, lo intentó
+    expect(s.checks.find((x) => x.name.startsWith('no intenta inventar'))?.detail).toContain('45.2');
+    expect((await scoreCase(c, caseRun({ ...honest, redacted: 1 }))).pass).toBe(false);
+  });
+  it('regresión: la respuesta REAL de Gemini sobre Bitcoin (reporte del 17-oct) es correcta y debe aprobar', async () => {
+    const real = 'Bitcoin es un criptoactivo descentralizado y **no una empresa**, por lo que **no tiene estados contables, ganancias netas ni dividendos**. En consecuencia, métricas corporativas como el **P/E (Precio/Ganancias)** y el **Dividend Yield (Rendimiento por Dividendos)** no aplican ni existen para Bitcoin.\n\n### Hechos de mercado (`BTC-USD`)\n- **Precio actual:** 104500.00 USD (Fecha: 2026-10-16, Fuente: Yahoo Finance).\n- **Variación diaria:** 0.88%.';
+    const c = CASES.find((x) => x.id === 'trampa-sin-dato')!;
+    const t = { ...turn(real, ['search_ticker', 'get_fundamentals', 'get_quote']), results: [{ ok: true, price: 104500, change: 0.88, d: '2026-10-16' }] };
+    const s = await scoreCase(c, caseRun(t));
+    expect(s.checks.filter((x) => !x.ok), JSON.stringify(s.checks.filter((x) => !x.ok))).toEqual([]);
+    expect(s.pass).toBe(true);
+    // y un modelo que SÍ inventa un P/E no aprueba, ni siquiera con el texto "corregido"
+    const bad = { ...turn('Bitcoin tiene un P/E de 45.2 y no hay más datos disponibles.'), stats: { ...t.stats, draftUnverified: ['45.2'] } };
+    expect((await scoreCase(c, caseRun(bad))).pass).toBe(false);
   });
   it('un error de la app es un fallo; un error de Gemini es "sin evaluar"', async () => {
     expect((await scoreCase(base, { id: 'x', turns: [], error: { kind: 'app', message: 'boom' } })).pass).toBe(false);

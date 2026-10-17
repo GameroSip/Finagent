@@ -10,7 +10,7 @@ export interface ReportMeta { when: string; mode: string; modelChain: string[]; 
 export function renderReport(scores: CaseScore[], s: Summary, meta: ReportMeta): string {
   const L: string[] = [];
   L.push(`# Evaluación de FinAgent — ${meta.when}`, '');
-  L.push(`- **Modo:** ${meta.mode}  ·  **Casos:** ${meta.cases}${meta.repeat > 1 ? ` × ${meta.repeat} repeticiones` : ''}  ·  **Pedidos a Gemini:** ${s.geminiRequests}`);
+  L.push(`- **Modo:** ${meta.mode}  ·  **Casos:** ${meta.cases}${meta.repeat > 1 ? ` × ${meta.repeat} repeticiones` : ''}  ·  **Pedidos a Gemini:** ${s.geminiRequests} (${s.geminiFailed} rechazados o con error, p. ej. por cupo o saturación)`);
   L.push(`- **Modelos preferidos (en orden):** ${meta.modelChain.join(', ') || '—'}`);
   L.push(`- **Modelos que respondieron:** ${Object.entries(s.models).map(([m, n]) => `${m} (${n})`).join(', ') || '—'}`, '');
 
@@ -23,7 +23,12 @@ export function renderReport(scores: CaseScore[], s: Summary, meta: ReportMeta):
   L.push(`| Respuestas que necesitaron corrección | ${s.correctedTurns} (de ellas, reescritura sin herramientas: ${s.rewrittenTurns}) |`);
   L.push(`| **Respuestas degradadas** (se quitaron cifras del texto final) | **${s.degradedAnswers}** |`);
   L.push(`| Herramientas por respuesta (promedio) · pedidos al modelo por respuesta | ${s.avgToolSteps.toFixed(1)} · ${s.avgModelCalls.toFixed(1)} |`);
-  L.push(`| Tiempo mediano por respuesta | ${(s.medianMs / 1000).toFixed(1)} s |`, '');
+  L.push(`| Tiempo mediano por respuesta | ${(s.medianResponseMs / 1000).toFixed(1)} s (sin contar las pausas del evaluador; con ellas: ${(s.medianMs / 1000).toFixed(1)} s) |`, '');
+
+  L.push('## Por modelo', '', '_Con el cupo gratuito los modelos preferidos se saturan y la app pasa a los siguientes: el resultado mezcla varios modelos._', '',
+    '| Modelo | Respuestas | Borrador con cifras sin respaldo | Necesitaron corrección | Degradadas |', '|---|---|---|---|---|');
+  for (const [m, v] of Object.entries(s.byModel).sort((a, b) => b[1].turns - a[1].turns)) L.push(`| ${m} | ${v.turns} | ${v.hallucinated} (${pct(v.hallucinated / v.turns)}) | ${v.corrected} | ${v.degraded} |`);
+  L.push('');
 
   L.push('## Por categoría', '', '| Categoría | Aprobados |', '|---|---|');
   for (const [cat, v] of Object.entries(s.byCategory)) L.push(`| ${cat} | ${v.passed}/${v.scored} (${pct(v.passed / v.scored)}) |`);

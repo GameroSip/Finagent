@@ -1,5 +1,7 @@
 # Evaluación de FinAgent con Gemini real
 
+> Con pocas respuestas no se puede afirmar un porcentaje: 0 alucinaciones en 8 respuestas es compatible con una tasa real de hasta ~37%. La corrida completa (41 respuestas) ya da un número más útil, y `--repeat=2` o `3` lo afina.
+
 Mide **cómo se comporta el modelo de verdad**: si inventa cifras, si hace cuentas de cabeza, si predice precios o recomienda comprar, si
 admite cuando un dato no existe. Usa el **mismo agente que la app** y **datos de mercado congelados** (`frozen-data.ts`): un mercado de
 mentira, determinista, con valores **distintos de la realidad a propósito** (si el modelo contesta de memoria, se nota).
@@ -28,6 +30,7 @@ o copiá `evals/.env.example` a `evals/.env` y pegá la clave (ese archivo no se
 | `npm run eval -- --only=calc-upside,trampa-prediccion` | Casos puntuales |
 | `npm run eval -- --repeat=3` | Repite cada caso (el modelo no es determinista: así ves la variación) |
 | `npm run eval -- --rpm=5` | Más lento, si ves muchos errores de cupo |
+| `npm run eval -- --only-model=gemini-3.8-flash` | Evalúa **solo** ese modelo (sin saltar a otros si se satura; los casos que no puedan correr quedan "sin evaluar") |
 | `npm run eval:fake` | Modelo **falso** (no gasta cuota): sirve para probar el evaluador. `-- --fake=descuidado` simula un modelo que se porta mal |
 
 ## Cómo leer el reporte (`evals/reports/eval-*.md`)
@@ -36,6 +39,11 @@ o copiá `evals/.env.example` a `evals/.env` y pegá la clave (ese archivo no se
   el modelo escribe **antes** de que la app lo corrija: la métrica más honesta de qué tan seguido inventa.
 - **Respuestas degradadas**: la app no logró respaldar alguna cifra y la quitó del texto final. Si son muchas, hay que mejorar las instrucciones.
 - **Borradores con cifras sin respaldo**: la lista de lo que inventó. Es lo más útil para ajustar el prompt.
+
+## Un detalle importante del cupo gratuito
+Con el cupo gratuito, los modelos preferidos se saturan rápido y la app pasa sola a los siguientes (la misma lógica que en el teléfono). Por eso un
+reporte puede mezclar varios modelos: mirá la tabla **"Por modelo"**. Para comparar un modelo puntual usá `--only-model=...`.
+El tiempo que informa el reporte **no incluye** las pausas que el evaluador se impone para no saturar a Gemini.
 
 ## Qué NO mide
 - No comprueba que la *interpretación* sea correcta (p. ej. citar un número real pero atribuido a la empresa equivocada): solo que cada cifra venga de los datos.

@@ -63,8 +63,10 @@ async function main() {
       console.error(e instanceof GeminiError && e.kind === 'invalid_key' ? 'La clave de Gemini no es válida.' : `No pude consultar los modelos de Gemini: ${(e as Error).message}`);
       process.exit(2);
     }
+    const only = flag('only-model');
     const forced = flag('model') ?? process.env.EVAL_MODEL;
-    if (forced) models.chain = [forced, ...models.chain.filter((m) => m !== forced)];
+    if (only) models.chain = [only];                     // evalúa SOLO ese modelo (sin saltar a otros si se satura: aparecerán casos "sin evaluar")
+    else if (forced) models.chain = [forced, ...models.chain.filter((m) => m !== forced)];
   }
 
   const rpm = Number(flag('rpm') ?? process.env.EVAL_RPM ?? (fake ? 100000 : 8));

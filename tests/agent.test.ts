@@ -32,6 +32,13 @@ describe('selección automática de modelos', () => {
     expect(hits).toBe(2);
   });
 
+  it('descarta modelos que no son de chat (texto a voz, audio, imagen) aunque su nombre diga "preview"', async () => {
+    const names = ['gemini-3.2-flash', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-flash-preview-native-audio-dialog', 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-preview-09-2025'];
+    setHttp(async () => json(200, listing(names)));
+    const chain = await new ModelManager().discover('KEY', true);
+    expect(chain).toEqual(['gemini-3.2-flash', 'gemini-2.5-flash-preview-09-2025', 'gemini-flash-latest']);   // las versiones con fecha sí son de chat
+  });
+
   it('pagina el listado', async () => {
     const pages = [{ ...listing(['gemini-3.2-flash']), nextPageToken: 'p2' }, listing(['gemini-3.9-flash'])];
     let i = 0;

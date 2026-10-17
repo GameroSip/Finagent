@@ -58,7 +58,7 @@ function summary(sym: string) {
   return { quoteSummary: { error: null, result: [{
     financialData: { currentPrice: px, targetMeanPrice: f.target * (cedear ? px / priceOf(sym.replace('.BA', '')) : 1), numberOfAnalystOpinions: 38, freeCashflow: px * 1e8, returnOnEquity: f.roe, debtToEquity: f.de, profitMargins: 0.24, operatingMargins: 0.31, revenueGrowth: 0.08, financialCurrency: fin },
     quoteType: { longName: NAME[sym] ?? sym, exchange: 'NMS', quoteType: 'EQUITY' },
-    defaultKeyStatistics: { trailingEps: Number((px / f.pe).toFixed(4)), forwardEps: Number((px / f.fpe).toFixed(4)), priceToBook: 12.4, enterpriseToEbitda: 18.1, beta: 1.09, mostRecentQuarter: 1759190400 },
+    defaultKeyStatistics: { trailingEps: Number((px / f.pe).toFixed(4)), forwardEps: Number((px / f.fpe).toFixed(4)), priceToBook: 12.4, enterpriseToEbitda: 18.1, beta: 1.09, mostRecentQuarter: 1782777600 /* 30-jun-2026 */ },
     assetProfile: { sector: 'Technology', industry: 'Consumer Electronics', country: sym.endsWith('.BA') ? 'Argentina' : 'United States' },
     summaryDetail: { currency: cur, dividendRate: f.div, marketCap: px * 1.4e10, payoutRatio: 0.16, trailingPE: f.pe, forwardPE: f.fpe },
   }] } };

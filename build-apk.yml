@@ -31,6 +31,23 @@ jobs:
       - name: Compilar la web
         run: npm run build
 
+      # Informativo: abre la app en un Chromium real (tamaño de teléfono) con Gemini y los datos simulados, verifica que
+      # todo funcione y deja capturas de pantalla como descarga. Si falla, NO bloquea la compilación del APK.
+      - name: Pruebas en navegador real
+        continue-on-error: true
+        run: |
+          cd e2e
+          npm ci
+          node run.mjs ../dist ../e2e-shots
+
+      - name: Publicar capturas de la app
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-de-la-app
+          path: e2e-shots/
+          if-no-files-found: ignore
+
       - name: Generar proyecto Android
         run: |
           npx cap add android

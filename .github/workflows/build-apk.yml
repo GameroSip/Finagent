@@ -36,6 +36,10 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Ícono y pantalla de inicio
+        continue-on-error: true   # si fallara, el APK se compila igual con el ícono por defecto
+        run: npx capacitor-assets generate --android --assetPath assets
+
       - name: Aceptar licencias del SDK de Android
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 

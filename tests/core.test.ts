@@ -452,3 +452,30 @@ describe('verificador: números con muchos decimales', () => {
     expect(verifyAnswer('Potencial de 17.1%.', pool).ok).toBe(false);       // el error real que se vio en WarrenAI
   });
 });
+
+describe('verificador: signos (las cifras negativas correctas no deben marcarse)', () => {
+  const dd = [{ data: { max_drawdown_1y_pct: -3.21, ret: 5.5 } }];
+  it('un "-3.21%" respalda un dato negativo (antes se marcaba como inventado)', () => {
+    expect(verifyAnswer('Caída máxima del último año: -3.21%.', dd).ok).toBe(true);
+    expect(verifyAnswer('Caída máxima del último año: −3.21% (menos tipográfico).', dd).ok).toBe(true);
+    expect(verifyAnswer('Caída máxima del último año: –3,21 %.', dd).ok).toBe(true);
+  });
+  it('sin signo alcanza la magnitud, porque el sentido lo da la palabra', () => {
+    expect(verifyAnswer('Cayó como máximo 3.21% en el año.', dd).ok).toBe(true);
+    expect(verifyAnswer('Rindió 5.5%.', dd).ok).toBe(true);
+  });
+  it('pero un error de signo explícito sí se detecta', () => {
+    expect(verifyAnswer('Caída máxima: +3.21%.', dd).ok).toBe(false);
+    expect(verifyAnswer('Rendimiento: -5.5%.', dd).ok).toBe(false);
+    expect(verifyAnswer('Rendimiento: +5.5%.', dd).ok).toBe(true);
+  });
+  it('un rango con guion no se confunde con un signo', () => {
+    expect(verifyAnswer('Entre 5.5-7%.', [{ a: 5.5, b: 7 }]).ok).toBe(true);
+  });
+  it('al quitar una cifra negativa sin respaldo se va también el signo', () => {
+    const answer = 'Caída máxima: -3.99% en el año.';
+    const v = verifyAnswer(answer, dd);
+    expect(v.unverified.map((u) => u.text)).toEqual(['-3.99%']);
+    expect(redactUnverified(answer, v.unverified)).toBe('Caída máxima: [dato no verificado] en el año.');
+  });
+});

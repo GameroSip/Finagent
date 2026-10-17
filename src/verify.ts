@@ -60,9 +60,20 @@ export function collectNumbers(obj: unknown, pool: number[] = []): number[] {
   return pool;
 }
 
-function matches(x: number, d: number, scale: number, pct: boolean, pool: number[]): boolean {
+/**
+ * `sign`: el signo que el texto escribió explícitamente (-1 con "-", +1 con "+", 0 si no puso ninguno).
+ * Un "-3.21%" solo respalda un dato negativo (y "+3.21%" uno positivo); sin signo ("cayó 3.21%") alcanza con la magnitud,
+ * porque el sentido lo da la palabra. Así se detectan errores de signo sin marcar como falsos las cifras negativas.
+ */
+function matches(x: number, d: number, scale: number, pct: boolean, pool: number[], sign: number): boolean {
   const tol = 10 ** -d * scale + 1e-9;
-  for (const v of pool) for (const cand of pct ? [v, v * 100] : [v]) if (Math.abs(x - cand) <= tol) return true;
+  for (const v of pool) {
+    for (const cand of pct ? [v, v * 100] : [v]) {
+      if (sign < 0 && cand > 0) continue;
+      if (sign > 0 && cand < 0) continue;
+      if (Math.abs(x - Math.abs(cand)) <= tol) return true;
+    }
+  }
   return false;
 }
 
@@ -92,10 +103,15 @@ export function verifyAnswer(answer: string, toolResults: unknown[], extraText =
     }
     const scales = suf && !pct ? SCALE[suf] ?? [1] : [1];
     checked++;
-    const ok = cands.some(([v, d]) => scales.some((s) => matches(v * s, d, s, pct, pool)));
+    const idx = m.index ?? 0;
+    // Signo explícito pegado a la cifra ("-3.21%", "−3,2", "+1.5%"); un guion entre cifras ("5-7%") es un rango, no un signo.
+    const prev = idx > 0 ? text[idx - 1] : '';
+    const hasSign = '-−–+'.includes(prev) && prev !== '' && !/[\w)]/.test(idx > 1 ? text[idx - 2] : ' ');
+    const sign = hasSign ? (prev === '+' ? 1 : -1) : 0;
+    const ok = cands.some(([v, d]) => scales.some((s) => matches(v * s, d, s, pct, pool, sign)));
     if (!ok) {
-      const idx = m.index ?? 0;
-      unverified.push({ text: m[0].trim(), context: text.slice(Math.max(0, idx - 40), idx + m[0].length + 40).replace(/\n/g, ' '), start: idx, end: idx + m[0].length });
+      const start = hasSign ? idx - 1 : idx; // el signo viaja con la cifra (también al quitarla del texto)
+      unverified.push({ text: text.slice(start, idx + m[0].length).trim(), context: text.slice(Math.max(0, idx - 40), idx + m[0].length + 40).replace(/\n/g, ' '), start, end: idx + m[0].length });
     }
   }
   return { ok: unverified.length === 0, checked, unverified };

@@ -1,6 +1,6 @@
 {
   "name": "finagent-mobile",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "description": "FinAgent móvil: agente financiero que corre 100% en el teléfono (sin servidor).",

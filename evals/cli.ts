@@ -95,7 +95,9 @@ async function main() {
   const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
   console.log(`\n──────── RESULTADO (${((Date.now() - t0) / 1000).toFixed(0)} s) ────────`);
   console.log(`Casos aprobados:               ${summary.passed}/${summary.scored} (${pct(summary.passRate)})${summary.infraErrors ? `   [${summary.infraErrors} sin evaluar por errores de Gemini]` : ''}`);
-  console.log(`Alucinación del 1er borrador:  ${summary.draftHallucinatedTurns}/${summary.turns} respuestas (${pct(summary.draftHallucinationRate)})`);
+  console.log(`Cifras sin respaldo (1er borrador): ${summary.draftHallucinatedTurns}/${summary.turns} respuestas (${pct(summary.draftHallucinationRate)})  — no siempre son errores`);
+  console.log(`Cifras realmente inventadas:   ${summary.draftNumbersInvented} en ${summary.inventedTurns}/${summary.turns} respuestas (${pct(summary.inventedRate)})`);
+  if (summary.geminiFailed) console.log(`Pedidos rechazados por Gemini: ${summary.geminiFailed} de ${summary.geminiRequests}`);
   console.log(`Respuestas degradadas:         ${summary.degradedAnswers}   (se quitaron cifras del texto final)`);
   for (const [k, v] of Object.entries(summary.byCategory)) console.log(`  ${k.padEnd(14)} ${v.passed}/${v.scored}`);
   console.log(`\nReporte: ${base}.md\n`);

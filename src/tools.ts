@@ -96,6 +96,8 @@ tool('get_quote', 60, async (a) => {
 });
 
 // ---------------------------------------------------------------- fundamentales
+const compactBig = (v: number) => { const a = Math.abs(v), s = v < 0 ? '-' : ''; return a >= 1e12 ? `${s}${(a / 1e12).toFixed(2)}T` : a >= 1e9 ? `${s}${(a / 1e9).toFixed(2)}B` : `${s}${(a / 1e6).toFixed(2)}M`; };
+
 export function metricsFromInfo(info: Args): { metrics: Record<string, any>; notes: string[] } {
   const m: Record<string, any> = {};
   const notes: string[] = [];
@@ -109,6 +111,7 @@ export function metricsFromInfo(info: Args): { metrics: Record<string, any>; not
     if (v === null) return;
     const e: Record<string, any> = { value: v, basis, formula };
     if (unit) e.unit = unit;
+    if (Math.abs(v) >= 1e6) e.display = `${compactBig(v)}${unit && unit !== '%' && unit !== 'x' ? ` ${unit}` : ''}`; // cifra legible (4.81T USD) para que el modelo no escriba 4808440000000
     if (inputs) e.inputs = Object.fromEntries(Object.entries(inputs).map(([k, x]) => [k, r(num(x))]));
     m[key] = e;
   };

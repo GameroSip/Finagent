@@ -496,3 +496,52 @@ describe('verificador: la "M" de los horizontes (1M, 3M, 6M) no es "millones"', 
     expect(verifyAnswer('El volumen fue 20M.', [{ vol: 20_000_000 }]).ok).toBe(true);
   });
 });
+
+describe('verificador: fechas y horas en cualquier formato (falsos positivos que vimos con Gemini real)', () => {
+  const sinCifras = (s: string) => verifyAnswer(s, [{ price: 343.46 }]).unverified.map((u) => u.text);
+  it.each([
+    'al 2026-10-16', 'el 16 de octubre de 2026', '16-10-2026', '16/10/2026', '16.10.2026', 'el 16/10', '16 oct 2026', '16 de oct. de 2026',
+    'octubre 16, 2026', 'October 16, 2026', 'Oct 16', '16/oct/2026', '16-oct-2026', 'del 5 may al 9 jun',
+    'cierre a las 20:00 UTC', '20:00 UTC', 'a las 20:00', 'a las 20', 'cierre de las 20h', '20 hs', '20:00:05',
+  ])('no confunde "%s" con una cifra de dato', (s) => expect(sinCifras(`Precio 343.46 (${s}).`)).toEqual([]));
+  it('pero las cifras de verdad se siguen controlando', () => {
+    expect(sinCifras('El P/E es 16 y el ROE 20.')).toEqual(['16', '20']);
+    expect(sinCifras('El ratio del CEDEAR es 20:1 y también 1:20.')).toEqual(['20', '20']);       // una razón no es una hora: el 20 sigue siendo una cifra a respaldar
+    expect(sinCifras('Rindió 16.5% en 20 meses, con 5 may.')).toContain('16.5%');
+    expect(sinCifras('Subió 12 puntos y 3.5 veces el promedio.')).toEqual(['12', '3.5']);
+    expect(sinCifras('Hay 12 acciones y 3.5 veces el promedio.')).toEqual(['3.5']);               // "12 acciones" es una cantidad descriptiva, no un dato
+  });
+  it('las posiciones de redacción siguen siendo exactas con fechas en el texto', () => {
+    const answer = 'Al 16 oct 2026 a las 20:00 UTC rindió 99.9% (otra cifra: 7.77).';
+    const v = verifyAnswer(answer, [{ ok: 99.9 }]);
+    expect(v.unverified.map((u) => answer.slice(u.start, u.end))).toEqual(['7.77']);
+  });
+});
+
+describe('cifras grandes legibles (display)', () => {
+  it('las métricas grandes traen una versión corta que el modelo puede copiar y que el verificador acepta', () => {
+    const { metrics } = metricsFromInfo({ currentPrice: 343.46, marketCap: 4.80844e12, freeCashflow: 9.8e10, currency: 'USD', financialCurrency: 'USD', trailingEps: 10 });
+    expect(metrics.market_cap.display).toBe('4.81T USD');
+    expect(metrics.free_cashflow.display).toBe('98.00B USD');
+    expect(metrics.pe_ttm.display).toBeUndefined();                                       // las cifras chicas no llevan display
+    expect(verifyAnswer('El market cap es 4.81T USD y el flujo de caja 98B.', [{ metrics }]).ok).toBe(true);
+  });
+  it('el prompt exige responder en el idioma del usuario y no confirmar tickers obvios', async () => {
+    const { SYSTEM_PROMPT } = await import('../src/agent');
+    expect(SYSTEM_PROMPT).toMatch(/IDIOMA: respondé SIEMPRE en el idioma del último mensaje/);
+    expect(SYSTEM_PROMPT).toMatch(/no gastes una consulta en confirmarlo/);
+  });
+});
+
+describe('verificador: nombres de indicadores y listas de períodos (lo que marcó Gemini real en "¿compro NVDA?")', () => {
+  const flagged = (s: string) => verifyAnswer(s, [{ price: 187.69 }]).unverified.map((u) => u.text);
+  it.each([
+    'EMA 20, 50 y 200', 'EMA 50 y EMA 200', 'SMA(200)', 'medias móviles de 20, 50 y 200', 'media móvil exponencial de 50', 'RSI 14', 'RSI(14)', 'MACD 12/26',
+    'las medias de 20, 50 y 200 ruedas', 'de 20, 50 y 200 días',
+  ])('"%s" son parámetros, no datos', (s) => expect(flagged(`Precio 187.69 con ${s}.`)).toEqual([]));
+  it('pero un valor que se parezca a un parámetro sigue controlado', () => {
+    expect(flagged('El RSI 56 indica neutralidad.')).toEqual(['56']);          // "RSI 56" sería un dato, no un parámetro
+    expect(flagged('La EMA 77 está arriba.')).toEqual(['77']);                 // 77 no es un período convencional
+    expect(flagged('Subió 20 puntos.')).toEqual(['20']);
+  });
+});

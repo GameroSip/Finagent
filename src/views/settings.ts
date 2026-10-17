@@ -12,7 +12,7 @@ import { icon } from '../ui/icons';
 import { logoSvg } from '../ui/logo';
 import { confirmSheet, openSheet } from '../ui/sheet';
 
-const VERSION = '0.3.4';
+const VERSION = '0.3.6';
 
 interface Probe { name: string; run: () => Promise<unknown> }
 

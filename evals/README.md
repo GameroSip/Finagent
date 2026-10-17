@@ -35,8 +35,10 @@ o copiá `evals/.env.example` a `evals/.env` y pegá la clave (ese archivo no se
 
 ## Cómo leer el reporte (`evals/reports/eval-*.md`)
 - **Casos aprobados**: la respuesta que ve el usuario cumple todo (datos correctos, herramientas, sin recomendaciones ni predicciones…).
-- **Índice de alucinación del borrador**: % de respuestas cuyo *primer* borrador tenía cifras que no salían de las herramientas. Es lo que
-  el modelo escribe **antes** de que la app lo corrija: la métrica más honesta de qué tan seguido inventa.
+- **Cifras sin respaldo en el primer borrador**: respuestas cuyo *primer* borrador tenía cifras que no salían de las herramientas. **No siempre son
+  errores**: una resta correcta hecha de cabeza también cuenta, y la app la hace respaldar con la calculadora. Por eso el reporte las separa:
+  las que **luego se respaldaron** (eran correctas) y las **realmente inventadas** (nunca tuvieron respaldo). Esta última es la que mide alucinación.
+- **Rechazos de Gemini**: qué respondió Gemini cuando no atendió un pedido (cupo por minuto o por día, saturación) y cuánto pidió esperar.
 - **Respuestas degradadas**: la app no logró respaldar alguna cifra y la quitó del texto final. Si son muchas, hay que mejorar las instrucciones.
 - **Borradores con cifras sin respaldo**: la lista de lo que inventó. Es lo más útil para ajustar el prompt.
 

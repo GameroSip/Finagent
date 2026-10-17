@@ -18,8 +18,9 @@ export function renderReport(scores: CaseScore[], s: Summary, meta: ReportMeta):
   L.push(`| Casos aprobados | **${s.passed}/${s.scored}** (${pct(s.passRate)}) |`);
   if (s.infraErrors) L.push(`| Casos sin evaluar por errores de Gemini (cupo, saturación) | ${s.infraErrors} |`);
   if (s.softObservations) L.push(`| Observaciones de conducta (no cuentan) | ${s.softPassed}/${s.softObservations} esperadas |`);
-  L.push(`| **Índice de alucinación del borrador** (respuestas cuyo primer borrador tenía cifras sin respaldo) | **${s.draftHallucinatedTurns}/${s.turns}** (${pct(s.draftHallucinationRate)}) |`);
-  L.push(`| Cifras sin respaldo por respuesta (promedio, primer borrador) | ${s.avgDraftUnverified.toFixed(2)} |`);
+  L.push(`| Respuestas con cifras **sin respaldo** en el primer borrador (no necesariamente erróneas) | ${s.draftHallucinatedTurns}/${s.turns} (${pct(s.draftHallucinationRate)}) |`);
+  L.push(`| …de esas cifras, las que luego **se respaldaron con una herramienta** (eran correctas: faltaba trazarlas) | ${s.draftNumbersBacked} de ${s.draftNumbers} |`);
+  L.push(`| **Cifras realmente inventadas** (sin respaldo ni después de corregir) | **${s.draftNumbersInvented}** en **${s.inventedTurns}/${s.turns}** respuestas (${pct(s.inventedRate)}) |`);
   L.push(`| Respuestas que necesitaron corrección | ${s.correctedTurns} (de ellas, reescritura sin herramientas: ${s.rewrittenTurns}) |`);
   L.push(`| **Respuestas degradadas** (se quitaron cifras del texto final) | **${s.degradedAnswers}** |`);
   L.push(`| Herramientas por respuesta (promedio) · pedidos al modelo por respuesta | ${s.avgToolSteps.toFixed(1)} · ${s.avgModelCalls.toFixed(1)} |`);
@@ -50,10 +51,19 @@ export function renderReport(scores: CaseScore[], s: Summary, meta: ReportMeta):
   }
 
   const halluc = scores.filter((x) => !x.infra).flatMap((x) => x.run.turns.map((t, i) => ({ id: x.id, i, t }))).filter(({ t }) => t.stats.draftUnverified.length);
-  L.push(`## Borradores con cifras sin respaldo (${halluc.length})`, '', '_Lo que el modelo escribió antes de que la app lo corrigiera. Es la materia prima para mejorar las instrucciones._', '');
-  for (const { id, t } of halluc.slice(0, 40)) L.push(`- **${id}** — cifras: \`${t.stats.draftUnverified.join('`, `')}\` · ${t.stats.corrected ? (t.redacted ? 'quedó degradada' : 'se corrigió') : 'sin corrección'} · «${clip(t.question, 70)}»`);
+  L.push(`## Borradores con cifras sin respaldo (${halluc.length})`, '', '_Lo que el modelo escribió antes de que la app lo corrigiera. ✔ = luego se respaldó con una herramienta (era correcta); ✘ = nunca tuvo respaldo (inventada)._', '');
+  for (const { id, t } of halluc.slice(0, 40)) {
+    const tags = [...t.draftBacked.map((x) => `✔ \`${x}\``), ...t.draftInvented.map((x) => `✘ \`${x}\``)].join(' ');
+    L.push(`- **${id}** — ${tags} · ${t.stats.corrected ? (t.redacted ? 'quedó degradada' : 'se corrigió') : 'sin corrección'} · «${clip(t.question, 70)}»`);
+  }
   L.push('');
 
+  if (s.rejections.length) {
+    L.push('## Rechazos de Gemini', '', '_Qué respondió Gemini cuando no atendió un pedido. Sirve para ajustar cuánto espera la app antes de cambiar de modelo._', '',
+      '| Estado | Modelo | Veces | Tipo de cupo | Espera que pidió | Mensaje |', '|---|---|---|---|---|---|');
+    for (const r of s.rejections.slice(0, 12)) L.push(`| ${r.status || 'red'} | ${r.model} | ${r.count} | ${r.quota || '—'} | ${r.retryAfterS !== undefined ? `${r.retryAfterS} s` : '—'} | ${esc(clip(r.sample, 110))} |`);
+    L.push('');
+  }
   const warn = scores.filter((x) => x.warnings.length);
   if (warn.length) { L.push('## Avisos', '', ...warn.flatMap((x) => x.warnings.map((w) => `- ${x.id}: ${w}`)), ''); }
   const infra = scores.filter((x) => x.infra);

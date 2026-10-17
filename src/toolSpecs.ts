@@ -26,7 +26,7 @@ export const DECLARATIONS: any[] = [
   },
   {
     name: 'get_technicals',
-    description: "Análisis técnico calculado sobre precios reales: RSI14, MACD(12,26,9), EMA 20/50/200, Bandas de Bollinger, ATR14, máximo/mínimo del período, distancia a la EMA200 y señales descriptivas. La app muestra el gráfico automáticamente. period: '6mo','1y','2y','5y'. interval: '1d' o '1wk'. Para EMA200 se necesitan al menos 200 barras.",
+    description: "Análisis técnico calculado sobre precios reales: RSI14, MACD(12,26,9), EMA 20/50/200, Bandas de Bollinger, ATR14, máximo/mínimo del período, distancia a la EMA200 y señales descriptivas. La app muestra el gráfico automáticamente. period: '6mo','1y','2y','5y' (por defecto '1y'). interval: '1d' o '1wk'. Para tener la EMA200 usá period '1y' o más (con '6mo' o menos NO se puede calcular: faltan barras); salvo que el usuario pida un plazo corto, usá '1y'.",
     parameters: obj({ ticker: S, period: S, interval: S }, ['ticker']),
   },
   {

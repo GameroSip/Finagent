@@ -2,7 +2,29 @@
 // Detecta números que el modelo pudo inventar o recordar de memoria; no prueba que la interpretación sea correcta.
 
 const MONTHS = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre';
+// Meses completos y abreviados, en español e inglés (los modelos escriben "16 oct 2026", "Oct 16", "October 16, 2026"...).
+const MONTHS_ANY = `${MONTHS}|january|february|march|april|june|july|august|september|october|november|december|ene|feb|mar|abr|may|jun|jul|ago|sept?|set|oct|nov|dic|jan|apr|aug|dec`;
+// Los meses fáciles de confundir con palabras ("mar", "may", "set", "sep") solo cuentan como mes si el día va ANTES ("5 may"), no después.
+const MONTHS_SAFE = `${MONTHS}|january|february|march|april|june|july|august|september|october|november|december|ene|feb|abr|jun|jul|ago|oct|nov|dic|jan|apr|aug|dec`;
+// Parámetros CONVENCIONALES de indicadores ("EMA 20, 50 y 200", "RSI 14", "medias móviles de 50 y 200"): son nombres, no datos.
+// Solo valores típicos: un "RSI 56" (que sería un dato) no entra en esta lista y se sigue controlando.
+const MA_PARAMS = '5|9|10|12|20|21|26|30|50|100|150|200';
 const STRIP: RegExp[] = [
+  new RegExp(`\\b(?:EMA|SMA|WMA|MA|MM)\\s?\\(?(?:${MA_PARAMS})\\)?(?:\\s*(?:,|/|y|e)\\s*(?:${MA_PARAMS})\\b)*`, 'g'),
+  /\b(?:RSI|ATR|ADX|CCI|MFI|MACD)\s?\(?(?:7|9|12|14|20|21|25|26)\)?(?:\s*[/,]\s*(?:7|9|12|14|20|21|25|26)\b)*/g,
+  new RegExp(`\\bmedias?\\s+m[óo]vil(?:es)?(?:\\s+(?:exponencial(?:es)?|simples?))?\\s+de\\s+(?:${MA_PARAMS})(?:\\s*(?:,|y|e)\\s*(?:${MA_PARAMS})\\b)*`, 'gi'),
+  // fechas con día y mes abreviado o completo: "16 oct 2026", "16 de oct. de 2026", "16-oct-2026", "16/oct/2026"
+  new RegExp(`\\b\\d{1,2}(?:\\s+de\\s+|\\s+|-|/)(?:${MONTHS_ANY})\\b\\.?(?:(?:\\s+de\\s+|\\s+|-|/|,\\s*)\\d{2,4}\\b)?`, 'gi'),
+  // "octubre 16, 2026", "Oct 16"
+  new RegExp(`\\b(?:${MONTHS_SAFE})\\b\\.?\\s+\\d{1,2}\\b(?:,?\\s+\\d{4}\\b)?`, 'gi'),
+  // "16-10-2026", "16.10.2026" y "al 16/10"
+  /\b\d{1,2}[-.]\d{1,2}[-.]\d{2,4}\b/g,
+  /\b(?:al|el|del|desde|hasta)\s+\d{1,2}\/\d{1,2}\b/gi,
+  // horas: "20:00 UTC", "20:00:05", "a las 20:00", "20 hs", "20h", "a las 20"
+  /\b\d{1,2}:\d{2}:\d{2}\b/g,
+  /\b\d{1,2}:\d{2}\s?(?:UTC|GMT|ART|hs?\b|h\b|horas\b|am\b|pm\b|a\.m\.|p\.m\.)/gi,
+  /\b(?:a\s+las|las|hora|cierre\s+de\s+las)\s+\d{1,2}(?::\d{2})?\b/gi,
+  /\b\d{1,2}\s?(?:hs|horas|h)\b/gi,
   /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?/g,
   /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
   new RegExp(`\\b\\d{1,2}\\s+de\\s+(?:${MONTHS})(?:\\s+de\\s+\\d{4})?`, 'gi'),
@@ -21,7 +43,8 @@ const SCALE: Record<string, number[]> = {
 const stripNoise = (t: string) => STRIP.reduce((acc, p) => acc.replace(p, (m) => ' '.repeat(m.length)), t);
 
 // "últimos 30 días", "200 ruedas", "52 semanas": cantidades descriptivas, no datos financieros que haya que respaldar.
-const UNIT_AFTER = /^\s+(?:d[ií]as?|semanas?|mes(?:es)?|años?|ruedas?|sesiones?|per[ií]odos?|velas?|barras?|trimestres?|horas?|minutos?|empresas?|activos?|acciones|pasos?)\b/i;
+// Admite listas: en "20, 50 y 200 ruedas" la unidad va solo al final y vale para todas las cantidades.
+const UNIT_AFTER = /^(?:\s*(?:,|y|e|o|\/)\s*\d{1,4}\b)*\s+(?:d[ií]as?|semanas?|mes(?:es)?|años?|ruedas?|sesiones?|per[ií]odos?|velas?|barras?|trimestres?|horas?|minutos?|empresas?|activos?|acciones|pasos?)\b/i;
 const numRe = () => new RegExp(NUM_SRC, 'g');
 
 /** Interpretaciones posibles [valor, decimales] (1.234 puede ser miles o decimal). */
@@ -106,7 +129,7 @@ export function scanNumbers(answer: string): NumToken[] {
     if (!suf) {
       const [v0, d0] = cands[0];
       if (d0 === 0 && cands.length === 1 && (v0 <= 10 || (v0 >= 1900 && v0 <= 2100))) skip = true; // ruido
-      const after = text.slice(idx + m[0].length, idx + m[0].length + 24);
+      const after = text.slice(idx + m[0].length, idx + m[0].length + 48);
       if (d0 === 0 && cands.length === 1 && v0 >= 11 && v0 <= 1000 && UNIT_AFTER.test(after)) skip = true; // cantidad descriptiva
     }
     // Signo explícito pegado a la cifra ("-3.21%", "−3,2", "+1.5%"); un guion entre cifras ("5-7%") es un rango, no un signo.

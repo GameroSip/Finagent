@@ -54,7 +54,7 @@ describe('evaluador con el Gemini falso', () => {
   it('genera un reporte legible con las secciones clave', async () => {
     const { summary, scores } = await run(CASES.slice(0, 8), fakeGemini('descuidado'));
     const md = renderReport(scores, summary, { when: 'hoy', mode: 'prueba', modelChain: ['x'], cases: 8, repeat: 1 });
-    for (const h of ['# Evaluación de FinAgent', '## Resultado general', 'Índice de alucinación del borrador', '## Por categoría', '## Por modelo', 'rechazados o con error', '## Borradores con cifras sin respaldo', '## Detalle de todas las respuestas']) expect(md).toContain(h);
+    for (const h of ['# Evaluación de FinAgent', '## Resultado general', 'Cifras realmente inventadas', '## Por categoría', '## Por modelo', 'rechazados o con error', '## Borradores con cifras sin respaldo', '## Detalle de todas las respuestas']) expect(md).toContain(h);
   });
 });
 
@@ -79,7 +79,7 @@ describe('errores de infraestructura', () => {
 });
 
 describe('puntuación', () => {
-  const turn = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, waitedMs: 0, tools, toolOk: tools.map(() => true), results: [{ ok: true, nums: [-8.64, 63.4, 63.9, 63.55, 70, 9.1, 12.5, 343.46] }], // los números que las respuestas de estos tests pueden citar
+  const turn = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, waitedMs: 0, draftBacked: [], draftInvented: [], tools, toolOk: tools.map(() => true), results: [{ ok: true, nums: [-8.64, 63.4, 63.9, 63.55, 70, 9.1, 12.5, 343.46] }], // los números que las respuestas de estos tests pueden citar
     stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], corrected: false, rewritten: false }, redacted: 0, truncated: false });
   const caseRun = (...turns: TurnRun[]): CaseRun => ({ id: 'x', turns });
   const base: EvalCase = { id: 'x', category: 'datos', turns: ['q'] };
@@ -137,5 +137,82 @@ describe('puntuación', () => {
     expect(r.turns).toHaveLength(3);
     expect(r.turns[2].answer).toMatch(/71\.4/);
     expect(r.turns[2].redacted).toBe(0);
+  });
+});
+
+describe('datos congelados: coherencia (lo que descubrió la corrida con Gemini real)', () => {
+  const closes = (range: string, interval = '1d') => JSON.parse(frozenHttp({ url: `https://query2.finance.yahoo.com/v8/finance/chart/NVDA?range=${range}&interval=${interval}` }).text).chart.result[0].indicators.quote[0].close as number[];
+  it('cada rango es un tramo de la MISMA historia (el año es el final de los 2 años)', () => {
+    const y2 = closes('2y'), y1 = closes('1y'), m6 = closes('6mo');
+    expect(y1).toEqual(y2.slice(-252));
+    expect(m6).toEqual(y1.slice(-126));
+    expect(y2.length).toBe(504);
+  });
+  it('el RSI no depende del período que elija el modelo (antes variaba de 44 a 73 con los mismos datos)', async () => {
+    setHttp(async (r) => frozenHttp(r));
+    const { callTool, clearCache } = await import('../src/tools');
+    const rsi: number[] = [];
+    for (const p of ['6mo', '1y', '2y', '5y']) { clearCache(); rsi.push((await callTool('get_technicals', { ticker: 'NVDA', period: p })).data.rsi14); }
+    expect(Math.max(...rsi) - Math.min(...rsi)).toBeLessThan(0.3);
+  });
+  it('la búsqueda por nombre es aproximada, pero un activo desconocido sigue sin existir', async () => {
+    setHttp(async (r) => frozenHttp(r));
+    const { callTool } = await import('../src/tools');
+    expect((await callTool('search_ticker', { query: 'MercadoLibre' })).data.candidates[0].symbol).toBe('MELI');
+    expect((await callTool('search_ticker', { query: 'PepsiCo' })).data.candidates[0].symbol).toBe('PEP');
+    expect((await callTool('search_ticker', { query: 'Tesla' })).ok).toBe(false);
+  });
+});
+
+describe('cifras sin respaldo ≠ cifras inventadas (lo que mostró el caso "80% vs 50.87%")', () => {
+  const reply = (parts: unknown[]) => ({ status: 200, headers: {}, text: JSON.stringify({ candidates: [{ content: { role: 'model', parts } }] }) });
+  const lastText = (b: any) => String(b.contents.at(-1)?.parts?.map((p: any) => p.text ?? '').join(''));
+  const diffCase = CASES.find((c) => c.id === 'calc-diferencia-pe')!;
+
+  it('una cuenta correcta hecha de cabeza se clasifica como "respaldada después", no como inventada', async () => {
+    let step = 0;
+    const gem = async (req: any) => {
+      step++;
+      if (step === 1) return reply([{ functionCall: { name: 'get_fundamentals', args: { ticker: 'PEP' } } }, { functionCall: { name: 'get_fundamentals', args: { ticker: 'KO' } } }]);
+      if (step === 2) return reply([{ text: 'El P/E de PEP es 21.63% más barato que el de KO.' }]);          // cuenta correcta, pero de cabeza
+      if (step === 3 && lastText(req.body).startsWith('Verificación automática')) return reply([{ functionCall: { name: 'calculate', args: { expression: '(19.1999 / 24.4999 - 1) * 100' } } }]);
+      return reply([{ text: 'El P/E de PEP es 21.63% más barato que el de KO (cálculo con la calculadora).' }]);
+    };
+    setHttp(makeNet(gem, 1e6).http);
+    const run = await runCase(diffCase, models(), 'k');
+    const t = run.turns[0];
+    expect(t.stats.draftUnverified).toEqual(['21.63%']);
+    expect(t.draftBacked).toEqual(['21.63%']);          // después se respaldó: era correcta
+    expect(t.draftInvented).toEqual([]);                // no es una alucinación
+    expect(t.stats.corrected).toBe(true);
+  });
+
+  it('una cifra que nunca se respalda sí cuenta como inventada', async () => {
+    const { summary } = await run([CASES.find((c) => c.id === 'trampa-sin-dato')!], fakeGemini('descuidado'));
+    expect(summary.draftNumbersInvented).toBeGreaterThan(0);
+    expect(summary.inventedRate).toBeGreaterThan(0);
+  });
+  it('el modelo que se porta bien no inventa ni deja cifras sin trazar', async () => {
+    const { summary } = await run(CASES, fakeGemini('bueno'));
+    expect(summary.draftNumbersInvented).toBe(0);
+    expect(summary.draftNumbers).toBe(0);
+  });
+});
+
+describe('registro de rechazos de Gemini', () => {
+  it('guarda qué respondió Gemini (estado, modelo, tipo de cupo y espera) para poder ajustar con datos reales', async () => {
+    let n = 0;
+    const gem = async () => (n++ < 2
+      ? { status: 429, headers: {}, text: JSON.stringify({ error: { message: 'You exceeded your current quota', details: [{ violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' }] }, { retryDelay: '30s' }] } }) }
+      : { status: 200, headers: {}, text: JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: 'No tengo ese dato disponible.' }] } }] }) });
+    const m = new ModelManager(); m.chain = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash-lite'];
+    const { summary, scores } = await runEval({ cases: [CASES.find((c) => c.id === 'trampa-memoria')!], gemini: gem, models: m, apiKey: 'k', rpm: 1e6 });
+    expect(summary.geminiFailed).toBe(2);
+    expect(summary.rejections.map((r) => [r.status, r.model, r.count])).toEqual(expect.arrayContaining([[429, 'gemini-3.8-flash', 1], [429, 'gemini-3.7-flash', 1]]));
+    expect(summary.rejections[0]).toMatchObject({ quota: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', retryAfterS: 30 });
+    const md = renderReport(scores, summary, { when: 'hoy', mode: 'prueba', modelChain: m.chain, cases: 1, repeat: 1 });
+    expect(md).toContain('## Rechazos de Gemini');
+    expect(md).toContain('GenerateRequestsPerMinutePerProjectPerModel-FreeTier');
+    expect(md).toContain('Cifras realmente inventadas');
   });
 });

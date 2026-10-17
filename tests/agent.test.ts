@@ -252,3 +252,75 @@ describe('el usuario nunca ve una cifra sin respaldo', () => {
     expect(res.corrected).toBe(false);
   });
 });
+
+// ------------------------------------------------------------------ cupo agotado (429): sin reintentos inútiles y respetando a Gemini
+import { parseQuota } from '../src/models';
+const quota429 = (retryDelay?: string, quotaId = 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', message = 'You exceeded your current quota'): HttpResult =>
+  json(429, { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message, details: [
+    { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId }] },
+    ...(retryDelay ? [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay }] : []) ] } });
+
+describe('cupo agotado (429)', () => {
+  it('lee lo que informa Gemini', () => {
+    expect(parseQuota(JSON.stringify({ error: { details: [{ retryDelay: '28.5s' }] } }))).toEqual({ retryAfterMs: 28500, daily: false });
+    expect(parseQuota(quota429('45s').text)).toEqual({ retryAfterMs: 45000, daily: false });
+    expect(parseQuota('{"error":{"details":[{"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}').daily).toBe(true);
+    expect(parseQuota('Quota exceeded. Please retry in 12.5s.')).toEqual({ retryAfterMs: 12500, daily: false });
+    expect(parseQuota('algo que no se reconoce')).toEqual({ retryAfterMs: undefined, daily: false });
+    expect(parseQuota('')).toEqual({ retryAfterMs: undefined, daily: false });
+  });
+
+  it('pasa de inmediato al siguiente modelo (sin reintentar el mismo) y espera lo que pidió Gemini', async () => {
+    let t = 1_000_000;
+    const calls = mockGemini((m) => (m === 'A' ? { ...quota429('45s') } : text('Listo.')));
+    const { agent, models } = agentWith(['A', 'B']);
+    models.now = () => t;
+    expect((await agent.ask('hola')).answer).toBe('Listo.');
+    expect(calls.filter((c) => c.model === 'A')).toHaveLength(1);        // antes: 3 pedidos rechazados seguidos
+    expect(models.pick()).toBe('B');
+    t += 44_000; expect(models.pick()).toBe('B');                        // todavía no pasaron los 45 s
+    t += 2_000; expect(models.pick()).toBe('A');                         // ya se puede volver al mejor modelo (antes se esperaban 90 s fijos)
+  });
+
+  it('si Gemini pide esperar muy poco, espera y reintenta UNA vez el mismo modelo', async () => {
+    let n = 0;
+    const calls = mockGemini((m) => (m === 'A' && n++ === 0 ? quota429('0.1s') : text('Listo.')));
+    const { agent } = agentWith(['A', 'B']);
+    const res = await agent.ask('hola');
+    expect(res.answer).toBe('Listo.');
+    expect(calls.map((c) => c.model)).toEqual(['A', 'A']);
+  });
+
+  it('cupo DIARIO agotado: el modelo se aparta por horas', async () => {
+    let t = 1_000_000;
+    const calls = mockGemini((m) => (m === 'A' ? quota429('30s', 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') : text('Listo.')));
+    const { agent, models } = agentWith(['A', 'B']);
+    models.now = () => t;
+    await agent.ask('hola');
+    expect(calls.filter((c) => c.model === 'A')).toHaveLength(1);
+    t += 5 * 3600_000; expect(models.pick()).toBe('B');                  // 5 h después sigue apartado (aunque Gemini dijo "30 s")
+    t += 2 * 3600_000; expect(models.pick()).toBe('A');
+  });
+
+  it('si el aviso no trae detalles, usa el "retry in" del mensaje; si no trae nada, 90 s', async () => {
+    let t = 1_000_000;
+    mockGemini((m) => (m === 'A' ? err(429, 'Quota exceeded. Please retry in 12.5s.') : text('Listo.')));
+    const a = agentWith(['A', 'B']); a.models.now = () => t;
+    await a.agent.ask('hola');
+    t += 13_000; expect(a.models.pick()).toBe('A');
+
+    t = 1_000_000;
+    mockGemini((m) => (m === 'A' ? err(429, 'Resource exhausted') : text('Listo.')));
+    const b = agentWith(['A', 'B']); b.models.now = () => t;
+    await b.agent.ask('hola');
+    t += 89_000; expect(b.models.pick()).toBe('B');
+    t += 2_000; expect(b.models.pick()).toBe('A');
+  });
+
+  it('la saturación pasajera (503) se sigue reintentando', async () => {
+    const calls = mockGemini((m) => (m === 'A' ? err(503, 'The model is overloaded') : text('Listo.')));
+    const { agent } = agentWith(['A', 'B']);
+    await agent.ask('hola');
+    expect(calls.filter((c) => c.model === 'A')).toHaveLength(3);
+  });
+});

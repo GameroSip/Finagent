@@ -39,11 +39,21 @@ function series(sym: string, n: number, step: number) {
   const open = closes.map((c, i) => (i ? closes[i - 1] : c * 0.998));
   return { ts, open, close: closes, high: closes.map((c, i) => Math.max(c, open[i]) * (1 + r() * 0.006)), low: closes.map((c, i) => Math.min(c, open[i]) * (1 - r() * 0.006)), volume: closes.map(() => Math.round(1e6 + r() * 5e6)) };
 }
-const BARS: Record<string, [number, number]> = { '1d|5m': [78, 300], '5d|30m': [65, 1800], '1mo|1d': [22, 86400], '3mo|1d': [64, 86400], '6mo|1d': [126, 86400], '1y|1d': [252, 86400], '2y|1d': [504, 86400], '5y|1d': [1260, 86400], '5y|1wk': [260, 604800], '5d|1d': [5, 86400] };
+const INTRADAY: Record<string, [number, number]> = { '1d|5m': [78, 300], '5d|30m': [65, 1800] };
+const DAILY: Record<string, number> = { '5d': 5, '1mo': 22, '3mo': 64, '6mo': 126, '1y': 252, '2y': 504, '5y': 1260 };
+type Series = ReturnType<typeof series>;
+// UNA sola historia diaria por activo; cada rango es un tramo de la misma (como en la realidad: el año es el final de los 2 años).
+// Antes cada rango generaba una trayectoria distinta y los indicadores (RSI, EMA) variaban según el período que eligiera el modelo.
+const masters = new Map<string, Series>();
+const master = (sym: string) => { let m = masters.get(sym); if (!m) { m = series(sym, 1260, 86400); masters.set(sym, m); } return m; };
+const tail = (s: Series, n: number): Series => ({ ts: s.ts.slice(-n), open: s.open.slice(-n), close: s.close.slice(-n), high: s.high.slice(-n), low: s.low.slice(-n), volume: s.volume.slice(-n) });
+const weekly = (s: Series): Series => { const keep = (_: unknown, i: number) => (s.close.length - 1 - i) % 5 === 0; return { ts: s.ts.filter(keep), open: s.open.filter(keep), close: s.close.filter(keep), high: s.high.filter(keep), low: s.low.filter(keep), volume: s.volume.filter(keep) }; };
 
 function chart(sym: string, range: string, interval: string) {
-  const [n, step] = BARS[`${range}|${interval}`] ?? [126, 86400];
-  const s = series(sym, n, step), year = series(sym, 252, 86400).close, last = s.close.at(-1)!, prev = s.close.at(-2) ?? last;
+  const key = `${range}|${interval}`;
+  const s = key === '5y|1wk' ? weekly(master(sym)) : interval === '1d' && DAILY[range] ? tail(master(sym), DAILY[range])
+    : series(sym, ...(INTRADAY[key] ?? [126, 86400]));
+  const year = tail(master(sym), 252).close, last = s.close.at(-1)!, prev = s.close.at(-2) ?? last;
   return { chart: { error: null, result: [{ meta: { currency: currencyOf(sym), symbol: sym, shortName: NAME[sym] ?? sym, longName: NAME[sym] ?? sym, exchangeName: 'NMS', fullExchangeName: 'NasdaqGS',
     regularMarketTime: NOW, regularMarketPrice: last, chartPreviousClose: prev, previousClose: prev, fiftyTwoWeekHigh: Math.max(...year), fiftyTwoWeekLow: Math.min(...year), regularMarketVolume: 48_200_000 },
     timestamp: s.ts, indicators: { quote: [{ open: s.open, high: s.high, low: s.low, close: s.close, volume: s.volume }], adjclose: [{ adjclose: s.close }] } }] } };
@@ -69,10 +79,11 @@ const statements = (types: string[], sym: string) => ({ timeseries: { result: ty
   return { meta: { symbol: [sym], type: [t] }, timestamp: [1], [t]: [0, 1, 2, 3].map((i) => ({ asOfDate: `${2025 - i}-06-30`, reportedValue: { raw: Math.round(base * (1 - i * 0.08)) } })) };
 }) } });
 
-const SEARCH_NAMES: Record<string, string> = { apple: 'AAPL', nvidia: 'NVDA', microsoft: 'MSFT', 'coca-cola': 'KO', coca: 'KO', pepsi: 'PEP', 'mercado libre': 'MELI', galicia: 'GGAL', ypf: 'YPF', bitcoin: 'BTC-USD' };
+const SEARCH_NAMES: Record<string, string> = { apple: 'AAPL', nvidia: 'NVDA', microsoft: 'MSFT', 'coca-cola': 'KO', coca: 'KO', pepsi: 'PEP', 'mercado libre': 'MELI', mercadolibre: 'MELI', galicia: 'GGAL', ypf: 'YPF', bitcoin: 'BTC-USD' };
 function search(q: string) {
   const key = q.toLowerCase().trim();
-  const sym = SEARCH_NAMES[key] ?? (isKnown(q) ? q.toUpperCase() : null);
+  const hit = Object.entries(SEARCH_NAMES).find(([k]) => key.includes(k) || (key.length >= 4 && k.includes(key)));
+  const sym = hit?.[1] ?? (isKnown(q) ? q.toUpperCase() : null);
   return {
     quotes: sym ? [{ symbol: sym, longname: NAME[sym] ?? sym, exchDisp: 'NASDAQ', quoteType: 'EQUITY' }] : [],
     news: sym ? [{ title: `${sym}: analistas mantienen su visión tras los resultados`, publisher: 'Reuters', link: 'https://example.com/n1', providerPublishTime: NOW - 3600 }] : [],

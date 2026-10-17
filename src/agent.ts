@@ -1,7 +1,7 @@
 // Agente: Gemini decide qué herramientas llamar; el código las ejecuta; un verificador revisa las cifras.
 // Modelo y límites son AUTOMÁTICOS: no hay nada que configurar.
 import { http } from './http';
-import { API_ROOT, GeminiError, ModelManager, modelLabel } from './models';
+import { API_ROOT, DAILY_QUOTA_MS, GeminiError, ModelManager, modelLabel, parseQuota } from './models';
 import { callTool, ToolResult } from './tools';
 import { DECLARATIONS } from './toolSpecs';
 import { collectNumbers, redactUnverified, Verification, verifyAnswer } from './verify';
@@ -12,11 +12,12 @@ const MAX_TURNS = 10;          // turnos de contexto que se reenvían al modelo
 const MAX_KNOWN_NUMBERS = 3000; // cifras de herramientas que se recuerdan por chat para verificar respuestas siguientes
 
 export const SYSTEM_PROMPT = `Sos un analista financiero asistente dentro de una app móvil. El modelo interpreta y redacta; las HERRAMIENTAS son la única fuente de cifras.
+IDIOMA: respondé SIEMPRE en el idioma del último mensaje del usuario (si escribe en inglés, toda la respuesta va en inglés), aunque estas instrucciones estén en español.
 
 REGLAS DE DATOS
 1. NUNCA escribas una cifra (precio, ratio, porcentaje, fecha de resultados, objetivo) que no provenga de una herramienta en esta conversación. No uses memoria para números.
 2. Todo cálculo derivado (variaciones, diferencias, upside, promedios) se hace con \`calculate\`; rendimientos, volatilidad y caídas máximas salen de \`get_performance\`. No hagas aritmética de cabeza: los modelos de lenguaje se equivocan en las cuentas.
-3. Si el usuario nombra una empresa sin ticker, usá \`search_ticker\`. Convenciones Yahoo: acciones de EE.UU. 'AAPL'; BYMA (acciones locales y CEDEARs) con sufijo '.BA' (ej. 'GGAL.BA', 'AAPL.BA'); ADRs argentinos sin sufijo ('GGAL'); cripto 'BTC-USD'; índices '^GSPC'.
+3. Si conocés el ticker con certeza (Apple=AAPL, Microsoft=MSFT, NVIDIA=NVDA, Coca-Cola=KO, PepsiCo=PEP, MercadoLibre=MELI, Galicia=GGAL, YPF=YPF), usalo directo: no gastes una consulta en confirmarlo. Usá \`search_ticker\` solo si dudás, si la empresa es poco conocida o si hay varios tickers posibles (local, ADR, CEDEAR). Convenciones Yahoo: acciones de EE.UU. 'AAPL'; BYMA (acciones locales y CEDEARs) con sufijo '.BA' (ej. 'GGAL.BA', 'AAPL.BA'); ADRs argentinos sin sufijo ('GGAL'); cripto 'BTC-USD'; índices '^GSPC'.
 4. Escribí cada cifra EXACTAMENTE como la devolvió la herramienta: mismos decimales, nunca más precisión. Si no tenés una cifra, decí que no está disponible; jamás la estimes, la redondees por tu cuenta ni la recuerdes de memoria. La app descarta las cifras que no puede respaldar con datos.
 5. Elegí las herramientas mínimas necesarias; podés encadenar varias y llamar varias a la vez. Si falta información, pedila a otra herramienta o decí claramente que no está disponible. Si una herramienta falla, reportalo; no completes con suposiciones.
 6. Para "¿cómo está el mercado?" o "resumen del día": \`get_market_overview\` + \`get_headlines\` (y \`get_argentina_macro\` si el usuario es de Argentina o pregunta por activos locales). Para dólar, brecha, riesgo país o inflación: \`get_argentina_macro\`.
@@ -32,8 +33,8 @@ REGLAS DE RIGOR
 
 FORMATO
 - La app muestra gráficos y tarjetas automáticamente cuando consultás datos: no los describas punto por punto, interpretalos.
-- Respondé en el idioma del usuario, conciso y directo; títulos cortos y listas cuando ayuden.
-- Números: punto decimal, sin separador de miles (1234.56). Cifras grandes con sufijo: K, M (millones), B (mil millones, 10^9), T (10^12).
+- Conciso y directo; títulos cortos y listas cuando ayuden.
+- Números: punto decimal, sin separador de miles (1234.56). Cifras grandes con sufijo: K, M (millones), B (mil millones, 10^9), T (10^12); si la herramienta trae el campo \`display\` (p. ej. 4.81T USD), usalo tal cual. Nunca escribas un número de más de 9 dígitos sin sufijo.
 - No agregues avisos legales: la app ya los muestra.`;
 
 export interface ToolCallRecord { name: string; args: Record<string, any>; result: ToolResult; ui?: any }
@@ -154,7 +155,18 @@ export class FinancialAgent {
       let msg = res.text.slice(0, 300);
       try { msg = JSON.parse(res.text)?.error?.message ?? msg; } catch { /* texto plano */ }
       const err = new GeminiError(res.status, msg);
-      if (err.kind === 'busy' && attempt < 2) {
+      const quota = parseQuota(res.text);
+      err.retryAfterMs = quota.retryAfterMs; err.daily = quota.daily;
+      if (err.kind === 'busy' && res.status === 429) {
+        // Cupo agotado (por minuto o por día): volver a pedirle lo mismo al mismo modelo casi nunca sirve y solo suma pedidos rechazados.
+        // Solo si Gemini pide esperar muy poco se espera y se reintenta una vez; si no, se pasa de inmediato al siguiente modelo.
+        if (!quota.daily && quota.retryAfterMs !== undefined && quota.retryAfterMs <= 8000 && attempt < 1) {
+          hooks.onStatus?.('Cupo por minuto agotado; esperando unos segundos…');
+          await sleep(quota.retryAfterMs + 250); continue;
+        }
+        throw err;
+      }
+      if (err.kind === 'busy' && attempt < 2) { // saturación pasajera (503…): reintento con espera creciente
         hooks.onStatus?.('Mucha demanda; reintentando…');
         await sleep(delay); delay *= 2; continue;
       }
@@ -188,7 +200,11 @@ export class FinancialAgent {
         if (!(e instanceof GeminiError)) throw e;
         last = e;
         if (e.kind === 'unavailable') { this.o.models.markUnavailable(model); tried.add(model); continue; }
-        if (e.kind === 'busy') { this.o.models.markCooldown(model); tried.add(model); continue; }
+        if (e.kind === 'busy') {
+          if (e.daily) this.o.models.markUnavailable(model, DAILY_QUOTA_MS); // cupo diario agotado: no insistir en horas
+          else this.o.models.markCooldown(model, Math.min(Math.max(e.retryAfterMs ?? 90_000, 5_000), 15 * 60_000)); // lo que pidió Gemini (o 90 s)
+          tried.add(model); continue;
+        }
         throw e; // invalid_key / other
       }
     }

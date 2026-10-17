@@ -2,7 +2,7 @@
 // probar el evaluador) y datos de mercado congelados. Mide qué hace el modelo y puntúa con comprobaciones objetivas.
 import { FinancialAgent, GeminiError, type AskStats } from '../src/agent';
 import { setHttp, type HttpRequest, type HttpResult } from '../src/http';
-import type { ModelManager } from '../src/models';
+import { parseQuota, type ModelManager } from '../src/models';
 import { clearCache } from '../src/tools';
 import { scanNumbers, tokenMatchesValue, verifyAnswer } from '../src/verify';
 import type { Category, EvalCase, Fact } from './cases';
@@ -14,6 +14,10 @@ export interface TurnRun {
   waitedMs: number;        // tiempo que el propio evaluador esperó por el límite de pedidos (no es latencia del modelo)
   tools: string[]; toolOk: boolean[]; results: unknown[];
   stats: AskStats; redacted: number; truncated: boolean;
+  /** Cifras del primer borrador que no tenían respaldo pero que luego SÍ se respaldaron con una herramienta (eran correctas: faltaba trazarlas). */
+  draftBacked: string[];
+  /** Cifras del primer borrador que nunca llegaron a tener respaldo: las realmente inventadas. */
+  draftInvented: string[];
 }
 export interface CaseRun { id: string; turns: TurnRun[]; error?: { kind: 'infra' | 'app'; message: string } }
 export interface Check { name: string; ok: boolean; detail?: string }
@@ -22,17 +26,27 @@ export interface CaseScore { id: string; category: Category; soft: boolean; chec
 export class FatalEvalError extends Error {}
 
 // ------------------------------------------------------------------ red: datos congelados + Gemini (real o falso) con ritmo controlado
-export interface Net { http: (req: HttpRequest) => Promise<HttpResult>; geminiRequests: () => number; geminiFailed: () => number; waited: () => number }
+export interface Rejection { status: number; model: string; message: string; quota: string; retryAfterMs?: number }
+export interface Net { http: (req: HttpRequest) => Promise<HttpResult>; geminiRequests: () => number; geminiFailed: () => number; waited: () => number; rejections: () => Rejection[] }
 export function makeNet(gemini: (req: HttpRequest) => Promise<HttpResult>, rpm = 8): Net {
   const gap = 60_000 / Math.max(1, rpm);
   let next = 0, count = 0, failed = 0, waited = 0;
+  const rejections: Rejection[] = [];
+  const record = (req: HttpRequest, status: number, text: string) => {
+    const model = /models\/([^:/?]+)/.exec(req.url)?.[1] ?? '?';
+    let message = text.slice(0, 220), quota = '';
+    try { const j = JSON.parse(text); message = String(j?.error?.message ?? message).slice(0, 220); for (const d of j?.error?.details ?? []) for (const v of d?.violations ?? []) if (v?.quotaId) quota = String(v.quotaId); } catch { /* texto plano */ }
+    const q = parseQuota(text);
+    rejections.push({ status, model, message, quota: quota || (q.daily ? 'diario' : ''), retryAfterMs: q.retryAfterMs });
+  };
   const gate = async () => { const wait = Math.max(0, next - Date.now()); next = Math.max(next, Date.now()) + gap; if (wait) { waited += wait; await new Promise((r) => setTimeout(r, wait)); } };
   return {
-    geminiRequests: () => count, geminiFailed: () => failed, waited: () => waited,
+    geminiRequests: () => count, geminiFailed: () => failed, waited: () => waited, rejections: () => rejections,
     http: async (req) => {
       if (new URL(req.url).host === 'generativelanguage.googleapis.com') {
         await gate(); count++;
-        try { const res = await gemini(req); if (res.status < 200 || res.status >= 300) failed++; return res; } catch (e) { failed++; throw e; }
+        try { const res = await gemini(req); if (res.status < 200 || res.status >= 300) { failed++; record(req, res.status, res.text); } return res; }
+        catch (e: any) { failed++; record(req, 0, String(e?.message ?? e)); throw e; }
       }
       return frozenHttp(req);
     },
@@ -44,11 +58,14 @@ export async function runCase(c: EvalCase, models: ModelManager, apiKey: string,
   clearCache();
   const agent = new FinancialAgent({ apiKey, models, retryDelayMs: 1500 });
   const run: CaseRun = { id: c.id, turns: [] };
+  const seen: unknown[] = []; // todo lo que devolvieron las herramientas en la conversación (un seguimiento puede apoyarse en turnos anteriores)
   for (const q of c.turns) {
     const t0 = Date.now(), w0 = net?.waited() ?? 0;
     try {
       const r = await agent.ask(q);
-      run.turns.push({
+      seen.push(...r.toolCalls.map((x) => x.result));
+      const draftBacked = r.stats.draftUnverified.filter((tok) => verifyAnswer(tok, seen, q).ok);
+      run.turns.push({ draftBacked, draftInvented: r.stats.draftUnverified.filter((tok) => !draftBacked.includes(tok)),
         question: q, answer: r.answer, model: r.model, ms: Date.now() - t0, waitedMs: (net?.waited() ?? 0) - w0, tools: r.toolCalls.map((x) => x.name), toolOk: r.toolCalls.map((x) => !!x.result?.ok),
         results: r.toolCalls.map((x) => x.result), stats: r.stats, redacted: r.redacted, truncated: r.truncated,
       });
@@ -121,9 +138,11 @@ export interface Summary {
   avgToolSteps: number; avgModelCalls: number; medianMs: number; geminiRequests: number;
   failedChecks: Record<string, number>; models: Record<string, number>;
   geminiFailed: number; medianResponseMs: number;
+  draftNumbers: number; draftNumbersBacked: number; draftNumbersInvented: number; inventedTurns: number; inventedRate: number;
+  rejections: Array<{ status: number; model: string; quota: string; count: number; sample: string; retryAfterS?: number }>;
   byModel: Record<string, { turns: number; hallucinated: number; degraded: number; corrected: number }>;
 }
-export function summarize(scores: CaseScore[], geminiRequests: number, geminiFailed = 0): Summary {
+export function summarize(scores: CaseScore[], geminiRequests: number, geminiFailed = 0, rejected: Rejection[] = []): Summary {
   const infra = scores.filter((s) => s.infra);
   const ok = scores.filter((s) => !s.infra);
   const hard = ok.filter((s) => !s.soft), soft = ok.filter((s) => s.soft);
@@ -152,7 +171,21 @@ export function summarize(scores: CaseScore[], geminiRequests: number, geminiFai
     avgToolSteps: turns.length ? sum((t) => t.stats.toolSteps) / turns.length : 0, avgModelCalls: turns.length ? sum((t) => t.stats.modelCalls) / turns.length : 0,
     medianMs: ms.length ? ms[Math.floor(ms.length / 2)] : 0, geminiRequests, failedChecks: failed, models, geminiFailed, byModel,
     medianResponseMs: net.length ? net[Math.floor(net.length / 2)] : 0,
+    draftNumbers: sum((t) => t.draftBacked.length + t.draftInvented.length), draftNumbersBacked: sum((t) => t.draftBacked.length),
+    draftNumbersInvented: sum((t) => t.draftInvented.length), inventedTurns: turns.filter((t) => t.draftInvented.length > 0).length,
+    inventedRate: turns.length ? turns.filter((t) => t.draftInvented.length > 0).length / turns.length : 0,
+    rejections: groupRejections(rejected),
   };
+}
+
+function groupRejections(list: Rejection[]): Summary['rejections'] {
+  const g = new Map<string, Summary['rejections'][number]>();
+  for (const r of list) {
+    const k = `${r.status}|${r.model}|${r.quota}`;
+    const cur = g.get(k) ?? { status: r.status, model: r.model, quota: r.quota, count: 0, sample: r.message, retryAfterS: r.retryAfterMs !== undefined ? Math.round(r.retryAfterMs / 1000) : undefined };
+    cur.count++; g.set(k, cur);
+  }
+  return [...g.values()].sort((a, b) => b.count - a.count);
 }
 
 // ------------------------------------------------------------------ orquestación
@@ -178,5 +211,5 @@ export async function runEval(o: EvalOptions): Promise<{ scores: CaseScore[]; su
       }
     }
   } finally { setHttp(); }
-  return { scores, summary: summarize(scores, net.geminiRequests(), net.geminiFailed()) };
+  return { scores, summary: summarize(scores, net.geminiRequests(), net.geminiFailed(), net.rejections()) };
 }

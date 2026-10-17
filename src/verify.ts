@@ -83,6 +83,53 @@ export interface Verification {
   unverified: Array<{ text: string; context: string; start: number; end: number }>;
 }
 
+/** Una cifra encontrada en un texto, con todo lo necesario para compararla con datos. */
+export interface NumToken {
+  text: string; start: number; end: number;       // posición exacta en el texto original (incluye el signo si lo hay)
+  at: number; len: number;                        // posición del número en sí (sin signo)
+  cands: Array<[number, number]>;                 // interpretaciones posibles [valor, decimales] ("1.234" puede ser miles o decimal)
+  scales: number[]; pct: boolean;
+  sign: number;                                   // -1 / +1 si el texto lo escribió explícitamente, 0 si no
+  skip: boolean;                                  // ruido: enteros chicos, años, "30 días"…
+  label?: number;                                 // "6M" puede ser una etiqueta de período (6 meses) y no 6 millones: se acepta si ese número EXACTO está en los datos
+}
+
+/** Encuentra todas las cifras de un texto. Las posiciones coinciden con el texto original. */
+export function scanNumbers(answer: string): NumToken[] {
+  const text = stripNoise(answer || '');
+  const out: NumToken[] = [];
+  for (const m of text.matchAll(numRe())) {
+    const idx = m.index ?? 0, tok = m[1], suf = m[2];
+    const cands = parseToken(tok);
+    const pct = suf === '%';
+    let skip = false;
+    if (!suf) {
+      const [v0, d0] = cands[0];
+      if (d0 === 0 && cands.length === 1 && (v0 <= 10 || (v0 >= 1900 && v0 <= 2100))) skip = true; // ruido
+      const after = text.slice(idx + m[0].length, idx + m[0].length + 24);
+      if (d0 === 0 && cands.length === 1 && v0 >= 11 && v0 <= 1000 && UNIT_AFTER.test(after)) skip = true; // cantidad descriptiva
+    }
+    // Signo explícito pegado a la cifra ("-3.21%", "−3,2", "+1.5%"); un guion entre cifras ("5-7%") es un rango, no un signo.
+    const prev = idx > 0 ? text[idx - 1] : '';
+    const hasSign = prev !== '' && '-−–+'.includes(prev) && !/[\w)]/.test(idx > 1 ? text[idx - 2] : ' ');
+    const start = hasSign ? idx - 1 : idx; // el signo viaja con la cifra (también al quitarla del texto)
+    out.push({
+      text: text.slice(start, idx + m[0].length).trim(), start, end: idx + m[0].length, at: idx, len: m[0].length,
+      cands, scales: suf && !pct ? SCALE[suf] ?? [1] : [1], pct, sign: hasSign ? (prev === '+' ? 1 : -1) : 0, skip,
+      // "M" es ambigua: "6M" puede ser 6 millones o 6 meses (etiquetas de rendimiento: 1M, 3M, 6M, 12M).
+      ...(suf === 'M' && cands.length === 1 && cands[0][1] === 0 && cands[0][0] <= 24 ? { label: cands[0][0] } : {}),
+    });
+  }
+  return out;
+}
+
+/** ¿Esta cifra del texto corresponde al valor esperado, con el redondeo que mostró? (el signo explícito debe coincidir) */
+export function tokenMatchesValue(t: NumToken, expected: number): boolean {
+  if (t.sign < 0 && expected > 0) return false;
+  if (t.sign > 0 && expected < 0) return false;
+  return t.cands.some(([v, d]) => t.scales.some((s) => Math.abs(v * s - Math.abs(expected)) <= 10 ** -d * s + 1e-9));
+}
+
 export function verifyAnswer(answer: string, toolResults: unknown[], extraText = ''): Verification {
   const pool: number[] = [];
   toolResults.forEach((r) => collectNumbers(r, pool));
@@ -91,27 +138,13 @@ export function verifyAnswer(answer: string, toolResults: unknown[], extraText =
   const text = stripNoise(answer || '');
   const unverified: Verification['unverified'] = [];
   let checked = 0;
-  for (const m of text.matchAll(numRe())) {
-    const tok = m[1], suf = m[2];
-    const cands = parseToken(tok);
-    const pct = suf === '%';
-    if (!suf) {
-      const [v0, d0] = cands[0];
-      if (d0 === 0 && cands.length === 1 && (v0 <= 10 || (v0 >= 1900 && v0 <= 2100))) continue; // ruido
-      const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
-      if (d0 === 0 && cands.length === 1 && v0 >= 11 && v0 <= 1000 && UNIT_AFTER.test(after)) continue; // cantidad descriptiva
-    }
-    const scales = suf && !pct ? SCALE[suf] ?? [1] : [1];
+  for (const t of scanNumbers(answer)) {
+    if (t.skip) continue;
     checked++;
-    const idx = m.index ?? 0;
-    // Signo explícito pegado a la cifra ("-3.21%", "−3,2", "+1.5%"); un guion entre cifras ("5-7%") es un rango, no un signo.
-    const prev = idx > 0 ? text[idx - 1] : '';
-    const hasSign = '-−–+'.includes(prev) && prev !== '' && !/[\w)]/.test(idx > 1 ? text[idx - 2] : ' ');
-    const sign = hasSign ? (prev === '+' ? 1 : -1) : 0;
-    const ok = cands.some(([v, d]) => scales.some((s) => matches(v * s, d, s, pct, pool, sign)));
+    const ok = t.cands.some(([v, d]) => t.scales.some((s) => matches(v * s, d, s, t.pct, pool, t.sign)))
+      || (t.label !== undefined && pool.some((v) => Math.abs(v) === t.label)); // etiqueta de período: coincidencia exacta, sin la tolerancia de ±1 de los enteros
     if (!ok) {
-      const start = hasSign ? idx - 1 : idx; // el signo viaja con la cifra (también al quitarla del texto)
-      unverified.push({ text: text.slice(start, idx + m[0].length).trim(), context: text.slice(Math.max(0, idx - 40), idx + m[0].length + 40).replace(/\n/g, ' '), start, end: idx + m[0].length });
+      unverified.push({ text: t.text, context: text.slice(Math.max(0, t.at - 40), t.at + t.len + 40).replace(/\n/g, ' '), start: t.start, end: t.end });
     }
   }
   return { ok: unverified.length === 0, checked, unverified };

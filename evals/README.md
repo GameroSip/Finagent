@@ -1,0 +1,45 @@
+# Evaluación de FinAgent con Gemini real
+
+Mide **cómo se comporta el modelo de verdad**: si inventa cifras, si hace cuentas de cabeza, si predice precios o recomienda comprar, si
+admite cuando un dato no existe. Usa el **mismo agente que la app** y **datos de mercado congelados** (`frozen-data.ts`): un mercado de
+mentira, determinista, con valores **distintos de la realidad a propósito** (si el modelo contesta de memoria, se nota).
+
+## Cómo correrlo
+
+**Opción A — En GitHub, sin instalar nada (recomendada)**
+1. En tu repositorio: *Settings → Secrets and variables → Actions → New repository secret*. Nombre: `GEMINI_API_KEY`. Valor: tu clave.
+2. Pestaña *Actions → "Evaluación con Gemini real" → Run workflow*. Elegí "rápida" la primera vez.
+3. Al terminar, el reporte aparece en la propia página de la ejecución y como descarga (`reporte-evaluacion`).
+
+**Opción B — En tu PC** (Node 22 y `npm ci` hechos)
+```
+# Windows (PowerShell)
+$env:GEMINI_API_KEY="tu_clave"; npm run eval:smoke
+# Mac / Linux
+GEMINI_API_KEY=tu_clave npm run eval:smoke
+```
+o copiá `evals/.env.example` a `evals/.env` y pegá la clave (ese archivo no se sube a GitHub).
+
+| Comando | Qué hace |
+|---|---|
+| `npm run eval:smoke` | 6 casos, unos minutos. Para ver que todo funciona |
+| `npm run eval` | Los 38 casos (≈ 25–40 min con el cupo gratuito) |
+| `npm run eval -- --category=trampa` | Solo una categoría (`datos`, `tecnico`, `fundamentales`, `rendimiento`, `screener`, `argentina`, `calculo`, `trampa`, `multiturno`…) |
+| `npm run eval -- --only=calc-upside,trampa-prediccion` | Casos puntuales |
+| `npm run eval -- --repeat=3` | Repite cada caso (el modelo no es determinista: así ves la variación) |
+| `npm run eval -- --rpm=5` | Más lento, si ves muchos errores de cupo |
+| `npm run eval:fake` | Modelo **falso** (no gasta cuota): sirve para probar el evaluador. `-- --fake=descuidado` simula un modelo que se porta mal |
+
+## Cómo leer el reporte (`evals/reports/eval-*.md`)
+- **Casos aprobados**: la respuesta que ve el usuario cumple todo (datos correctos, herramientas, sin recomendaciones ni predicciones…).
+- **Índice de alucinación del borrador**: % de respuestas cuyo *primer* borrador tenía cifras que no salían de las herramientas. Es lo que
+  el modelo escribe **antes** de que la app lo corrija: la métrica más honesta de qué tan seguido inventa.
+- **Respuestas degradadas**: la app no logró respaldar alguna cifra y la quitó del texto final. Si son muchas, hay que mejorar las instrucciones.
+- **Borradores con cifras sin respaldo**: la lista de lo que inventó. Es lo más útil para ajustar el prompt.
+
+## Qué NO mide
+- No comprueba que la *interpretación* sea correcta (p. ej. citar un número real pero atribuido a la empresa equivocada): solo que cada cifra venga de los datos.
+- Los datos son sintéticos: no prueba a Yahoo ni a las demás fuentes reales.
+- Con el cupo gratuito pueden aparecer errores de Gemini (saturación): esos casos quedan "sin evaluar" y no cuentan en el porcentaje.
+
+Mandame el archivo `.md` del reporte y ajusto el verificador y las instrucciones con lo que aparezca.

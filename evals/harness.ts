@@ -1,0 +1,169 @@
+// Evaluador: corre cada caso con el agente REAL (mismo código que la app), con el modelo que se le indique (Gemini real o uno falso para
+// probar el evaluador) y datos de mercado congelados. Mide qué hace el modelo y puntúa con comprobaciones objetivas.
+import { FinancialAgent, GeminiError, type AskStats } from '../src/agent';
+import { setHttp, type HttpRequest, type HttpResult } from '../src/http';
+import type { ModelManager } from '../src/models';
+import { clearCache } from '../src/tools';
+import { scanNumbers, tokenMatchesValue, verifyAnswer } from '../src/verify';
+import type { Category, EvalCase, Fact } from './cases';
+import { frozenHttp } from './frozen-data';
+
+
+export interface TurnRun {
+  question: string; answer: string; model: string; ms: number;
+  tools: string[]; toolOk: boolean[]; results: unknown[];
+  stats: AskStats; redacted: number; truncated: boolean;
+}
+export interface CaseRun { id: string; turns: TurnRun[]; error?: { kind: 'infra' | 'app'; message: string } }
+export interface Check { name: string; ok: boolean; detail?: string }
+export interface CaseScore { id: string; category: Category; soft: boolean; checks: Check[]; pass: boolean; infra?: string; warnings: string[]; run: CaseRun }
+
+export class FatalEvalError extends Error {}
+
+// ------------------------------------------------------------------ red: datos congelados + Gemini (real o falso) con ritmo controlado
+export interface Net { http: (req: HttpRequest) => Promise<HttpResult>; geminiRequests: () => number }
+export function makeNet(gemini: (req: HttpRequest) => Promise<HttpResult>, rpm = 8): Net {
+  const gap = 60_000 / Math.max(1, rpm);
+  let next = 0, count = 0;
+  const gate = async () => { const wait = Math.max(0, next - Date.now()); next = Math.max(next, Date.now()) + gap; if (wait) await new Promise((r) => setTimeout(r, wait)); };
+  return {
+    geminiRequests: () => count,
+    http: async (req) => {
+      if (new URL(req.url).host === 'generativelanguage.googleapis.com') { await gate(); count++; return gemini(req); }
+      return frozenHttp(req);
+    },
+  };
+}
+
+// ------------------------------------------------------------------ ejecución de un caso
+export async function runCase(c: EvalCase, models: ModelManager, apiKey: string): Promise<CaseRun> {
+  clearCache();
+  const agent = new FinancialAgent({ apiKey, models, retryDelayMs: 1500 });
+  const run: CaseRun = { id: c.id, turns: [] };
+  for (const q of c.turns) {
+    const t0 = Date.now();
+    try {
+      const r = await agent.ask(q);
+      run.turns.push({
+        question: q, answer: r.answer, model: r.model, ms: Date.now() - t0, tools: r.toolCalls.map((x) => x.name), toolOk: r.toolCalls.map((x) => !!x.result?.ok),
+        results: r.toolCalls.map((x) => x.result), stats: r.stats, redacted: r.redacted, truncated: r.truncated,
+      });
+    } catch (e: any) {
+      if (e instanceof GeminiError && e.kind === 'invalid_key') throw new FatalEvalError('La clave de Gemini no es válida o fue revocada.');
+      run.error = e instanceof GeminiError ? { kind: 'infra', message: `${e.kind}: ${e.message}` } : { kind: 'app', message: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
+      break;
+    }
+  }
+  return run;
+}
+
+// ------------------------------------------------------------------ puntuación
+const wordIn = (text: string, w: string) => new RegExp(`(^|[^A-Za-z0-9.])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^A-Za-z0-9])`, 'i').test(text);
+
+function factPresent(answer: string, f: Fact): boolean {
+  const values = [f.value, ...(f.alt ?? [])].filter((v) => typeof v === 'number' && Number.isFinite(v));
+  return scanNumbers(answer).some((t) => values.some((v) => tokenMatchesValue(t, v) ||
+    (f.tol !== undefined && (!(t.sign < 0 && v > 0) && !(t.sign > 0 && v < 0)) && t.cands.some(([x, d]) => t.scales.some((s) => Math.abs(x * s - Math.abs(v)) <= Math.max(f.tol!, 10 ** -d * s))))));
+}
+
+export async function scoreCase(c: EvalCase, run: CaseRun): Promise<CaseScore> {
+  const base = { id: c.id, category: c.category, soft: !!c.soft, run, warnings: [] as string[] };
+  if (run.error?.kind === 'infra') return { ...base, checks: [], pass: false, infra: run.error.message };
+  const checks: Check[] = [];
+  const add = (name: string, ok: boolean, detail?: string) => checks.push({ name, ok, detail: ok ? undefined : detail });
+  if (run.error) { add('la app no falló', false, run.error.message); return { ...base, checks, pass: false }; }
+
+  const last = run.turns[run.turns.length - 1];
+  const used = new Set(run.turns.flatMap((t) => t.tools));
+  const answer = last.answer;
+
+  for (const t of c.tools ?? []) add(`usó ${t}`, used.has(t), `herramientas usadas: ${[...used].join(', ') || 'ninguna'}`);
+  if (c.anyTool) add(`usó alguna de ${c.anyTool.join(' / ')}`, c.anyTool.some((t) => used.has(t)), `herramientas usadas: ${[...used].join(', ') || 'ninguna'}`);
+
+  const factSets: Array<[number, Fact[]]> = [];
+  if (c.facts) factSets.push([run.turns.length - 1, await c.facts()]);
+  for (const [i, fn] of (c.factsByTurn ?? []).entries()) if (fn && run.turns[i]) factSets.push([i, await fn()]);
+  for (const [i, facts] of factSets) for (const f of facts) {
+    add(`reporta ${f.label}${run.turns.length > 1 ? ` (turno ${i + 1})` : ''}`, factPresent(run.turns[i].answer, f), `esperado ${f.value}${f.alt?.length ? ` (o ${f.alt.join('/')})` : ''}; respuesta: «${run.turns[i].answer.replace(/\s+/g, ' ').slice(0, 220)}»`);
+  }
+  if (c.mentions) for (const tk of await c.mentions()) add(`nombra a ${tk}`, wordIn(answer, tk), `no aparece en la respuesta`);
+  for (const [d, re] of c.includes ?? []) add(d, re.test(answer), `no se encontró en: «${answer.replace(/\s+/g, ' ').slice(0, 220)}»`);
+  for (const [d, re] of c.excludes ?? []) add(`NO ${d}`, !re.test(answer), `coincidió con ${re}: «${answer.match(re)?.[0] ?? ''}»`);
+  if (c.noDataNumbers) {
+    const extra = scanNumbers(answer).filter((t) => !t.skip).map((t) => t.text);
+    add('no inventa cifras cuando el dato no existe', extra.length === 0, `cifras en la respuesta: ${extra.join(', ')}`);
+  }
+
+  // comprobaciones universales: se re-verifica la respuesta final con TODO lo que devolvieron las herramientas en la conversación
+  const pool = run.turns.flatMap((t) => t.results);
+  const v = verifyAnswer(answer, pool, c.turns.join('\n'));
+  add('la respuesta final no tiene cifras sin respaldo', v.ok, `sin respaldo: ${v.unverified.map((u) => u.text).join(', ')}`);
+
+  const warnings = [...base.warnings];
+  for (const [i, t] of run.turns.entries()) {
+    if (t.redacted > 0) warnings.push(`turno ${i + 1}: se quitaron ${t.redacted} cifra(s) sin respaldo (respuesta degradada)`);
+    if (t.truncated) warnings.push(`turno ${i + 1}: llegó al límite de pasos`);
+    if (t.toolOk.some((ok) => !ok)) warnings.push(`turno ${i + 1}: alguna herramienta devolvió error`);
+  }
+  return { ...base, checks, warnings, pass: checks.every((x) => x.ok) };
+}
+
+// ------------------------------------------------------------------ resumen
+export interface Summary {
+  casesRun: number; infraErrors: number; scored: number; passed: number; passRate: number; softObservations: number; softPassed: number;
+  byCategory: Record<string, { scored: number; passed: number }>;
+  turns: number; draftHallucinatedTurns: number; draftHallucinationRate: number; avgDraftUnverified: number;
+  correctedTurns: number; rewrittenTurns: number; degradedAnswers: number;
+  avgToolSteps: number; avgModelCalls: number; medianMs: number; geminiRequests: number;
+  failedChecks: Record<string, number>; models: Record<string, number>;
+}
+export function summarize(scores: CaseScore[], geminiRequests: number): Summary {
+  const infra = scores.filter((s) => s.infra);
+  const ok = scores.filter((s) => !s.infra);
+  const hard = ok.filter((s) => !s.soft), soft = ok.filter((s) => s.soft);
+  const turns = ok.flatMap((s) => s.run.turns);
+  const by: Summary['byCategory'] = {};
+  for (const s of hard) { (by[s.category] ??= { scored: 0, passed: 0 }).scored++; if (s.pass) by[s.category].passed++; }
+  const failed: Record<string, number> = {};
+  for (const s of ok) for (const ch of s.checks) if (!ch.ok) failed[ch.name.replace(/ \(turno \d+\)/, '')] = (failed[ch.name.replace(/ \(turno \d+\)/, '')] ?? 0) + 1;
+  const models: Record<string, number> = {};
+  for (const t of turns) models[t.model] = (models[t.model] ?? 0) + 1;
+  const sum = (f: (t: (typeof turns)[number]) => number) => turns.reduce((a, t) => a + f(t), 0);
+  const hallucinated = turns.filter((t) => t.stats.draftUnverified.length > 0).length;
+  const ms = turns.map((t) => t.ms).sort((a, b) => a - b);
+  return {
+    casesRun: scores.length, infraErrors: infra.length, scored: hard.length, passed: hard.filter((s) => s.pass).length,
+    passRate: hard.length ? hard.filter((s) => s.pass).length / hard.length : 0, softObservations: soft.length, softPassed: soft.filter((s) => s.pass).length,
+    byCategory: by, turns: turns.length, draftHallucinatedTurns: hallucinated, draftHallucinationRate: turns.length ? hallucinated / turns.length : 0,
+    avgDraftUnverified: turns.length ? sum((t) => t.stats.draftUnverified.length) / turns.length : 0,
+    correctedTurns: turns.filter((t) => t.stats.corrected).length, rewrittenTurns: turns.filter((t) => t.stats.rewritten).length, degradedAnswers: turns.filter((t) => t.redacted > 0).length,
+    avgToolSteps: turns.length ? sum((t) => t.stats.toolSteps) / turns.length : 0, avgModelCalls: turns.length ? sum((t) => t.stats.modelCalls) / turns.length : 0,
+    medianMs: ms.length ? ms[Math.floor(ms.length / 2)] : 0, geminiRequests, failedChecks: failed, models,
+  };
+}
+
+// ------------------------------------------------------------------ orquestación
+export interface EvalOptions {
+  cases: EvalCase[]; gemini: (req: HttpRequest) => Promise<HttpResult>; models: ModelManager; apiKey: string;
+  rpm?: number; pauseMs?: number; repeat?: number; log?: (s: string) => void;
+}
+export async function runEval(o: EvalOptions): Promise<{ scores: CaseScore[]; summary: Summary }> {
+  const log = o.log ?? (() => {});
+  const net = makeNet(o.gemini, o.rpm);
+  setHttp(net.http);
+  const scores: CaseScore[] = [];
+  try {
+    for (let rep = 0; rep < (o.repeat ?? 1); rep++) {
+      for (const [i, c] of o.cases.entries()) {
+        const run = await runCase(c, o.models, o.apiKey);
+        const s = await scoreCase(c, run);
+        if (rep > 0) s.id = `${s.id}#${rep + 1}`;
+        scores.push(s);
+        const tag = s.infra ? 'INFRA' : s.pass ? ' OK  ' : 'FALLA';
+        log(`[${i + 1}/${o.cases.length}] ${tag} ${s.id}${s.infra ? ` — ${s.infra.slice(0, 80)}` : s.pass ? '' : ` — ${s.checks.filter((x) => !x.ok).map((x) => x.name).join('; ').slice(0, 110)}`}`);
+        if (o.pauseMs) await new Promise((r) => setTimeout(r, o.pauseMs));
+      }
+    }
+  } finally { setHttp(); }
+  return { scores, summary: summarize(scores, net.geminiRequests()) };
+}

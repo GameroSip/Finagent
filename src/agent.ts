@@ -37,6 +37,15 @@ FORMATO
 - No agregues avisos legales: la app ya los muestra.`;
 
 export interface ToolCallRecord { name: string; args: Record<string, any>; result: ToolResult; ui?: any }
+/** Métricas de una respuesta (para evaluar al modelo; la app no las muestra). */
+export interface AskStats {
+  modelCalls: number;          // pedidos al modelo que hicieron falta
+  toolSteps: number;           // consultas a herramientas
+  draftChecked: number;        // cifras del PRIMER borrador
+  draftUnverified: string[];   // cifras del primer borrador que NO salían de las herramientas (el "índice de alucinación" real)
+  corrected: boolean;          // hizo falta la pasada de corrección o de reescritura
+  rewritten: boolean;          // hizo falta la reescritura sin herramientas
+}
 export interface AgentResult {
   answer: string;
   toolCalls: ToolCallRecord[];
@@ -46,6 +55,7 @@ export interface AgentResult {
   corrected: boolean;
   /** Cantidad de cifras que no se pudieron respaldar y se quitaron de la respuesta (el usuario nunca ve una cifra sin sustento). */
   redacted: number;
+  stats: AskStats;
   /** Cifras que devolvieron las herramientas en este turno (para verificar las respuestas siguientes del mismo chat). */
   numbers: number[];
 }
@@ -103,6 +113,7 @@ export class FinancialAgent {
   /** Cifras de las herramientas de turnos anteriores: una respuesta de seguimiento puede repetirlas sin que se marquen como inventadas. */
   priorNumbers: number[] = [];
   private aborted = false;
+  private modelCalls = 0;
   private activeModel: string | null = null;
   private o: Required<AgentOptions>;
 
@@ -171,6 +182,7 @@ export class FinancialAgent {
         const data = await this.request(model, withTools, hooks);
         this.activeModel = model;
         this.o.models.active = model;
+        this.modelCalls++;
         return data;
       } catch (e) {
         if (!(e instanceof GeminiError)) throw e;
@@ -231,6 +243,7 @@ export class FinancialAgent {
 
   async ask(question: string, hooks: Hooks = {}): Promise<AgentResult> {
     this.aborted = false;
+    this.modelCalls = 0;
     this.contents = historyToContents(this.history);
     this.contents.push(userMsg(question));
     const calls: ToolCallRecord[] = [];
@@ -239,7 +252,8 @@ export class FinancialAgent {
       const verify = () => verifyAnswer(answer, [...calls.map((c) => c.result), this.priorNumbers], question);
       const list = (v: Verification) => v.unverified.slice(0, 8).map((u) => u.text).join(', ');
       let verification = verify();
-      let corrected = false;
+      const draft = { checked: verification.checked, unverified: verification.unverified.map((u) => u.text) };
+      let corrected = false, rewritten = false;
 
       // 1) Corrección con herramientas: el modelo puede consultar o calcular lo que le faltó.
       if (!verification.ok && !truncated) {
@@ -260,7 +274,7 @@ export class FinancialAgent {
           `Verificación automática: estas cifras siguen sin respaldo en los datos de las herramientas: ${list(verification)}. ` +
           'Reescribí la respuesta completa SIN ellas ni ninguna otra cifra que no esté en los datos: no hagas cuentas ni estimaciones. ' +
           'Si falta un dato, decí que no está disponible. No uses herramientas.', hooks);
-        if (text) { answer = text; verification = verify(); corrected = true; }
+        if (text) { answer = text; verification = verify(); corrected = true; rewritten = true; }
       }
 
       // 3) Último recurso: lo que siga sin respaldo se quita del texto. Nunca se muestra una cifra sin sustento.
@@ -276,7 +290,8 @@ export class FinancialAgent {
       this.history = this.history.slice(-MAX_TURNS);
       const numbers = [...new Set(collectNumbers(calls.map((c) => c.result)))];
       this.priorNumbers = [...new Set([...this.priorNumbers, ...numbers])].slice(-MAX_KNOWN_NUMBERS);
-      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, redacted, numbers };
+      const stats: AskStats = { modelCalls: this.modelCalls, toolSteps: calls.length, draftChecked: draft.checked, draftUnverified: draft.unverified, corrected, rewritten };
+      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, redacted, stats, numbers };
     } catch (e) {
       this.contents = historyToContents(this.history); // se descarta el turno incompleto
       throw e;

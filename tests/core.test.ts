@@ -479,3 +479,20 @@ describe('verificador: signos (las cifras negativas correctas no deben marcarse)
     expect(redactUnverified(answer, v.unverified)).toBe('Caída máxima: [dato no verificado] en el año.');
   });
 });
+
+describe('verificador: la "M" de los horizontes (1M, 3M, 6M) no es "millones"', () => {
+  const perfPool = [{ data: { returns: { '1M': 4.2, '3M': 8.61, '6M': 22.87, '1Y': 50.87 } } }];
+  it('acepta las etiquetas de período cuando ese número existe en los datos (aunque la cifra se escriba "6M")', () => {
+    const answer = 'Rendimiento 6M: 22.87%, 3M: 8.61% y 1M: 4.2%.';
+    const v = verifyAnswer(answer, perfPool);
+    expect(v.ok, JSON.stringify(v.unverified)).toBe(true);
+  });
+  it('pero un "7M" inventado igual se marca (ese número no está en los datos)', () => {
+    expect(verifyAnswer('Ganó 7M en el año.', perfPool).unverified.map((u) => u.text)).toEqual(['7M']);
+  });
+  it('los millones de verdad siguen funcionando', () => {
+    expect(verifyAnswer('Facturó 3.2M en el trimestre.', [{ rev: 3_200_000 }]).ok).toBe(true);
+    expect(verifyAnswer('Facturó 3.2M en el trimestre.', [{ rev: 3_000_000 }]).ok).toBe(false);
+    expect(verifyAnswer('El volumen fue 20M.', [{ vol: 20_000_000 }]).ok).toBe(true);
+  });
+});

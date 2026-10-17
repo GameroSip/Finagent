@@ -6,6 +6,7 @@ import { fetchFearGreed, fetchIndices } from './data/market';
 import { fetchHeadlines, Region } from './data/news';
 import { ema, r, snapshot } from './indicators';
 import { UNIVERSES } from './universes';
+import { safeUrl } from './url';
 import * as Y from './yahoo';
 
 type Args = Record<string, any>;
@@ -56,7 +57,10 @@ export async function callTool(name: string, args: Args = {}): Promise<ToolResul
   } catch (e: any) {
     return { ok: false, tool: name, error: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
   }
-  if (def.ttl && out.ok) cache.set(key, { at: Date.now(), value: out });
+  if (def.ttl && out.ok) {
+    if (cache.size >= 200) cache.delete(cache.keys().next().value as string); // acotado: se descarta lo más viejo
+    cache.set(key, { at: Date.now(), value: out });
+  }
   return out;
 }
 const tool = (name: string, ttl: number, fn: (a: Args) => Promise<ToolResult>) => { defs[name] = { ttl, fn }; };
@@ -109,19 +113,34 @@ export function metricsFromInfo(info: Args): { metrics: Record<string, any>; not
     m[key] = e;
   };
 
+  // Si la acción cotiza en una moneda y la empresa reporta en otra (CEDEARs en pesos con balances en dólares, ADRs
+  // argentinos), dividir precio por EPS o flujo de caja por market cap mezcla monedas y da cifras absurdas.
+  const quoteCur = String(info.currency ?? '').toUpperCase();
+  const finCur = String(info.financialCurrency ?? '').toUpperCase();
+  const mixed = !!quoteCur && !!finCur && quoteCur !== finCur;
+
   put('price', price, 'último precio disponible', 'campo Yahoo currentPrice/regularMarketPrice', cur);
   put('market_cap', mcap, 'actual', 'campo Yahoo marketCap', cur);
-  if (price && epsTtm !== null) {
-    if (epsTtm > 0) put('pe_ttm', price / epsTtm, 'TTM (últimos 12 meses)', 'precio / EPS TTM', undefined, { price, trailing_eps: epsTtm });
-    else notes.push('EPS TTM <= 0: el P/E TTM no aplica');
+  if (mixed) {
+    notes.push(`La moneda de cotización (${quoteCur}) difiere de la de reporte (${finCur}): no se calculan FCF yield ni dividend yield ` +
+      'porque mezclarían monedas; el P/E se toma de Yahoo si lo informa. Los objetivos de analistas pueden estar en otra moneda.');
+    const peY = num(info.trailingPE), pfY = num(info.forwardPE);
+    if (peY !== null && peY > 0) put('pe_ttm', peY, 'TTM, calculado por Yahoo (monedas de cotización y reporte distintas)', 'campo Yahoo trailingPE');
+    if (pfY !== null && pfY > 0) put('pe_forward', pfY, 'forward, calculado por Yahoo (monedas distintas)', 'campo Yahoo forwardPE');
+  } else {
+    if (price && epsTtm !== null) {
+      if (epsTtm > 0) put('pe_ttm', price / epsTtm, 'TTM (últimos 12 meses)', 'precio / EPS TTM', undefined, { price, trailing_eps: epsTtm });
+      else notes.push('EPS TTM <= 0: el P/E TTM no aplica');
+    }
+    if (price && epsFwd !== null) {
+      if (epsFwd > 0) put('pe_forward', price / epsFwd, 'forward (estimación de analistas)', 'precio / EPS forward', undefined, { price, forward_eps: epsFwd });
+      else notes.push('EPS forward <= 0: el P/E forward no aplica');
+    }
   }
-  if (price && epsFwd !== null) {
-    if (epsFwd > 0) put('pe_forward', price / epsFwd, 'forward (estimación de analistas)', 'precio / EPS forward', undefined, { price, forward_eps: epsFwd });
-    else notes.push('EPS forward <= 0: el P/E forward no aplica');
-  }
+
   put('price_to_book', info.priceToBook, 'último balance', 'campo Yahoo priceToBook');
   put('ev_ebitda', info.enterpriseToEbitda, 'TTM', 'campo Yahoo enterpriseToEbitda');
-  if (price && price > 0 && divRate !== null) {
+  if (!mixed && price && price > 0 && divRate !== null) {
     put('dividend_yield_pct', (divRate / price) * 100, 'dividendo anual indicado / precio actual',
       'dividendo anual por acción / precio × 100', '%', { dividend_rate: divRate, price });
   }
@@ -138,8 +157,8 @@ export function metricsFromInfo(info: Args): { metrics: Record<string, any>; not
   }
   const de = num(info.debtToEquity);
   if (de !== null) put('debt_to_equity_ratio', de / 100, 'último balance', 'campo Yahoo debtToEquity (viene en %) / 100', 'x');
-  put('free_cashflow', fcf, 'TTM', 'campo Yahoo freeCashflow', cur);
-  if (fcf !== null && mcap && mcap > 0) {
+  put('free_cashflow', fcf, 'TTM', 'campo Yahoo freeCashflow', finCur || cur);
+  if (!mixed && fcf !== null && mcap && mcap > 0) {
     put('fcf_yield_pct', (fcf / mcap) * 100, 'TTM', 'flujo de caja libre / market cap × 100', '%', { free_cashflow: fcf, market_cap: mcap });
   }
   put('beta', info.beta, 'Yahoo (horizonte no especificado)', 'campo Yahoo beta');
@@ -216,7 +235,7 @@ tool('get_news', 600, async (a) => {
   const limit = Math.max(1, Math.min(Number(a.limit ?? 5) || 5, 10));
   const { news } = await Y.searchSymbols(s, 0, limit);
   const articles = news.filter((n: any) => n?.title).slice(0, limit).map((n: any) => ({
-    title: n.title, published: iso(n.providerPublishTime), publisher: n.publisher ?? null, url: n.link ?? null,
+    title: n.title, published: iso(n.providerPublishTime), publisher: n.publisher ?? null, url: safeUrl(n.link),
   }));
   if (!articles.length) throw new Error(`Sin noticias para ${s}`);
   return env(s, { articles }, articles[0].published, ['Las noticias suelen reflejar eventos ya conocidos por el mercado.']);

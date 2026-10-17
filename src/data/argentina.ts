@@ -33,7 +33,8 @@ export async function fetchRiesgoPais(): Promise<{ valor: number; fecha: string 
 async function lastOf(path: string, what: string): Promise<{ fecha: string; valor: number } | null> {
   try {
     const j = await getJsonFrom(`https://api.argentinadatos.com/v1/finanzas/indices/${path}`, what);
-    const arr: any[] = Array.isArray(j) ? j : [];
+    const arr: any[] = (Array.isArray(j) ? j : []).filter((x: any) => x && typeof x.fecha === 'string')
+      .sort((a: any, b: any) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0)); // no se asume el orden de la API
     const last = arr[arr.length - 1];
     const v = num(last?.valor);
     return v === null ? null : { fecha: String(last.fecha), valor: v };

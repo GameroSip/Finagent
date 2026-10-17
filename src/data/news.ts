@@ -1,12 +1,29 @@
 // Titulares vía Google News RSS (gratuito, sin clave). Sirve para "narrativas": qué dicen los medios hoy.
+import { safeUrl } from '../url';
 import { getText } from './net';
 
 export interface Headline { title: string; source: string | null; url: string; published: string | null; ts: number | null }
 export type Region = 'ar' | 'us';
 
-const decode = (s: string) =>
-  s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/&amp;/g, '&').trim();
+const ENT: Record<string, string> = { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&', nbsp: ' ' };
+/** Decodifica entidades en una sola pasada (sin doble decodificación) y soporta &#128512; y &#x1F600;. */
+const decodeEntities = (s: string) =>
+  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
+    if (e[0] === '#') {
+      const cp = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return Number.isInteger(cp) && cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+    }
+    return ENT[e.toLowerCase()] ?? m;
+  });
+/** El contenido CDATA es literal (no se decodifica); fuera de CDATA se decodifican las entidades. */
+const decode = (s: string) => {
+  let out = '', last = 0;
+  for (const m of s.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)) {
+    out += decodeEntities(s.slice(last, m.index)) + m[1];
+    last = (m.index ?? 0) + m[0].length;
+  }
+  return (out + decodeEntities(s.slice(last))).trim();
+};
 
 const tag = (xml: string, name: string): string | null => {
   const m = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`).exec(xml);
@@ -19,7 +36,7 @@ export function parseRss(xml: string, limit = 10): Headline[] {
   for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const item = m[1];
     let title = tag(item, 'title');
-    const url = tag(item, 'link');
+    const url = safeUrl(tag(item, 'link'));
     if (!title || !url) continue;
     const source = tag(item, 'source');
     if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3)).trim();

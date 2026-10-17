@@ -4,13 +4,15 @@ import { fetchFearGreed } from '../data/market';
 import { fetchDolares, fetchRiesgoPais } from '../data/argentina';
 import { fetchHeadlines } from '../data/news';
 import { GeminiError, modelLabel } from '../models';
+import { deleteAllChats, listChats } from '../chats';
 import { clearWatchlist, getSettings, saveSettings, type Theme } from '../store';
 import { fetchChart, fetchInfo } from '../yahoo';
 import { $, esc, h, toast } from '../ui/dom';
 import { icon } from '../ui/icons';
 import { logoSvg } from '../ui/logo';
+import { confirmSheet, openSheet } from '../ui/sheet';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 interface Probe { name: string; run: () => Promise<unknown> }
 
@@ -32,6 +34,7 @@ export function createSettingsView(ctx: Ctx): View {
   function render() {
     const s = getSettings();
     const id = ctx.models.active ?? ctx.models.pick();
+    const nChats = listChats().length;
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Tu cuenta y la app</div><h1 class="title-xl">Ajustes</h1></div></div>
       <div class="card prof"><div style="width:52px;height:52px;border-radius:16px;overflow:hidden;flex:none">${logoSvg(52)}</div>
@@ -56,6 +59,7 @@ export function createSettingsView(ctx: Ctx): View {
         <div class="muted" style="font-size:12px;margin:8px 4px 0">Si una fuente falla desde tu red, esa sección muestra un aviso y el resto sigue funcionando.</div></div>
 
       <div class="set-group"><div class="set-title">Datos</div><div class="card set-card">
+        <button class="set-row" id="s-clear-chats"><span class="set-ic">${icon('messageSquare', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Borrar historial de chats</div><div class="set-sub">${nChats ? `${nChats} ${nChats === 1 ? 'chat guardado' : 'chats guardados'} en este teléfono` : 'No hay chats guardados'}</div></div></button>
         <button class="set-row" id="s-clear-w"><span class="set-ic">${icon('star', 18)}</span><div class="set-main" style="flex:1;text-align:left">Borrar favoritos</div></button>
         <button class="set-row danger" id="s-wipe"><span class="set-ic">${icon('trash', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Cerrar sesión y borrar todo</div><div class="set-sub">Elimina tu clave y tus datos de este teléfono</div></div></button>
       </div></div>
@@ -66,22 +70,13 @@ export function createSettingsView(ctx: Ctx): View {
     bind();
   }
 
-  function sheet(content: HTMLElement) {
-    const back = h('div', { class: 'sheet-back' }), card = h('div', { class: 'sheet' });
-    card.append(content); back.append(card); document.body.append(back);
-    requestAnimationFrame(() => back.classList.add('show'));
-    const close = () => { back.classList.remove('show'); setTimeout(() => back.remove(), 220); };
-    back.addEventListener('click', (e) => { if (e.target === back) close(); });
-    return close;
-  }
-
   function changeKey() {
     const c = h('div');
     c.innerHTML = `<h3 style="font-size:19px;font-weight:750">Cambiar clave de Gemini</h3><p class="muted" style="margin:6px 0 14px;font-size:13.5px">Pegá la nueva clave. Se verifica antes de guardarla.</p>
       <div class="onb-field"><span class="muted">${icon('keyRound', 18)}</span><input id="k-in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nueva clave" /></div>
       <div id="k-err" class="error-box hide" style="margin-top:12px"></div>
       <div style="display:flex;gap:10px;margin-top:16px"><button class="btn btn-ghost" id="k-cancel" style="flex:1">Cancelar</button><button class="btn btn-primary" id="k-ok" style="flex:1">Guardar</button></div>`;
-    const close = sheet(c);
+    const close = openSheet(c);
     const err = $('#k-err', c);
     $('#k-cancel', c).onclick = close;
     $('#k-ok', c).onclick = async () => {
@@ -89,7 +84,7 @@ export function createSettingsView(ctx: Ctx): View {
       const ok = $<HTMLButtonElement>('#k-ok', c);
       if (v.length < 20) { err.textContent = 'La clave parece incompleta.'; err.classList.remove('hide'); return; }
       ok.disabled = true; ok.innerHTML = '<span class="spin"></span>';
-      try { await ctx.models.discover(v, true, true); saveSettings({ apiKey: v }); close(); toast('Clave actualizada'); render(); }
+      try { ctx.models.invalidate(); await ctx.models.discover(v, true, true); saveSettings({ apiKey: v }); close(); toast('Clave actualizada'); render(); }
       catch (e) { ok.disabled = false; ok.textContent = 'Guardar'; err.textContent = e instanceof GeminiError && e.kind === 'invalid_key' ? 'Esa clave no es válida.' : 'No pude conectarme para verificarla.'; err.classList.remove('hide'); }
     };
   }
@@ -119,8 +114,14 @@ export function createSettingsView(ctx: Ctx): View {
       $('#s-theme', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     });
     $('#s-probe', el).onclick = () => void probeAll();
-    $('#s-clear-w', el).onclick = () => { if (confirm('¿Borrar todos tus favoritos?')) { clearWatchlist(); toast('Favoritos borrados'); } };
-    $('#s-wipe', el).onclick = () => { if (confirm('Se borrará tu clave y todos tus datos de este teléfono. ¿Continuar?')) ctx.logout(); };
+    $('#s-clear-chats', el).onclick = async () => {
+      if (!listChats().length) { toast('No hay chats para borrar'); return; }
+      if (await confirmSheet({ title: '¿Borrar todo el historial de chats?', text: 'Se eliminan todas tus conversaciones de este teléfono. No se puede deshacer.', confirm: 'Borrar', danger: true })) { deleteAllChats(); toast('Historial borrado'); render(); }
+    };
+    $('#s-clear-w', el).onclick = async () => { if (await confirmSheet({ title: '¿Borrar todos tus favoritos?', confirm: 'Borrar', danger: true })) { clearWatchlist(); toast('Favoritos borrados'); } };
+    $('#s-wipe', el).onclick = async () => {
+      if (await confirmSheet({ title: '¿Cerrar sesión y borrar todo?', text: 'Se eliminan tu clave, tus favoritos y todos tus chats de este teléfono. No se puede deshacer.', confirm: 'Borrar todo', danger: true })) ctx.logout();
+    };
   }
 
   render();

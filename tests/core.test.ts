@@ -277,3 +277,96 @@ describe('herramientas', () => {
   });
 });
 
+
+// ------------------------------------------------------------------ markdown, URLs y formato (revisión de bugs)
+import { renderMarkdown } from '../src/markdown';
+import { safeUrl } from '../src/url';
+import { parseRss } from '../src/data/news';
+import { timeAgo } from '../src/ui/format';
+import { metricsFromInfo } from '../src/tools';
+
+describe('markdown', () => {
+  it('escapa HTML y solo permite enlaces http(s)', () => {
+    const h = renderMarkdown('<script>alert(1)</script> [ok](https://a.com/x?y=1&z=2) [mal](javascript:alert(1)) **b** `c<d>`');
+    expect(h).not.toContain('<script>');
+    expect(h).toContain('href="https://a.com/x?y=1&amp;z=2"');
+    expect(h).not.toContain('href="javascript');
+    expect(h).toContain('[mal](javascript:alert(1))');
+    expect(h).toContain('<strong>b</strong>');
+    expect(h).toContain('<code>c&lt;d&gt;</code>');
+  });
+  it('listas anidadas, ordenadas con inicio y continuaciones', () => {
+    const h = renderMarkdown('1. Uno\n   - sub a\n   - sub b\n2. Dos\n\n3. Tres\n\n- x\n- y');
+    expect(h).toBe('<ol><li>Uno<ul><li>sub a</li><li>sub b</li></ul></li><li>Dos</li><li>Tres</li></ol><ul><li>x</li><li>y</li></ul>');
+    expect(renderMarkdown('3. a\n4. b')).toContain('<ol start="3">');
+  });
+  it('bloques de código, citas, reglas y tablas', () => {
+    expect(renderMarkdown('```ts\nconst a = "<x>";\n```')).toContain('<pre class="code"><code>const a = &quot;&lt;x&gt;&quot;;</code></pre>');
+    expect(renderMarkdown('> cita\n> dos')).toBe('<blockquote>cita<br>dos</blockquote>');
+    expect(renderMarkdown('a\n---\nb')).toContain('<hr>');
+    const t = renderMarkdown('| a | b |\n|---|---|\n| 1 | 2 |');
+    expect(t).toContain('<th>a</th>');
+    expect(t).toContain('<td>2</td>');
+  });
+  it('no confunde guiones bajos de identificadores con cursiva', () => {
+    expect(renderMarkdown('usa max_pe y min_roe_pct')).toBe('<p>usa max_pe y min_roe_pct</p>');
+    expect(renderMarkdown('esto es *importante* y _clave_')).toBe('<p>esto es <em>importante</em> y <em>clave</em></p>');
+  });
+});
+
+describe('url y noticias', () => {
+  it('safeUrl', () => {
+    expect(safeUrl('https://x.com/a')).toBe('https://x.com/a');
+    for (const bad of ['javascript:alert(1)', 'data:text/html,hi', 'intent://x', 'file:///etc/passwd', 'no es url', '']) expect(safeUrl(bad)).toBeNull();
+  });
+  it('parseRss decodifica entidades sin doble decodificación y filtra enlaces peligrosos', () => {
+    const rss = `<rss><channel>
+      <item><title>Merval &amp; bonos: &#128512; &#x1F4C8; &amp;lt;no&amp;gt; - Ámbito</title><link>https://n.com/1</link><source url="x">Ámbito</source><pubDate>Fri, 16 Oct 2026 12:00:00 GMT</pubDate></item>
+      <item><title><![CDATA[Título con "CDATA" & crudo]]></title><link>https://n.com/2</link></item>
+      <item><title>Malicioso</title><link>javascript:alert(1)</link></item></channel></rss>`;
+    const items = parseRss(rss);
+    expect(items).toHaveLength(2);
+    expect(items[0].title).toBe('Merval & bonos: 😀 📈 &lt;no&gt;');
+    expect(items[0].source).toBe('Ámbito');
+    expect(items[1].title).toBe('Título con "CDATA" & crudo');
+  });
+});
+
+describe('fechas relativas', () => {
+  it('no redondea hacia arriba', () => {
+    const now = Date.UTC(2026, 9, 16, 12, 0, 0);
+    const ago = (ms: number) => timeAgo(now - ms, now);
+    expect(ago(30_000)).toBe('ahora');
+    expect(ago(90_000)).toBe('hace 1 min');
+    expect(ago(110 * 60_000)).toBe('hace 1 h');
+    expect(ago(36 * 3600_000)).toBe('ayer');
+    expect(ago(50 * 3600_000)).toBe('hace 2 d');
+  });
+});
+
+describe('monedas mezcladas (CEDEARs y ADRs)', () => {
+  const base = { currentPrice: 20000, trailingEps: 10, forwardEps: 8, dividendRate: 300, marketCap: 5e12, freeCashflow: 2e8,
+    returnOnEquity: 0.2, debtToEquity: 50, currency: 'ARS', financialCurrency: 'USD', trailingPE: 27.5, forwardPE: 22.1 };
+  it('no mezcla precio en ARS con EPS en USD', () => {
+    const { metrics: m, notes } = metricsFromInfo(base);
+    expect(m.pe_ttm.value).toBe(27.5);                       // el de Yahoo, no 20000 / 10 = 2000
+    expect(m.pe_ttm.basis).toContain('Yahoo');
+    expect(m.pe_forward.value).toBe(22.1);
+    expect(m.fcf_yield_pct).toBeUndefined();
+    expect(m.dividend_yield_pct).toBeUndefined();
+    expect(m.free_cashflow.unit).toBe('USD');
+    expect(m.roe_pct.value).toBe(20);                        // los ratios puros se conservan
+    expect(notes.join(' ')).toContain('ARS');
+  });
+  it('sin P/E de Yahoo no inventa uno', () => {
+    const { metrics: m } = metricsFromInfo({ ...base, trailingPE: undefined, forwardPE: undefined });
+    expect(m.pe_ttm).toBeUndefined();
+    expect(m.pe_forward).toBeUndefined();
+  });
+  it('con la misma moneda calcula como siempre', () => {
+    const { metrics: m } = metricsFromInfo({ ...base, currency: 'USD', currentPrice: 100, dividendRate: 3, marketCap: 5e9 });
+    expect(m.pe_ttm.value).toBe(10);
+    expect(m.dividend_yield_pct.value).toBe(3);
+    expect(m.fcf_yield_pct.value).toBe(4);
+  });
+});

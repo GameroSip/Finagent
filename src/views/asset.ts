@@ -5,7 +5,7 @@ import { metricsFromInfo } from '../tools';
 import { adjustBars, fetchChart, fetchInfo, searchSymbols, type Bar, type ChartData } from '../yahoo';
 import { isWatched, pushRecent, toggleWatch } from '../store';
 import { mountPriceChart, PALETTE, type ChartHandle, type Pt } from '../ui/chart';
-import { $, esc, h, openUrl, toast } from '../ui/dom';
+import { $, esc, h, openUrl, safeUrl, toast } from '../ui/dom';
 import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, initials, symbolColor, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 
@@ -25,6 +25,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
   let showEma50 = false, showEma200 = false;
   let handle: ChartHandle | null = null;
   let yearData: ChartData | null = null;
+  let yearPromise: Promise<ChartData> | null = null;
   let base = 0;
   let currency: string | null = null;
   let closed = false;
@@ -89,8 +90,8 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
       const bars = adjustBars(ch.bars);
       out = { pts: toPts(bars), intraday: false, base: bars[0]?.c ?? 0 };
     } else {
-      if (!yearData) { yearData = await fetchChart(sym, '1y', '1d'); applyMeta(yearData); }
-      const bars = adjustBars(yearData.bars);
+      const yd = await getYear();
+      const bars = adjustBars(yd.bars);
       const n = r === '1M' ? 22 : r === '6M' ? 126 : bars.length;
       const slice = bars.slice(-n);
       out = { pts: toPts(slice), intraday: false, base: slice[0]?.c ?? 0 };
@@ -98,6 +99,12 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
     if (out.pts.length < 2) throw new Error('Sin datos para este período');
     cache.set(r, out);
     return out;
+  }
+
+  /** Una única descarga del último año (la usan el gráfico y las estadísticas); si falla, se puede reintentar. */
+  function getYear(): Promise<ChartData> {
+    if (yearData) return Promise.resolve(yearData);
+    return (yearPromise ??= fetchChart(sym, '1y', '1d').then((d) => { yearData = d; applyMeta(d); return d; }).finally(() => { yearPromise = null; }));
   }
 
   function applyMeta(ch: ChartData) {
@@ -147,9 +154,9 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
   async function loadStats() {
     const tiles: string[] = [];
     try {
-      if (!yearData) { yearData = await fetchChart(sym, '1y', '1d'); applyMeta(yearData); }
-      const m = yearData.meta;
-      const px = yearData.bars[yearData.bars.length - 1].c;
+      const yd = await getYear();
+      const m = yd.meta;
+      const px = yd.bars[yd.bars.length - 1].c;
       if (m.fiftyTwoWeekLow && m.fiftyTwoWeekHigh) {
         const pos = Math.max(0, Math.min(100, ((px - m.fiftyTwoWeekLow) / (m.fiftyTwoWeekHigh - m.fiftyTwoWeekLow)) * 100));
         tiles.push(`<div class="stat wide"><div class="eyebrow" style="font-weight:600">Rango de 52 semanas</div>
@@ -160,7 +167,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
       if (m.previousClose ?? m.chartPreviousClose) tiles.push(stat('Cierre previo', fmtPrice(m.previousClose ?? m.chartPreviousClose, currency)));
       if (m.exchangeName ?? m.fullExchangeName) tiles.push(stat('Mercado', esc(m.fullExchangeName ?? m.exchangeName ?? ''), esc(currency ?? '')));
       // señales técnicas con ≥200 barras
-      const snap = snapshot(adjustBars(yearData.bars));
+      const snap = snapshot(adjustBars(yd.bars));
       if (snap.signals.length) {
         q('#a-signals').innerHTML = `<div class="section" style="margin-top:20px"><div class="section-head"><h2>${icon('activity', 19)} Lectura técnica</h2><span class="muted" style="font-size:12px">descriptiva</span></div>
           <div class="chips-wrap compact">${snap.signals.slice(0, 4).map((s) => `<span class="chip" style="white-space:normal">${esc(s)}</span>`).join('')}</div>
@@ -200,8 +207,8 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
       const box = q('#a-news');
       if (!news.length) { box.innerHTML = '<div class="muted" style="font-size:13px">Sin noticias recientes.</div>'; return; }
       box.innerHTML = '';
-      news.filter((n: any) => n?.title && n?.link).slice(0, 5).forEach((n: any) => {
-        const a = h('a', { class: 'card', attrs: { href: n.link }, style: 'padding:13px 15px;display:block' });
+      news.filter((n: any) => n?.title && safeUrl(n?.link)).slice(0, 5).forEach((n: any) => {
+        const a = h('a', { class: 'card', attrs: { href: safeUrl(n.link)! }, style: 'padding:13px 15px;display:block' });
         a.innerHTML = `<div style="font-weight:620;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(n.title)}</div>
           <div class="muted" style="font-size:12px;margin-top:8px">${esc(n.publisher ?? '')} · ${esc(timeAgo((n.providerPublishTime ?? 0) * 1000))}</div>`;
         a.onclick = (e) => { e.preventDefault(); openUrl(n.link); };

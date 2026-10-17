@@ -41,11 +41,11 @@ export function timeAgo(ts: number | string | null | undefined, now = Date.now()
   if (!t || !Number.isFinite(t)) return '';
   const s = Math.max(0, Math.round((now - t) / 1000));
   if (s < 60) return 'ahora';
-  const m = Math.round(s / 60);
+  const m = Math.floor(s / 60);
   if (m < 60) return `hace ${m} min`;
-  const hr = Math.round(m / 60);
+  const hr = Math.floor(m / 60);
   if (hr < 24) return `hace ${hr} h`;
-  const d = Math.round(hr / 24);
+  const d = Math.floor(hr / 24);
   return d === 1 ? 'ayer' : `hace ${d} d`;
 }
 

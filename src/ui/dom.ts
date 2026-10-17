@@ -1,4 +1,9 @@
 // Utilidades mínimas de DOM (sin framework).
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
+import { safeUrl } from '../url';
+
+export { safeUrl };
 export type Child = Node | string | number | null | undefined | false;
 interface Props {
   class?: string; text?: string; html?: string; attrs?: Record<string, string>; style?: string;
@@ -38,5 +43,13 @@ export function toast(msg: string) {
   toastTimer = window.setTimeout(() => t!.classList.remove('show'), 2200);
 }
 
-/** Abre un enlace externo (navegador del sistema en la app). */
-export const openUrl = (url: string) => { window.open(url, '_blank', 'noopener'); };
+/**
+ * Abre un enlace externo. En la app usa el navegador integrado de Android (Custom Tabs, plugin oficial de
+ * Capacitor): `window.open` no está garantizado en un WebView. Solo se permiten enlaces http(s).
+ */
+export function openUrl(url: string): void {
+  const u = safeUrl(url);
+  if (!u) return;
+  if (Capacitor.isNativePlatform()) void Browser.open({ url: u }).catch(() => { window.location.href = u; });
+  else window.open(u, '_blank', 'noopener');
+}

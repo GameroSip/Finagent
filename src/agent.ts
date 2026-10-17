@@ -4,10 +4,12 @@ import { http } from './http';
 import { API_ROOT, GeminiError, ModelManager, modelLabel } from './models';
 import { callTool, ToolResult } from './tools';
 import { DECLARATIONS } from './toolSpecs';
-import { Verification, verifyAnswer } from './verify';
+import { collectNumbers, Verification, verifyAnswer } from './verify';
 
 export { GeminiError } from './models';
 export const MAX_STEPS = 12;
+const MAX_TURNS = 10;          // turnos de contexto que se reenvían al modelo
+const MAX_KNOWN_NUMBERS = 3000; // cifras de herramientas que se recuerdan por chat para verificar respuestas siguientes
 
 export const SYSTEM_PROMPT = `Sos un analista financiero asistente dentro de una app móvil. El modelo interpreta y redacta; las HERRAMIENTAS son la única fuente de cifras.
 
@@ -41,6 +43,8 @@ export interface AgentResult {
   model: string;
   truncated: boolean;
   corrected: boolean;
+  /** Cifras que devolvieron las herramientas en este turno (para verificar las respuestas siguientes del mismo chat). */
+  numbers: number[];
 }
 export interface Hooks {
   onTool?: (name: string, args: Record<string, any>, result: ToolResult) => void;
@@ -48,6 +52,21 @@ export interface Hooks {
   onStatus?: (msg: string) => void;
 }
 export interface AgentOptions { apiKey: string; models: ModelManager; retryDelayMs?: number }
+
+/** El usuario detuvo la respuesta. */
+export class AbortedError extends Error {
+  constructor() { super('Respuesta detenida'); this.name = 'AbortedError'; }
+}
+
+export interface Turn { q: string; a: string }
+
+/** Contexto compacto de la conversación: solo preguntas y respuestas finales (sin llamadas a herramientas ni firmas de pensamiento). */
+export function historyToContents(history: Turn[]): any[] {
+  return history.flatMap((t) => [
+    { role: 'user', parts: [{ text: t.q }] },
+    { role: 'model', parts: [{ text: t.a.length > 8000 ? t.a.slice(0, 8000) + '…' : t.a }] },
+  ]);
+}
 
 const userMsg = (text: string) => ({ role: 'user', parts: [{ text }] });
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -76,6 +95,11 @@ export function flattenContents(contents: any[]): any[] {
 
 export class FinancialAgent {
   contents: any[] = [];
+  /** Turnos anteriores del chat (compactos). Se persisten con el chat y se restauran al reabrirlo. */
+  history: Turn[] = [];
+  /** Cifras de las herramientas de turnos anteriores: una respuesta de seguimiento puede repetirlas sin que se marquen como inventadas. */
+  priorNumbers: number[] = [];
+  private aborted = false;
   private activeModel: string | null = null;
   private o: Required<AgentOptions>;
 
@@ -85,18 +109,28 @@ export class FinancialAgent {
   }
   get model() { return this.activeModel ?? this.o.models.pick() ?? ''; }
   get modelLabel() { return this.model ? modelLabel(this.model) : ''; }
-  reset() { this.contents = []; }
+  reset() { this.contents = []; this.history = []; this.priorNumbers = []; }
+  /** Restaura el estado de un chat guardado. */
+  restore(history: Turn[], numbers: number[]) { this.history = history.slice(-MAX_TURNS); this.priorNumbers = numbers; this.contents = []; }
+  /** Quita el último turno (para "Regenerar"). */
+  popTurn() { this.history.pop(); }
+  /** Detiene la respuesta en curso: la llamada de red ya enviada no se puede cancelar, pero su resultado se descarta. */
+  abort() { this.aborted = true; }
+  private check() { if (this.aborted) throw new AbortedError(); }
 
   private async request(model: string, withTools: boolean, hooks: Hooks): Promise<any> {
     const body: Record<string, unknown> = { systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: this.contents };
     if (withTools) body.tools = [{ functionDeclarations: DECLARATIONS }];
     let delay = this.o.retryDelayMs;
     for (let attempt = 0; ; attempt++) {
+      this.check();
       let res;
       try {
         res = await http({ url: `${API_ROOT}/models/${encodeURIComponent(model)}:generateContent`, method: 'POST',
           headers: { 'x-goog-api-key': this.o.apiKey }, body, timeoutMs: 120000 });
+        this.check();
       } catch (e: any) {
+        if (e instanceof AbortedError) throw e;
         if (attempt < 2) { hooks.onStatus?.('Sin conexión; reintentando…'); await sleep(delay); delay *= 2; continue; }
         throw new GeminiError(0, `Sin conexión con Gemini: ${e?.message ?? e}`, 'busy');
       }
@@ -119,6 +153,7 @@ export class FinancialAgent {
     const tried = new Set<string>();
     let last: GeminiError | null = null;
     for (;;) {
+      this.check();
       const model = this.o.models.pick(tried);
       if (!model) {
         throw last && last.kind === 'busy'
@@ -162,6 +197,7 @@ export class FinancialAgent {
       }
       fcs.forEach((fc) => hooks.onToolStart?.(fc.name, fc.args ?? {}));
       const results = await Promise.all(fcs.map((fc) => callTool(fc.name, (fc.args ?? {}) as Record<string, any>)));
+      this.check();
       const responses = fcs.map((fc, i) => {
         const { ui, ...forModel } = results[i]; // la UI recibe los datos del gráfico; el modelo no los necesita
         const args = (fc.args ?? {}) as Record<string, any>;
@@ -180,22 +216,35 @@ export class FinancialAgent {
   }
 
   async ask(question: string, hooks: Hooks = {}): Promise<AgentResult> {
+    this.aborted = false;
+    this.contents = historyToContents(this.history);
     this.contents.push(userMsg(question));
     const calls: ToolCallRecord[] = [];
-    let { answer, truncated } = await this.run(calls, hooks);
-    let verification = verifyAnswer(answer, calls.map((c) => c.result), question);
-    let corrected = false;
-    if (!verification.ok && !truncated) {
-      const bad = verification.unverified.slice(0, 8).map((u) => u.text).join(', ');
-      hooks.onStatus?.('Verificando cifras…');
-      this.contents.push(userMsg(
-        `Verificación automática: estas cifras de tu respuesta no coinciden con ningún resultado de herramienta: ${bad}. ` +
-        'Verificá cada una con las herramientas (usá `calculate` para derivados) y reescribí la respuesta completa, ' +
-        'corrigiendo o eliminando lo que no puedas respaldar.'));
-      ({ answer, truncated } = await this.run(calls, hooks));
-      verification = verifyAnswer(answer, calls.map((c) => c.result), question);
-      corrected = true;
+    try {
+      let { answer, truncated } = await this.run(calls, hooks);
+      const verify = () => verifyAnswer(answer, [...calls.map((c) => c.result), this.priorNumbers], question);
+      let verification = verify();
+      let corrected = false;
+      if (!verification.ok && !truncated) {
+        const bad = verification.unverified.slice(0, 8).map((u) => u.text).join(', ');
+        hooks.onStatus?.('Verificando cifras…');
+        this.contents.push(userMsg(
+          `Verificación automática: estas cifras de tu respuesta no coinciden con ningún resultado de herramienta: ${bad}. ` +
+          'Verificá cada una con las herramientas (usá `calculate` para derivados) y reescribí la respuesta completa, ' +
+          'corrigiendo o eliminando lo que no puedas respaldar.'));
+        ({ answer, truncated } = await this.run(calls, hooks));
+        verification = verify();
+        corrected = true;
+      }
+      // Turno completo: se guarda de forma compacta y se recuerdan las cifras de las herramientas.
+      this.history.push({ q: question, a: answer });
+      this.history = this.history.slice(-MAX_TURNS);
+      const numbers = [...new Set(collectNumbers(calls.map((c) => c.result)))];
+      this.priorNumbers = [...new Set([...this.priorNumbers, ...numbers])].slice(-MAX_KNOWN_NUMBERS);
+      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, numbers };
+    } catch (e) {
+      this.contents = historyToContents(this.history); // se descarta el turno incompleto
+      throw e;
     }
-    return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected };
   }
 }

@@ -40,10 +40,19 @@ import trendUp from 'lucide-static/icons/trending-up.svg?raw';
 import warn from 'lucide-static/icons/triangle-alert.svg?raw';
 import x from 'lucide-static/icons/x.svg?raw';
 import zap from 'lucide-static/icons/zap.svg?raw';
+import copy from 'lucide-static/icons/copy.svg?raw';
+import ellipsis from 'lucide-static/icons/ellipsis.svg?raw';
+import menu from 'lucide-static/icons/menu.svg?raw';
+import messageSquare from 'lucide-static/icons/message-square.svg?raw';
+import pencil from 'lucide-static/icons/pencil.svg?raw';
+import rotateCcw from 'lucide-static/icons/rotate-ccw.svg?raw';
+import square from 'lucide-static/icons/square.svg?raw';
+import squarePen from 'lucide-static/icons/square-pen.svg?raw';
 
 const ICONS = { activity, arrowDown, arrowUp, arrowUpRight, bitcoin, candles, lineChart, check, checkCircle, chevronLeft, clock, dollar,
   externalLink, flame, gauge, globe, house, info, keyRound, landmark, layers, lock, monitor, moon, newspaper, plus, refresh, scale,
-  search, send, settings, shield, sparkles, star, sun, trash, trendDown, trendUp, warn, x, zap } as const;
+  search, send, settings, shield, sparkles, star, sun, trash, trendDown, trendUp, warn, x, zap,
+  copy, ellipsis, menu, messageSquare, pencil, rotateCcw, square, squarePen } as const;
 export type IconName = keyof typeof ICONS;
 
 /** Devuelve el HTML de un icono (hereda el color del texto). `fill` rellena la forma (ej. estrella activa). */

@@ -6,6 +6,7 @@ import { pool } from '../data/net';
 import { $, esc, h } from '../ui/dom';
 import { dirClass, fmtPct, fmtPrice, initials, symbolColor } from '../ui/format';
 import { icon } from '../ui/icons';
+import { confirmSheet } from '../ui/sheet';
 import { sparkSvg } from '../ui/spark';
 
 const STARTERS = ['AAPL', 'MSFT', 'NVDA', 'MELI', 'GGAL', 'YPFD.BA', 'BTC-USD', 'AAPL.BA'];
@@ -53,9 +54,17 @@ export function createWatchView(ctx: Ctx): View {
         <div class="px">${qd?.price !== undefined && qd.price !== null
           ? `<div class="num" style="font-weight:650;margin-bottom:3px">${fmtPrice(qd.price, qd.currency)}</div><span class="pill ${cls}">${fmtPct(qd.changePct, false)}</span>`
           : '<div class="skeleton" style="height:34px;width:78px"></div>'}</div>`;
-      row.onclick = () => ctx.openAsset(s, qd?.name);
-      let timer: number | undefined;
-      row.addEventListener('touchstart', () => { timer = window.setTimeout(() => { if (confirm(`¿Quitar ${s} de favoritos?`)) toggleWatch(s); }, 650); }, { passive: true });
+      // Mantener presionado quita el favorito; al soltar, el navegador igual emite un "click" que NO debe abrir el activo.
+      let timer: number | undefined, longPress = false;
+      row.onclick = () => { if (longPress) { longPress = false; return; } ctx.openAsset(s, qd?.name); };
+      row.addEventListener('contextmenu', (ev) => ev.preventDefault());
+      row.addEventListener('touchstart', () => {
+        longPress = false;
+        timer = window.setTimeout(async () => {
+          longPress = true;
+          if (await confirmSheet({ title: `¿Quitar ${s} de favoritos?`, confirm: 'Quitar', danger: true })) toggleWatch(s);
+        }, 650);
+      }, { passive: true });
       ['touchend', 'touchmove', 'touchcancel'].forEach((ev) => row.addEventListener(ev, () => clearTimeout(timer), { passive: true }));
       wrap.append(row);
     });

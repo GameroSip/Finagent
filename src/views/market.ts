@@ -158,25 +158,39 @@ export function createMarketView(ctx: Ctx): View {
   }
 
   // ------------------------------------------------------------ carga (pinta caché y refresca)
-  async function load<T>(key: string, fetcher: () => Promise<T>, render: (d: T) => void, onFail: () => void, force: boolean) {
+  /**
+   * Pinta el caché y refresca. `isCurrent` evita que una respuesta lenta pise a la de una pestaña más nueva
+   * (p. ej. "Suben" -> "Bajan" rápido), y un render que falla con datos viejos no rompe la pantalla.
+   */
+  async function load<T>(key: string, fetcher: () => Promise<T>, render: (d: T) => void, onFail: () => void, force: boolean, isCurrent: () => boolean = () => true) {
+    const tryRender = (d: T) => { try { render(d); return true; } catch { return false; } };
     const c = getCache<T>(key);
-    if (c) render(c.data);
-    if (c && !force && Date.now() - c.at < STALE_MS) return;
-    try { const d = await fetcher(); setCache(key, d); render(d); } catch { if (!c) onFail(); }
+    const shown = !!c && isCurrent() && tryRender(c.data);
+    if (shown && !force && Date.now() - c!.at < STALE_MS) return;
+    try {
+      const d = await fetcher();
+      setCache(key, d);
+      if (isCurrent()) tryRender(d);
+    } catch { if (!shown && isCurrent()) onFail(); }
   }
 
-  const loadIndices = (force: boolean) => load('indices', fetchIndices, (l) => { renderHero(l); renderIndices(l); },
+  const fetchIndicesOk = async () => {
+    const l = await fetchIndices();
+    if (!l.some((i) => i.price !== null)) throw new Error('sin datos'); // falla total: se conserva lo último que andaba
+    return l;
+  };
+  const loadIndices = (force: boolean) => load('indices', fetchIndicesOk, (l) => { renderHero(l); renderIndices(l); },
     () => { q('m-indices').innerHTML = errorBox('No se pudieron cargar los índices.', 'idx'); }, force);
   const loadAr = (force: boolean) => load('argentina', async () => {
     const [dol, rp, inf] = await Promise.all([fetchDolares().then(withBrecha, () => null), fetchRiesgoPais().catch(() => null), fetchInflacion().catch(() => null)]);
     if (!dol && !rp && !inf) throw new Error('sin datos');
     return { dol, rp, inf };
   }, renderArgentina, () => { q('m-ar').innerHTML = errorBox('No se pudieron cargar los datos de Argentina.', 'ar'); }, force);
-  const loadMovers = (force: boolean) => load(`movers-${moverKind}`, () => fetchMovers(moverKind, 8), renderMovers,
-    () => { q('m-movers').innerHTML = errorBox('No se pudo cargar el ranking.', 'mov'); }, force);
+  const loadMovers = (force: boolean) => { const kind = moverKind; return load(`movers-${kind}`, () => fetchMovers(kind, 8), renderMovers,
+    () => { q('m-movers').innerHTML = errorBox('No se pudo cargar el ranking.', 'mov'); }, force, () => moverKind === kind); };
   const loadFng = (force: boolean) => load('fng', fetchFearGreed, (f) => renderFng(f), () => renderFng(null), force);
-  const loadNews = (force: boolean) => load(`news-${region}`, () => fetchHeadlines(undefined, region, 8), renderNews,
-    () => { q('m-news').innerHTML = errorBox('No se pudieron cargar los titulares.', 'news'); }, force);
+  const loadNews = (force: boolean) => { const rg = region; return load(`news-${rg}`, () => fetchHeadlines(undefined, rg, 8), renderNews,
+    () => { q('m-news').innerHTML = errorBox('No se pudieron cargar los titulares.', 'news'); }, force, () => region === rg); };
 
   function refresh(force = false) {
     lastRefresh = Date.now();

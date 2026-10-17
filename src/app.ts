@@ -5,6 +5,7 @@ import type { Ctx, TabId, View } from './ctx';
 import type { ModelManager } from './models';
 import { wipeAll } from './store';
 import { h } from './ui/dom';
+import { closeTopSheet } from './ui/sheet';
 import { icon, type IconName } from './ui/icons';
 import { openAssetOverlay, type Overlay } from './views/asset';
 import { createChatView, type ChatView } from './views/chat';
@@ -33,8 +34,9 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
   const ctx: Ctx = {
     models,
     go(t) { setTab(t); },
-    openAsset(symbol, name) { push(openAssetOverlay(ctx, symbol, name, () => pop())); },
-    openSearch() { push(openSearchOverlay(ctx, () => pop())); },
+    openAsset(symbol, name) { push((done) => openAssetOverlay(ctx, symbol, name, done)); },
+    openSearch() { push((done) => openSearchOverlay(ctx, done)); },
+    layer(make) { push(make); },
     askAI(prompt, label) { closeAll(); setTab('chat'); chat.ask(prompt, label); },
     logout() { wipeAll(); location.reload(); },
   };
@@ -59,13 +61,22 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
     tabbar.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', (b as HTMLElement).dataset.tab === t));
     views[t].onShow?.();
   }
-  function push(o: Overlay) { overlays.push(o); root.append(o.el); }
-  function pop() { overlays.pop(); }
-  function closeAll() { while (overlays.length) overlays.pop()!.close(); }
+  // Cada pantalla se quita de la pila por identidad cuando termina de cerrarse (antes se hacía pop() del último,
+  // y abrir un activo desde la búsqueda dejaba la pila desfasada y el botón "atrás" dejaba de funcionar).
+  function push(make: (done: () => void) => Overlay) {
+    let o!: Overlay;
+    o = make(() => { const i = overlays.indexOf(o); if (i >= 0) overlays.splice(i, 1); });
+    overlays.push(o);
+    root.append(o.el);
+  }
+  const topOverlay = () => [...overlays].reverse().find((o) => !o.el.classList.contains('leaving'));
+  function closeAll() { [...overlays].forEach((o) => o.close()); }
 
   if (Capacitor.isNativePlatform()) {
     void CapApp.addListener('backButton', () => {
-      if (overlays.length) overlays[overlays.length - 1].close();
+      if (closeTopSheet()) return;
+      const top = topOverlay();
+      if (top) top.close();
       else if (tab !== 'market') setTab('market');
       else void CapApp.minimizeApp();
     });

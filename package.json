@@ -1,0 +1,23 @@
+{
+  "name": "finagent-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FinAgent móvil: agente financiero que corre 100% en el teléfono (sin servidor).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}

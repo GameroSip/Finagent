@@ -4,7 +4,7 @@ import { evaluate } from './calc';
 import { fetchDolares, fetchInflacion, fetchRiesgoPais, withBrecha } from './data/argentina';
 import { fetchFearGreed, fetchIndices } from './data/market';
 import { fetchHeadlines, Region } from './data/news';
-import { ema, r, snapshot } from './indicators';
+import { ema, performance, r, snapshot } from './indicators';
 import { UNIVERSES } from './universes';
 import { safeUrl } from './url';
 import * as Y from './yahoo';
@@ -227,6 +227,34 @@ tool('get_technicals', 300, async (a) => {
     ema: { 20: emaFor(20), 50: emaFor(50), 200: emaFor(200) },
   };
   return env(s, { period, interval, ...snap }, bars[bars.length - 1].t, notes, ui);
+});
+
+// ---------------------------------------------------------------- rendimiento y riesgo
+const HORIZON_ES: Record<string, string> = { '1M': '1 mes', '3M': '3 meses', '6M': '6 meses', '1Y': '1 año', '3Y': '3 años', '5Y': '5 años' };
+tool('get_performance', 300, async (a) => {
+  const s = sym(a.ticker);
+  const ch = await Y.fetchChart(s, '5y', '1d');
+  const bars = Y.adjustBars(ch.bars);
+  if (bars.length < 30) throw new Error(`Historia insuficiente para ${s}`);
+  const p = performance(bars.map((b) => ({ t: b.t, c: b.c })));
+  const last = bars[bars.length - 1];
+  const items: Array<Record<string, unknown>> = [
+    ...Object.entries(p.returns).filter(([, v]) => v !== null).map(([k, v]) => ({ key: `ret_${k}`, label: `Retorno ${HORIZON_ES[k]}`, value: v, unit: '%', signed: true })),
+    ...(p.ytd !== null ? [{ key: 'ret_ytd', label: 'Retorno en el año', value: p.ytd, unit: '%', signed: true }] : []),
+    ...(p.volatility_1y_pct !== null ? [{ key: 'vol', label: 'Volatilidad anual', value: p.volatility_1y_pct, unit: '%' }] : []),
+    { key: 'dd', label: 'Caída máxima 1 año', value: p.max_drawdown_1y_pct, unit: '%' },
+  ];
+  const notes = ['Precios ajustados por dividendos y splits (retorno total aproximado). Los horizontes sin historia suficiente vienen en null. Rendimientos pasados no garantizan resultados futuros.'];
+  if (ch.meta.currency === 'ARS') notes.push('Cotiza en pesos: el rendimiento es nominal en pesos (no descuenta inflación ni la evolución del dólar).');
+  return env(s, {
+    currency: ch.meta.currency ?? null, ...p,
+    formulas: {
+      returns: '(último cierre / cierre N días atrás - 1) × 100',
+      cagr: '((último cierre / cierre inicial) ^ (365 / días) - 1) × 100',
+      volatility_1y_pct: 'desvío estándar de los retornos logarítmicos diarios (252 ruedas) × √252 × 100',
+      max_drawdown_1y_pct: 'mínimo de (cierre / máximo previo - 1) × 100 en las últimas 252 ruedas',
+    },
+  }, last.t, notes, { kind: 'metrics', title: `${s} · rendimiento y riesgo`, symbol: s, name: s, items });
 });
 
 // ---------------------------------------------------------------- noticias

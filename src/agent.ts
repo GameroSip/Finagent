@@ -4,7 +4,7 @@ import { http } from './http';
 import { API_ROOT, GeminiError, ModelManager, modelLabel } from './models';
 import { callTool, ToolResult } from './tools';
 import { DECLARATIONS } from './toolSpecs';
-import { collectNumbers, Verification, verifyAnswer } from './verify';
+import { collectNumbers, redactUnverified, Verification, verifyAnswer } from './verify';
 
 export { GeminiError } from './models';
 export const MAX_STEPS = 12;
@@ -15,19 +15,20 @@ export const SYSTEM_PROMPT = `Sos un analista financiero asistente dentro de una
 
 REGLAS DE DATOS
 1. NUNCA escribas una cifra (precio, ratio, porcentaje, fecha de resultados, objetivo) que no provenga de una herramienta en esta conversación. No uses memoria para números.
-2. Todo cálculo derivado (variaciones, diferencias, upside, promedios) se hace con \`calculate\`. No hagas aritmética de cabeza.
+2. Todo cálculo derivado (variaciones, diferencias, upside, promedios) se hace con \`calculate\`; rendimientos, volatilidad y caídas máximas salen de \`get_performance\`. No hagas aritmética de cabeza: los modelos de lenguaje se equivocan en las cuentas.
 3. Si el usuario nombra una empresa sin ticker, usá \`search_ticker\`. Convenciones Yahoo: acciones de EE.UU. 'AAPL'; BYMA (acciones locales y CEDEARs) con sufijo '.BA' (ej. 'GGAL.BA', 'AAPL.BA'); ADRs argentinos sin sufijo ('GGAL'); cripto 'BTC-USD'; índices '^GSPC'.
-4. Elegí las herramientas mínimas necesarias; podés encadenar varias y llamar varias a la vez. Si falta información, pedila a otra herramienta o decí claramente que no está disponible. Si una herramienta falla, reportalo; no completes con suposiciones.
-5. Para "¿cómo está el mercado?" o "resumen del día": \`get_market_overview\` + \`get_headlines\` (y \`get_argentina_macro\` si el usuario es de Argentina o pregunta por activos locales). Para dólar, brecha, riesgo país o inflación: \`get_argentina_macro\`.
+4. Escribí cada cifra EXACTAMENTE como la devolvió la herramienta: mismos decimales, nunca más precisión. Si no tenés una cifra, decí que no está disponible; jamás la estimes, la redondees por tu cuenta ni la recuerdes de memoria. La app descarta las cifras que no puede respaldar con datos.
+5. Elegí las herramientas mínimas necesarias; podés encadenar varias y llamar varias a la vez. Si falta información, pedila a otra herramienta o decí claramente que no está disponible. Si una herramienta falla, reportalo; no completes con suposiciones.
+6. Para "¿cómo está el mercado?" o "resumen del día": \`get_market_overview\` + \`get_headlines\` (y \`get_argentina_macro\` si el usuario es de Argentina o pregunta por activos locales). Para dólar, brecha, riesgo país o inflación: \`get_argentina_macro\`.
 
 REGLAS DE RIGOR
-6. Aclará siempre la base de cada métrica: TTM vs forward vs último año fiscal, moneda, ADR vs acción local vs CEDEAR. Al comparar, avisá si bases o monedas difieren.
-7. Citá fecha y fuente de los datos clave (usá \`meta.as_of\` y \`meta.source\`). Si el dato es de una rueda anterior, decilo.
-8. Separá con claridad: **Hechos** (con fuente y fecha), **Cálculos**, **Interpretación** y **Escenarios**. No presentes hipótesis como hechos. Correlación no es causalidad.
-9. Los titulares son narrativa mediática, no hechos verificados: parafraseá, nombrá el medio y contrastá con los datos; nunca copies titulares textuales largos.
-10. Para preguntas abiertas ("¿conviene...?", "¿es buena inversión?") NO des veredicto ni predigas precios. Entregá: Caso alcista, Caso bajista, qué evento o umbral medible invalidaría cada tesis, y qué datos faltan. Marcá el nivel de incertidumbre.
-11. Las señales técnicas son descriptivas, no predictivas. Los objetivos de analistas son opiniones, no pronósticos verificados.
-12. Si la conclusión depende del perfil del usuario (horizonte, tolerancia al riesgo, moneda base), hacé notar que cambia según ese perfil.
+7. Aclará siempre la base de cada métrica: TTM vs forward vs último año fiscal, moneda, ADR vs acción local vs CEDEAR. Al comparar, avisá si bases o monedas difieren.
+8. Citá fecha y fuente de los datos clave (usá \`meta.as_of\` y \`meta.source\`). Si el dato es de una rueda anterior, decilo.
+9. Separá con claridad: **Hechos** (con fuente y fecha), **Cálculos**, **Interpretación** y **Escenarios**. No presentes hipótesis como hechos. Correlación no es causalidad.
+10. Los titulares son narrativa mediática, no hechos verificados: parafraseá, nombrá el medio y contrastá con los datos; nunca copies titulares textuales largos.
+11. Para preguntas abiertas ("¿conviene...?", "¿es buena inversión?") NO des veredicto ni predigas precios. Entregá: Caso alcista, Caso bajista, qué evento o umbral medible invalidaría cada tesis, y qué datos faltan. Marcá el nivel de incertidumbre.
+12. Las señales técnicas son descriptivas, no predictivas. Los objetivos de analistas son opiniones, no pronósticos verificados.
+13. Si la conclusión depende del perfil del usuario (horizonte, tolerancia al riesgo, moneda base), hacé notar que cambia según ese perfil.
 
 FORMATO
 - La app muestra gráficos y tarjetas automáticamente cuando consultás datos: no los describas punto por punto, interpretalos.
@@ -43,6 +44,8 @@ export interface AgentResult {
   model: string;
   truncated: boolean;
   corrected: boolean;
+  /** Cantidad de cifras que no se pudieron respaldar y se quitaron de la respuesta (el usuario nunca ve una cifra sin sustento). */
+  redacted: number;
   /** Cifras que devolvieron las herramientas en este turno (para verificar las respuestas siguientes del mismo chat). */
   numbers: number[];
 }
@@ -215,6 +218,17 @@ export class FinancialAgent {
     return { answer: text || 'No alcancé a completar el análisis. Probá con una pregunta más acotada.', truncated: true };
   }
 
+  /** Una vuelta del modelo SIN herramientas (se usa para reescribir sin cifras sin respaldo). */
+  private async plainRewrite(instruction: string, hooks: Hooks): Promise<string | null> {
+    this.contents.push(userMsg(instruction));
+    const data = await this.generate(false, hooks);
+    const content = data?.candidates?.[0]?.content;
+    if (!content) return null;
+    this.contents.push({ role: 'model', ...content });
+    const text = (content.parts ?? []).filter((p: any) => typeof p.text === 'string' && !p.thought).map((p: any) => p.text).join('').trim();
+    return text || null;
+  }
+
   async ask(question: string, hooks: Hooks = {}): Promise<AgentResult> {
     this.aborted = false;
     this.contents = historyToContents(this.history);
@@ -223,25 +237,46 @@ export class FinancialAgent {
     try {
       let { answer, truncated } = await this.run(calls, hooks);
       const verify = () => verifyAnswer(answer, [...calls.map((c) => c.result), this.priorNumbers], question);
+      const list = (v: Verification) => v.unverified.slice(0, 8).map((u) => u.text).join(', ');
       let verification = verify();
       let corrected = false;
+
+      // 1) Corrección con herramientas: el modelo puede consultar o calcular lo que le faltó.
       if (!verification.ok && !truncated) {
-        const bad = verification.unverified.slice(0, 8).map((u) => u.text).join(', ');
         hooks.onStatus?.('Verificando cifras…');
         this.contents.push(userMsg(
-          `Verificación automática: estas cifras de tu respuesta no coinciden con ningún resultado de herramienta: ${bad}. ` +
-          'Verificá cada una con las herramientas (usá `calculate` para derivados) y reescribí la respuesta completa, ' +
+          `Verificación automática: estas cifras de tu respuesta no coinciden con ningún resultado de herramienta: ${list(verification)}. ` +
+          'Verificá cada una con las herramientas (usá `get_performance` para rendimientos y `calculate` para derivados) y reescribí la respuesta completa, ' +
           'corrigiendo o eliminando lo que no puedas respaldar.'));
         ({ answer, truncated } = await this.run(calls, hooks));
         verification = verify();
         corrected = true;
       }
+
+      // 2) Si todavía quedan cifras sin respaldo (o se agotaron los pasos): reescritura sin herramientas y sin esas cifras.
+      if (!verification.ok) {
+        hooks.onStatus?.('Quitando cifras sin respaldo…');
+        const text = await this.plainRewrite(
+          `Verificación automática: estas cifras siguen sin respaldo en los datos de las herramientas: ${list(verification)}. ` +
+          'Reescribí la respuesta completa SIN ellas ni ninguna otra cifra que no esté en los datos: no hagas cuentas ni estimaciones. ' +
+          'Si falta un dato, decí que no está disponible. No uses herramientas.', hooks);
+        if (text) { answer = text; verification = verify(); corrected = true; }
+      }
+
+      // 3) Último recurso: lo que siga sin respaldo se quita del texto. Nunca se muestra una cifra sin sustento.
+      let redacted = 0;
+      if (!verification.ok) {
+        redacted = verification.unverified.length;
+        answer = redactUnverified(answer, verification.unverified);
+        verification = verify();
+      }
+
       // Turno completo: se guarda de forma compacta y se recuerdan las cifras de las herramientas.
       this.history.push({ q: question, a: answer });
       this.history = this.history.slice(-MAX_TURNS);
       const numbers = [...new Set(collectNumbers(calls.map((c) => c.result)))];
       this.priorNumbers = [...new Set([...this.priorNumbers, ...numbers])].slice(-MAX_KNOWN_NUMBERS);
-      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, numbers };
+      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, redacted, numbers };
     } catch (e) {
       this.contents = historyToContents(this.history); // se descarta el turno incompleto
       throw e;

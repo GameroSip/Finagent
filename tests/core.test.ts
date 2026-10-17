@@ -370,3 +370,85 @@ describe('monedas mezcladas (CEDEARs y ADRs)', () => {
     expect(m.fcf_yield_pct.value).toBe(4);
   });
 });
+
+// ------------------------------------------------------------------ verificador: posiciones, cantidades descriptivas y redacción
+import { redactUnverified, REDACTED } from '../src/verify';
+describe('verificador: redacción de cifras sin respaldo', () => {
+  const POOL2 = [{ ok: true, data: { price: 187.32, ret: 12.34 } }];
+  it('informa la posición exacta de cada cifra', () => {
+    const answer = 'El precio es 187.32 y el rendimiento 24.572% (ver 24.572% otra vez).';
+    const v = verifyAnswer(answer, POOL2);
+    expect(v.unverified.map((u) => answer.slice(u.start, u.end))).toEqual(['24.572%', '24.572%']);
+  });
+  it('las posiciones se conservan aunque haya fechas en el texto', () => {
+    const answer = 'Al 7 de octubre de 2026 (2026-10-16) subió 35.7% y cerró en 187.32.';
+    const v = verifyAnswer(answer, POOL2);
+    expect(v.unverified).toHaveLength(1);
+    expect(answer.slice(v.unverified[0].start, v.unverified[0].end)).toBe('35.7%');
+  });
+  it('quita solo lo que no tiene respaldo y deja el resto intacto', () => {
+    const answer = 'Precio 187.32; rendimiento anual 24.572% y volatilidad 21.512%.';
+    const v = verifyAnswer(answer, POOL2);
+    const out = redactUnverified(answer, v.unverified);
+    expect(out).toBe(`Precio 187.32; rendimiento anual ${REDACTED} y volatilidad ${REDACTED}.`);
+    expect(verifyAnswer(out, POOL2).ok).toBe(true);
+  });
+  it('no marca como dato las cantidades descriptivas (días, semanas, ruedas)', () => {
+    const v = verifyAnswer('En los últimos 30 días y las 52 semanas previas, con 200 ruedas de historia; el precio es 187.32.', POOL2);
+    expect(v.ok, JSON.stringify(v.unverified)).toBe(true);
+  });
+  it('pero sí marca cifras de dato aunque sean enteras', () => {
+    expect(verifyAnswer('El índice cerró en 5000 puntos y el volumen fue 12000.', POOL2).unverified.map((u) => u.text)).toEqual(['5000', '12000']);
+  });
+});
+
+// ------------------------------------------------------------------ rendimiento y riesgo (get_performance)
+import perfFixture from './fixtures/perf.json';
+import { performance as perfCalc } from '../src/indicators';
+describe('rendimiento y riesgo', () => {
+  it('coincide con el cálculo independiente en Python (retornos, CAGR, volatilidad, caída máxima)', () => {
+    const got = perfCalc(perfFixture.bars) as any;
+    const exp = perfFixture.expected as any;
+    const close = (a: number | null, b: number | null) => (b === null ? expect(a).toBeNull() : expect(Math.abs((a as number) - b)).toBeLessThanOrEqual(0.011));
+    for (const k of Object.keys(exp.returns)) close(got.returns[k], exp.returns[k]);
+    close(got.ytd, exp.ytd);
+    for (const k of Object.keys(exp.cagr)) close(got.cagr[k], exp.cagr[k]);
+    close(got.volatility_1y_pct, exp.volatility_1y_pct);
+    close(got.max_drawdown_1y_pct, exp.max_drawdown_1y_pct);
+  });
+  it('los horizontes sin historia quedan en null, no se aproximan', async () => {
+    const r = await callTool('get_performance', { ticker: 'AAA' });   // el simulador entrega ~300 días
+    expect(r.ok).toBe(true);
+    const ret = r.data.returns;
+    expect(ret['1M']).not.toBeNull();
+    expect(ret['6M']).not.toBeNull();
+    expect(ret['1Y']).toBeNull();
+    expect(ret['3Y']).toBeNull();
+    expect(r.data.volatility_1y_pct).not.toBeNull();
+    expect(r.data.max_drawdown_1y_pct).toBeLessThanOrEqual(0);
+    expect(r.ui.items.some((i: any) => i.key === 'ret_1Y')).toBe(false);
+    expect(r.meta.notes.join(' ')).toContain('ajustados');
+  });
+  it('lo que devuelve la herramienta es verificable (el modelo puede citarlo sin que se lo quiten)', async () => {
+    const r = await callTool('get_performance', { ticker: 'AAA' });
+    const v = r.data.returns['6M'];
+    expect(verifyAnswer(`En 6 meses rindió ${v}%.`, [r]).ok).toBe(true);
+    expect(verifyAnswer(`En 6 meses rindió ${(v + 3.217).toFixed(3)}%.`, [r]).ok).toBe(false);
+  });
+});
+
+describe('verificador: números con muchos decimales', () => {
+  it.each([
+    ['Rinde 5.431951%.', '5.431951%'], ['Subió 24.572312%.', '24.572312%'], ['Vale 187.6921.', '187.6921'],
+    ['Fue 12.3456 veces.', '12.3456'], ['Cap 1.234.567,89 pesos.', '1.234.567,89'], ['Precio 187.692.', '187.692'],
+  ])('lee %s como un solo número', (text, expected) => {
+    expect(verifyAnswer(text, []).unverified.map((u) => u.text)).toEqual([expected]); // antes: "5.431", "24.572", "187.692", "12.345"
+  });
+  it('compara con todos los decimales y respeta el %', () => {
+    const pool = [{ result: 5.431951 }];
+    expect(verifyAnswer('Potencial de 5.431951%.', pool).ok).toBe(true);
+    expect(verifyAnswer('Potencial de 5.43%.', pool).ok).toBe(true);        // redondeado: sigue siendo trazable
+    expect(verifyAnswer('Potencial de 5.431999%.', pool).ok).toBe(false);   // más precisión de la que tienen los datos
+    expect(verifyAnswer('Potencial de 17.1%.', pool).ok).toBe(false);       // el error real que se vio en WarrenAI
+  });
+});

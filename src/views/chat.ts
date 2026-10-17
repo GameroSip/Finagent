@@ -31,6 +31,7 @@ const LABELS: Record<string, (a: any) => string> = {
   get_financials: (a) => `Estados contables de ${a.ticker}`, get_technicals: (a) => `Análisis técnico de ${a.ticker}`, get_news: (a) => `Noticias de ${a.ticker}`,
   compare_assets: (a) => `Comparando ${(a.tickers ?? []).join(', ')}`, screen_assets: () => 'Filtrando activos', calculate: () => 'Calculando',
   get_market_overview: () => 'Panorama de mercado', get_movers: () => 'Rankings del día', get_argentina_macro: () => 'Dólar, brecha y riesgo país',
+  get_performance: (a) => `Rendimiento y riesgo de ${a.ticker}`,
   get_headlines: (a) => `Titulares de medios${a.topic ? `: ${a.topic}` : ''}`,
 };
 const labelFor = (name: string, args: any) => (LABELS[name] ?? (() => name))(args ?? {});
@@ -144,8 +145,11 @@ export function createChatView(ctx: Ctx): ChatView {
     body.append(h('div', { class: 'md', html: renderMarkdown(m.text) }));
     const v = m.verification;
     let pills = '';
-    if (v && v.checked > 0) pills += v.ok ? `<span class="vpill ok">${icon('shield', 13)} ${v.checked} cifras verificadas con datos</span>`
-      : `<span class="vpill warn">${icon('warn', 13)} Sin respaldo en los datos: ${v.unverified.map((u) => `<code>${esc(u)}</code>`).join(' ')}</span>`;
+    // Nunca se muestran cifras sin respaldo: el agente las quita antes de responder y acá solo se avisa cuántas fueron.
+    if (v && v.ok && v.checked > 0) pills += `<span class="vpill ok">${icon('shield', 13)} ${v.checked} cifras verificadas con datos</span>`;
+    if (v && !v.ok) pills += `<span class="vpill warn">${icon('warn', 13)} Algunas cifras no se pudieron verificar</span>`; // chats guardados con versiones anteriores
+    const nr = m.flags?.redacted ?? 0;
+    if (nr) pills += `<span class="vpill">${icon('info', 13)} Quité ${nr} ${nr === 1 ? 'cifra' : 'cifras'} que no pude respaldar con datos</span>`;
     if (m.flags?.corrected) pills += `<span class="vpill">${icon('check', 13)} corregida tras verificar</span>`;
     if (m.flags?.truncated) pills += `<span class="vpill warn">${icon('clock', 13)} respuesta parcial</span>`;
     body.append(h('div', { class: 'ai-foot', html: `<div class="vrow">${pills}</div>
@@ -269,7 +273,7 @@ export function createChatView(ctx: Ctx): ChatView {
     const am: StoredMsg = {
       id: newId(), role: 'ai', at: Date.now(), text: res.answer, model: res.model,
       verification: { checked: res.verification.checked, ok: res.verification.ok, unverified: res.verification.unverified.map((u) => u.text) },
-      flags: { ...(res.corrected ? { corrected: true } : {}), ...(res.truncated ? { truncated: true } : {}) },
+      flags: { ...(res.corrected ? { corrected: true } : {}), ...(res.truncated ? { truncated: true } : {}), ...(res.redacted ? { redacted: res.redacted } : {}) },
       trace: traceOf(res.toolCalls), ui: uiOf(res.toolCalls),
     };
     data.messages.push(am);

@@ -197,3 +197,51 @@ describe('flattenContents', () => {
     expect(out[2].parts).toHaveLength(2);
   });
 });
+
+// ------------------------------------------------------------------ cero cifras sin respaldo
+import { verifyAnswer } from '../src/verify';
+describe('el usuario nunca ve una cifra sin respaldo', () => {
+  it('si el modelo insiste, la cifra se quita del texto (y avisa cuántas)', async () => {
+    let n = 0;
+    const calls = mockGemini(() => { n++; return n <= 2 ? text('Rinde 24.572% y vol 21.512%.') : text('Rinde 24.572% anual.'); });
+    const { agent } = agentWith(['A']);
+    const res = await agent.ask('¿cuánto rinde?');
+    expect(res.answer).toBe('Rinde [dato no verificado] anual.');
+    expect(res.redacted).toBe(1);
+    expect(verifyAnswer(res.answer, []).ok).toBe(true);
+    expect(calls).toHaveLength(3);                           // borrador, corrección con herramientas, reescritura sin herramientas
+    expect(calls[1].body.tools).toBeDefined();
+    expect(calls[2].body.tools).toBeUndefined();
+    expect(agent.history[0].a).toBe(res.answer);             // el contexto guardado tampoco conserva la cifra inventada
+  });
+
+  it('si la reescritura sin esas cifras alcanza, no se quita nada', async () => {
+    let n = 0;
+    mockGemini(() => { n++; return n <= 2 ? text('Rinde 24.572%.') : text('No tengo ese dato disponible.'); });
+    const { agent } = agentWith(['A']);
+    const res = await agent.ask('¿cuánto rinde?');
+    expect(res.answer).toBe('No tengo ese dato disponible.');
+    expect(res.redacted).toBe(0);
+    expect(res.corrected).toBe(true);
+  });
+
+  it('también cuando la respuesta se corta por el límite de pasos (antes se salteaba la corrección)', async () => {
+    const calls = mockGemini((_m, body) => (body.tools ? fcall('1+1') : text('Dato 99.123 sin respaldo.')));
+    const { agent } = agentWith(['A']);
+    const res = await agent.ask('loop');
+    expect(res.truncated).toBe(true);
+    expect(res.answer).toBe('Dato [dato no verificado] sin respaldo.');
+    expect(res.redacted).toBe(1);
+    expect(calls).toHaveLength(MAX_STEPS + 2);               // pasos + cierre + reescritura
+  });
+
+  it('las cifras respaldadas por herramientas no se tocan', async () => {
+    let n = 0;
+    mockGemini(() => { n++; return n === 1 ? fcall('1.1*100') : text('El resultado es 110.'); });
+    const { agent } = agentWith(['A']);
+    const res = await agent.ask('multiplicá');
+    expect(res.answer).toBe('El resultado es 110.');
+    expect(res.redacted).toBe(0);
+    expect(res.corrected).toBe(false);
+  });
+});

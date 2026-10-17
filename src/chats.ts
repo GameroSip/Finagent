@@ -25,7 +25,7 @@ export interface StoredMsg {
   text: string;                                       // usuario: lo que se ve; ia: respuesta en markdown; error: mensaje
   prompt?: string;                                    // usuario: el mensaje real si lo que se ve es una etiqueta (sugerencias)
   verification?: { checked: number; ok: boolean; unverified: string[] };
-  flags?: { corrected?: boolean; truncated?: boolean };
+  flags?: { corrected?: boolean; truncated?: boolean; redacted?: number }; // redacted: cifras sin respaldo que se quitaron
   trace?: TraceItem[];
   ui?: any[];                                         // tarjetas gráficas (acotadas en tamaño)
   model?: string;
@@ -249,7 +249,7 @@ export function uiOf(calls: ToolCallRecord[]): any[] {
   for (const c of calls) {
     const ui = c.ui;
     if (!ui) continue;
-    const key = ui.kind + (ui.symbol ?? ui.title ?? '') + (ui.period ?? '');
+    const key = ui.kind + (ui.symbol ?? '') + (ui.title ?? '') + (ui.period ?? '');
     if (seen.has(key)) continue;
     seen.add(key);
     if (JSON.stringify(ui).length <= MAX_UI_BYTES) out.push(ui);

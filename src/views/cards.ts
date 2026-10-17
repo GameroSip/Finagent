@@ -114,10 +114,10 @@ function headlinesCard(ui: any): Rich {
 }
 
 function metricsCard(ui: any, ctx: Ctx): Rich {
-  const { el, body } = shell(`${ui.symbol} · fundamentales`, ui.name !== ui.symbol ? ui.name : '', 'scale', () => ctx.openAsset(ui.symbol, ui.name));
+  const { el, body } = shell(ui.title ?? `${ui.symbol} · fundamentales`, ui.name !== ui.symbol ? ui.name : '', 'scale', () => ctx.openAsset(ui.symbol, ui.name));
   const fmt = (it: any) => {
     if (it.key === 'market_cap') return fmtCompact(it.value);
-    if (it.unit === '%') return fmtPct(it.value, false);
+    if (it.unit === '%') return fmtPct(it.value, !!it.signed);
     if (it.unit === 'x') return `${fmtNum(it.value, 2)}x`;
     return fmtNum(it.value, 2);
   };

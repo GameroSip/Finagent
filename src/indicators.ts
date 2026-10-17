@@ -157,3 +157,55 @@ export function snapshot(bars: OHLC[]) {
     },
   };
 }
+
+// ------------------------------------------------------------------ rendimiento y riesgo (calculados por código, no por el modelo)
+export interface PerfBar { t: number; c: number }
+const DAY = 86400;
+export const PERF_HORIZONS: Array<[string, number]> = [['1M', 30], ['3M', 91], ['6M', 182], ['1Y', 365], ['3Y', 1095], ['5Y', 1826]];
+
+/**
+ * Rendimiento (%), CAGR, volatilidad anualizada y caída máxima a partir de cierres diarios ajustados.
+ * Los horizontes sin historia suficiente quedan en null (nunca se inventan ni se aproximan).
+ */
+export function performance(bars: PerfBar[]) {
+  if (bars.length < 2) throw new Error('Historia insuficiente');
+  const last = bars[bars.length - 1];
+  /** Último cierre en o antes de `target`; null si la historia no llega tan atrás (tolerancia de 7 días al inicio). */
+  const at = (target: number): PerfBar | null => {
+    if (bars[0].t > target + 7 * DAY) return null;
+    let lo = 0, hi = bars.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (bars[mid].t <= target) lo = mid; else hi = mid - 1; }
+    return bars[lo];
+  };
+  const pct = (base: PerfBar | null) => (base ? r((last.c / base.c - 1) * 100, 2) : null);
+
+  const returns: Record<string, number | null> = {};
+  for (const [label, days] of PERF_HORIZONS) returns[label] = pct(at(last.t - days * DAY));
+  const year = new Date(last.t * 1000).getUTCFullYear();
+  const ytd = pct(at(Date.UTC(year, 0, 1) / 1000 - 1));
+
+  const cagr: Record<string, number | null> = {};
+  for (const [label, days] of PERF_HORIZONS.filter(([l]) => l === '3Y' || l === '5Y')) {
+    const base = at(last.t - days * DAY);
+    const span = base ? (last.t - base.t) / DAY : 0;
+    cagr[label] = base && span > 0 ? r(((last.c / base.c) ** (365 / span) - 1) * 100, 2) : null;
+  }
+
+  const win = bars.slice(-253); // 252 retornos diarios ≈ 1 año de ruedas
+  let vol: number | null = null;
+  if (win.length > 60) {
+    const rets = win.slice(1).map((b, i) => Math.log(b.c / win[i].c));
+    const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+    const sd = Math.sqrt(rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length - 1));
+    vol = r(sd * Math.sqrt(252) * 100, 2);
+  }
+  let peak = -Infinity, maxDd = 0;
+  for (const b of bars.slice(-252)) { peak = Math.max(peak, b.c); maxDd = Math.min(maxDd, b.c / peak - 1); }
+
+  return {
+    returns, ytd, cagr,
+    volatility_1y_pct: vol,
+    max_drawdown_1y_pct: r(maxDd * 100, 2),
+    bars_used: bars.length,
+  };
+}

@@ -11,13 +11,17 @@ const STRIP: RegExp[] = [
   /\(\s*\d+\s*,\s*\d+\s*(?:,\s*\d+\s*)?\)/g, // parámetros tipo MACD (12,26,9)
 ];
 const NUM_SRC =
-  String.raw`(?<![\w.,])(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)(?:\s?(mil millones|millones|billones|%|[KMBTk])(?![A-Za-z]))?`;
+  String.raw`(?<![\w.,])(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?(?!\d)|\d+(?:[.,]\d+)?)(?:\s?(mil millones|millones|billones|%|[KMBTk])(?![A-Za-z]))?`;
 const SCALE: Record<string, number[]> = {
   k: [1e3], K: [1e3], M: [1e6], B: [1e9], T: [1e12],
   millones: [1e6], 'mil millones': [1e9], billones: [1e12, 1e9],
 };
 
-const stripNoise = (t: string) => STRIP.reduce((acc, p) => acc.replace(p, ' '), t);
+// El ruido (fechas, nombres de índices…) se tapa con espacios del MISMO largo: las posiciones siguen coincidiendo con el texto original.
+const stripNoise = (t: string) => STRIP.reduce((acc, p) => acc.replace(p, (m) => ' '.repeat(m.length)), t);
+
+// "últimos 30 días", "200 ruedas", "52 semanas": cantidades descriptivas, no datos financieros que haya que respaldar.
+const UNIT_AFTER = /^\s+(?:d[ií]as?|semanas?|mes(?:es)?|años?|ruedas?|sesiones?|per[ií]odos?|velas?|barras?|trimestres?|horas?|minutos?|empresas?|activos?|acciones|pasos?)\b/i;
 const numRe = () => new RegExp(NUM_SRC, 'g');
 
 /** Interpretaciones posibles [valor, decimales] (1.234 puede ser miles o decimal). */
@@ -65,7 +69,7 @@ function matches(x: number, d: number, scale: number, pct: boolean, pool: number
 export interface Verification {
   ok: boolean;
   checked: number;
-  unverified: Array<{ text: string; context: string }>;
+  unverified: Array<{ text: string; context: string; start: number; end: number }>;
 }
 
 export function verifyAnswer(answer: string, toolResults: unknown[], extraText = ''): Verification {
@@ -83,14 +87,25 @@ export function verifyAnswer(answer: string, toolResults: unknown[], extraText =
     if (!suf) {
       const [v0, d0] = cands[0];
       if (d0 === 0 && cands.length === 1 && (v0 <= 10 || (v0 >= 1900 && v0 <= 2100))) continue; // ruido
+      const after = text.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 24);
+      if (d0 === 0 && cands.length === 1 && v0 >= 11 && v0 <= 1000 && UNIT_AFTER.test(after)) continue; // cantidad descriptiva
     }
     const scales = suf && !pct ? SCALE[suf] ?? [1] : [1];
     checked++;
     const ok = cands.some(([v, d]) => scales.some((s) => matches(v * s, d, s, pct, pool)));
     if (!ok) {
       const idx = m.index ?? 0;
-      unverified.push({ text: m[0].trim(), context: text.slice(Math.max(0, idx - 40), idx + m[0].length + 40).replace(/\n/g, ' ') });
+      unverified.push({ text: m[0].trim(), context: text.slice(Math.max(0, idx - 40), idx + m[0].length + 40).replace(/\n/g, ' '), start: idx, end: idx + m[0].length });
     }
   }
   return { ok: unverified.length === 0, checked, unverified };
+}
+
+export const REDACTED = '[dato no verificado]';
+
+/** Quita del texto las cifras que no se pudieron respaldar (nunca se le muestra al usuario un número sin sustento). */
+export function redactUnverified(answer: string, unverified: Array<{ start: number; end: number }>): string {
+  let out = answer;
+  for (const u of [...unverified].sort((a, b) => b.start - a.start)) out = out.slice(0, u.start) + REDACTED + out.slice(u.end);
+  return out;
 }

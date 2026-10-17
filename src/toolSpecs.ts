@@ -30,6 +30,11 @@ export const DECLARATIONS: any[] = [
     parameters: obj({ ticker: S, period: S, interval: S }, ['ticker']),
   },
   {
+    name: 'get_performance',
+    description: "Rendimiento (%) a 1 mes, 3 meses, 6 meses, en el año, 1, 3 y 5 años; CAGR a 3 y 5 años; volatilidad anualizada y caída máxima del último año de un activo, calculados con precios ajustados. USALA para cualquier pregunta de rendimiento, retorno, volatilidad o caída: no los calcules vos. Los horizontes sin historia suficiente vienen en null.",
+    parameters: obj({ ticker: S }, ['ticker']),
+  },
+  {
     name: 'get_news',
     description: 'Últimas noticias de un activo (título, fecha, medio y link). Sirven como contexto, no como prueba de causalidad: que una noticia coincida con un movimiento de precio no demuestra que lo haya causado.',
     parameters: obj({ ticker: S, limit: { type: 'INTEGER' } }, ['ticker']),

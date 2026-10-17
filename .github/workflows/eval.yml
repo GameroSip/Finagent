@@ -13,6 +13,13 @@ on:
       repeticiones:
         description: "Veces que se repite cada caso"
         default: "1"
+      casos:
+        description: "Opcional: ids de casos separados por coma (si lo completás, ignora 'alcance'). Ej.: idioma-ingles,trampa-prediccion,ar-riesgo"
+        default: ""
+
+# contents: write permite guardar el reporte en la rama "eval-reports" (se puede leer ahí sin descargar nada).
+permissions:
+  contents: write
 
 jobs:
   eval:
@@ -31,19 +38,40 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ALCANCE: ${{ inputs.alcance }}
           REPETICIONES: ${{ inputs.repeticiones }}
+          CASOS: ${{ inputs.casos }}
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::error::Falta el secreto GEMINI_API_KEY (Settings → Secrets and variables → Actions → New repository secret)."
             exit 1
           fi
           ARGS=""
-          if [ "$ALCANCE" = "rapida (6 casos)" ]; then ARGS="--smoke"; fi
+          if [ -n "$CASOS" ]; then ARGS="--only=$CASOS"; elif [ "$ALCANCE" = "rapida (6 casos)" ]; then ARGS="--smoke"; fi
           npx tsx evals/cli.ts $ARGS --repeat="$REPETICIONES"
 
       - name: Mostrar el reporte en la página de la ejecución
         if: always()
         run: |
           for f in evals/reports/*.md; do [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"; done || true
+
+      - name: Publicar el reporte en la rama eval-reports
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if ! ls evals/reports/*.md > /dev/null 2>&1; then echo "No hay reportes para publicar."; exit 0; fi
+          git config --global user.name "FinAgent eval"
+          git config --global user.email "eval@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" eval-reports > /dev/null 2>&1; then
+            git clone -q --depth 1 --branch eval-reports "$URL" .
+          else
+            git init -q . && git checkout -q -b eval-reports && git remote add origin "$URL"
+          fi
+          mkdir -p reports && cp "$GITHUB_WORKSPACE"/evals/reports/* reports/
+          git add reports && git commit -q -m "Reporte de evaluación (ejecución ${RUN_ID})" && git push -q origin eval-reports
 
       - name: Guardar el reporte
         if: always()

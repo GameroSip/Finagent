@@ -1,6 +1,7 @@
 // Agente: Gemini decide qué herramientas llamar; el código las ejecuta; un verificador revisa las cifras.
 // Modelo y límites son AUTOMÁTICOS: no hay nada que configurar.
 import { http } from './http';
+import { languageHint } from './lang';
 import { API_ROOT, DAILY_QUOTA_MS, GeminiError, ModelManager, modelLabel, parseQuota } from './models';
 import { callTool, ToolResult } from './tools';
 import { DECLARATIONS } from './toolSpecs';
@@ -24,7 +25,7 @@ REGLAS DE DATOS
 
 REGLAS DE RIGOR
 7. Aclará siempre la base de cada métrica: TTM vs forward vs último año fiscal, moneda, ADR vs acción local vs CEDEAR. Al comparar, avisá si bases o monedas difieren.
-8. Citá fecha y fuente de los datos clave (usá \`meta.as_of\` y \`meta.source\`). Si el dato es de una rueda anterior, decilo.
+8. Citá la fecha y la fuente de los datos clave con palabras normales (p. ej. "datos al 16 de octubre de 2026, fuente: Yahoo Finance"). Si el dato es de una rueda anterior, decilo. NUNCA escribas nombres internos de campos ni de herramientas (as_of, meta.source, pct_vs_ema200, returnOnEquity, debtToEquity, get_performance, calculate…): el usuario no los conoce; usá lenguaje natural ("distancia a la media de 200 ruedas", "ROE", "calculado con la calculadora").
 9. Separá con claridad: **Hechos** (con fuente y fecha), **Cálculos**, **Interpretación** y **Escenarios**. No presentes hipótesis como hechos. Correlación no es causalidad.
 10. Los titulares son narrativa mediática, no hechos verificados: parafraseá, nombrá el medio y contrastá con los datos; nunca copies titulares textuales largos.
 11. Para preguntas abiertas ("¿conviene...?", "¿es buena inversión?") NO des veredicto ni predigas precios. Entregá: Caso alcista, Caso bajista, qué evento o umbral medible invalidaría cada tesis, y qué datos faltan. Marcá el nivel de incertidumbre.
@@ -201,7 +202,7 @@ export class FinancialAgent {
         last = e;
         if (e.kind === 'unavailable') { this.o.models.markUnavailable(model); tried.add(model); continue; }
         if (e.kind === 'busy') {
-          if (e.daily) this.o.models.markUnavailable(model, DAILY_QUOTA_MS); // cupo diario agotado: no insistir en horas
+          if (e.daily) this.o.models.markUnavailable(model, e.retryAfterMs ? Math.min(e.retryAfterMs + 30_000, 24 * 3600_000) : DAILY_QUOTA_MS); // cupo diario agotado: hasta cuando Gemini dice que vuelve (si no lo dice, 6 h)
           else this.o.models.markCooldown(model, Math.min(Math.max(e.retryAfterMs ?? 90_000, 5_000), 15 * 60_000)); // lo que pidió Gemini (o 90 s)
           tried.add(model); continue;
         }
@@ -247,8 +248,8 @@ export class FinancialAgent {
   }
 
   /** Una vuelta del modelo SIN herramientas (se usa para reescribir sin cifras sin respaldo). */
-  private async plainRewrite(instruction: string, hooks: Hooks): Promise<string | null> {
-    this.contents.push(userMsg(instruction));
+  private async plainRewrite(instruction: string, hooks: Hooks, hint = ''): Promise<string | null> {
+    this.contents.push(userMsg(instruction + hint));
     const data = await this.generate(false, hooks);
     const content = data?.candidates?.[0]?.content;
     if (!content) return null;
@@ -261,7 +262,8 @@ export class FinancialAgent {
     this.aborted = false;
     this.modelCalls = 0;
     this.contents = historyToContents(this.history);
-    this.contents.push(userMsg(question));
+    const hint = languageHint(question); // si el usuario escribe en inglés, se le recuerda al modelo en cada turno (el historial guarda solo la pregunta)
+    this.contents.push(userMsg(question + hint));
     const calls: ToolCallRecord[] = [];
     try {
       let { answer, truncated } = await this.run(calls, hooks);
@@ -277,7 +279,7 @@ export class FinancialAgent {
         this.contents.push(userMsg(
           `Verificación automática: estas cifras de tu respuesta no coinciden con ningún resultado de herramienta: ${list(verification)}. ` +
           'Verificá cada una con las herramientas (usá `get_performance` para rendimientos y `calculate` para derivados) y reescribí la respuesta completa, ' +
-          'corrigiendo o eliminando lo que no puedas respaldar.'));
+          'corrigiendo o eliminando lo que no puedas respaldar.' + hint));
         ({ answer, truncated } = await this.run(calls, hooks));
         verification = verify();
         corrected = true;
@@ -289,7 +291,7 @@ export class FinancialAgent {
         const text = await this.plainRewrite(
           `Verificación automática: estas cifras siguen sin respaldo en los datos de las herramientas: ${list(verification)}. ` +
           'Reescribí la respuesta completa SIN ellas ni ninguna otra cifra que no esté en los datos: no hagas cuentas ni estimaciones. ' +
-          'Si falta un dato, decí que no está disponible. No uses herramientas.', hooks);
+          'Si falta un dato, decí que no está disponible. No uses herramientas.', hooks, hint);
         if (text) { answer = text; verification = verify(); corrected = true; rewritten = true; }
       }
 

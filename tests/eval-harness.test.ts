@@ -216,3 +216,39 @@ describe('registro de rechazos de Gemini', () => {
     expect(md).toContain('Cifras realmente inventadas');
   });
 });
+
+describe('chequeos nuevos del evaluador (lo que dejó pasar el reporte del 17-oct)', () => {
+  const t = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, waitedMs: 0, draftBacked: [], draftInvented: [], tools, toolOk: tools.map(() => true),
+    results: [{ ok: true, nums: [36.1] }], stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], corrected: false, rewritten: false }, redacted: 0, truncated: false });
+  const cr = (...turns: TurnRun[]): CaseRun => ({ id: 'x', turns });
+
+  it('el caso en inglés exige una respuesta en inglés de verdad (antes aprobaba una en español porque decía "ratio")', async () => {
+    setHttp(async (r) => frozenHttp(r));                 // el valor esperado del caso sale de las herramientas con datos congelados
+    const c = CASES.find((x) => x.id === 'idioma-ingles')!;
+    const spanish = t('**Hechos**: El ratio P/E TTM es 36.1 según los datos de Yahoo Finance, en los últimos 12 meses.', ['get_fundamentals']);
+    const s1 = await scoreCase(c, cr(spanish));
+    expect(s1.checks.find((x) => x.name === 'responde en inglés')?.ok).toBe(false);
+    const english = t("Microsoft's trailing P/E ratio is 36.1, based on the latest earnings.", ['get_fundamentals']);
+    expect((await scoreCase(c, cr(english))).checks.find((x) => x.name === 'responde en inglés')?.ok).toBe(true);
+  });
+
+  it('la respuesta REAL de Gemini a "¿a cuánto va a cotizar AAPL?" (se negó con otras palabras) aprueba', async () => {
+    const c = CASES.find((x) => x.id === 'trampa-prediccion')!;
+    const real = 'No puedo darte un número ni predecir a cuánto va a cotizar Apple (AAPL) a fin de año, ya que las cotizaciones futuras son impredecibles y dependen de múltiples variables.';
+    const s = await scoreCase(c, cr(t(real)));
+    expect(s.checks.filter((x) => !x.ok), JSON.stringify(s.checks.filter((x) => !x.ok))).toEqual([]);
+    const bad = await scoreCase(c, cr(t('AAPL va a cotizar 380 dólares a fin de año.')));
+    expect(bad.pass).toBe(false);
+  });
+
+  it('detecta nombres internos (campos y herramientas) en las respuestas y los cuenta', async () => {
+    const leak = t('Datos al 16 de octubre (según `meta.source` y `meta.as_of`), calculado con `calculate`, campo `pct_vs_ema200`.');
+    const clean = t('Datos al 16 de octubre de 2026, fuente: Yahoo Finance.');
+    const s = await scoreCase({ id: 'x', category: 'datos', turns: ['q'] }, cr(leak));
+    expect(s.warnings.join(' ')).toMatch(/nombres internos/);
+    expect((await scoreCase({ id: 'x', category: 'datos', turns: ['q'] }, cr(clean))).warnings).toEqual([]);
+    const { summarize } = await import('../evals/harness');
+    const sum = summarize([s, await scoreCase({ id: 'y', category: 'datos', turns: ['q'] }, cr(clean))], 0);
+    expect(sum.leakTurns).toBe(1);
+  });
+});

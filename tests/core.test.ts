@@ -545,3 +545,26 @@ describe('verificador: nombres de indicadores y listas de períodos (lo que marc
     expect(flagged('Subió 20 puntos.')).toEqual(['20']);
   });
 });
+
+import { detectLanguage, languageHint } from '../src/lang';
+describe('detección de idioma', () => {
+  it.each([
+    ["What is Microsoft's P/E ratio?", 'en'], ['Is NVDA overvalued?', 'en'], ['Show me the RSI of AAPL and compare it with last year', 'en'],
+    ['¿Cuál es el P/E de Microsoft?', 'es'], ['Dame el precio de YPFD.BA', 'es'], ['mostrame el RSI de AAPL', 'es'], ['Compará KO y PEP: valuación y dividendos.', 'es'],
+    ['El ratio P/E refleja la valoración actual que el mercado le asigna', 'es'],            // "ratio" existe en español: no es una pista de inglés
+    ['AAPL', 'other'], ['', 'other'], ['RSI NVDA', 'other'],
+  ] as const)('%s -> %s', (text, lang) => expect(detectLanguage(text)).toBe(lang));
+  it('solo se agrega indicación cuando el usuario escribe en inglés', () => {
+    expect(languageHint('What is the price of AAPL?')).toContain('English');
+    expect(languageHint('¿Cuánto cotiza AAPL?')).toBe('');
+    expect(languageHint('AAPL')).toBe('');
+  });
+});
+
+describe('prompt: sin nombres internos', () => {
+  it('ya no le pide al modelo "usá meta.as_of" y le prohíbe mostrar nombres internos', async () => {
+    const { SYSTEM_PROMPT } = await import('../src/agent');
+    expect(SYSTEM_PROMPT).not.toMatch(/usá \\?`meta\.as_of/);
+    expect(SYSTEM_PROMPT).toMatch(/NUNCA escribas nombres internos de campos ni de herramientas/);
+  });
+});

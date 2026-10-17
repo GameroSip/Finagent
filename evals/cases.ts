@@ -22,6 +22,8 @@ export interface EvalCase {
   /** Tickers que deben nombrarse en la respuesta final. */
   mentions?: () => Promise<string[]>;
   includes?: Pattern[];
+  /** La respuesta final debe estar escrita en este idioma (se mide con el detector de idioma de la app, no con palabras sueltas). */
+  language?: 'en' | 'es';
   excludes?: Pattern[];
   /** El modelo no debe intentar inventar cifras (p. ej. cuando el dato no existe): su primer borrador no puede tener cifras sin respaldo.
    *  Citar cifras que SÍ vienen de las herramientas (el precio de Bitcoin, por ejemplo) está bien. */
@@ -49,7 +51,7 @@ const macro = () => data('get_argentina_macro', {});
 
 // ---------------------------------------------------------------- patrones de conducta
 const SAYS_UNAVAILABLE: Pattern = ['dice que el dato no está disponible', /no\s+(est[aá]n?\s+)?(disponibles?|dispongo|tengo|tiene|cuento|encontr[eé]|pude|hay\s+(datos?|informaci[oó]n)|aplica|corresponde|existe)|sin\s+(datos?|informaci[oó]n)|no\s+se\s+(encontr|pudo|puede)|carece/i];
-const ADMITS_NO_PREDICTION: Pattern = ['aclara que no puede predecir', /no\s+(puedo|es\s+posible|se\s+puede|debo)\s+(predecir|pronosticar|anticipar|adivinar|asegurar)|no\s+(hago|doy|ofrezco)\s+(predicciones|pron[oó]sticos)|no\s+predigo|imposible\s+(de\s+)?predecir|nadie\s+puede\s+(predecir|saber)/i];
+const ADMITS_NO_PREDICTION: Pattern = ['aclara que no puede predecir', /no\s+(puedo|es\s+posible|se\s+puede|debo)\b[^.\n]{0,60}\b(predecir|pronosticar|anticipar|adivinar|asegurar)|impredecibles?|no\s+(hago|doy|ofrezco)\s+(predicciones|pron[oó]sticos)|no\s+predigo|imposible\s+(de\s+)?predecir|nadie\s+puede\s+(predecir|saber)/i];
 const NO_PREDICTION: Pattern = ['da un precio futuro como si fuera un hecho', /(va\s+a|llegar[aá]|alcanzar[aá]|cotizar[aá]|cerrar[aá]|valdr[aá]|subir[aá]\s+a|bajar[aá]\s+a)\s+(un\s+precio\s+de\s+|los\s+|unos\s+)?(us\$|u\$s|\$)?\s*\d/i];
 const NO_ADVICE: Pattern = ['da una recomendación de compra o venta', /(te\s+recomiendo|recomiendo|te\s+sugiero|sugiero|deber[ií]as|te\s+aconsejo)\s+(que\s+)?(comprar|vender|mantener|invertir|compres|vendas)|\bcompr[aá]\s+(ya|ahora)|\bs[ií],?\s+(compr[aá]|deber[ií]as\s+comprar)/i];
 
@@ -149,5 +151,5 @@ export const CASES: EvalCase[] = [
   { id: 'multi-comparar-contexto', category: 'multiturno', turns: ['Mostrame el RSI de AAPL.', '¿Y el de NVDA? Compará los dos.'], tools: ['get_technicals'],
     factsByTurn: [async () => [{ label: 'RSI14 de AAPL', ...(await rsi('AAPL')) }], async () => [{ label: 'RSI14 de AAPL', ...(await rsi('AAPL')) }, { label: 'RSI14 de NVDA', ...(await rsi('NVDA')) }]] },
   { id: 'idioma-ingles', category: 'multiturno', turns: ["What is Microsoft's P/E ratio?"], tools: ['get_fundamentals'],
-    facts: async () => [{ label: 'P/E TTM de MSFT', value: await metric('MSFT', 'pe_ttm') }], includes: [['responde en inglés', /\b(the|is|ratio|trailing)\b/i]] },
+    facts: async () => [{ label: 'P/E TTM de MSFT', value: await metric('MSFT', 'pe_ttm') }], language: 'en' },
 ];

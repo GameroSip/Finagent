@@ -4,8 +4,12 @@ const config: CapacitorConfig = {
   appId: 'com.finagent.app',
   appName: 'FinAgent',
   webDir: 'dist',
-  // Las llamadas a Yahoo y Gemini se hacen con CapacitorHttp (red nativa, sin CORS): ver src/http.ts
+  backgroundColor: '#05070C',
   android: { allowMixedContent: false },
+  plugins: {
+    // Edge-to-edge: Capacitor inyecta --safe-area-inset-* para respetar la barra de estado y de gestos.
+    SystemBars: { insetsHandling: 'css' },
+  },
 };
 
 export default config;

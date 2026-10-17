@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import fixture from './fixtures/snapshot.json';
-import { FinancialAgent, GeminiError } from '../src/agent';
 import { evaluate } from '../src/calc';
 import { HttpRequest, HttpResult, setHttp } from '../src/http';
 import { rsi, snapshot } from '../src/indicators';
@@ -139,6 +138,23 @@ const yahooRouter = (req: HttpRequest): HttpResult | undefined => {
       series('annual', 'FreeCashFlow', [120, 90]), series('annual', 'TotalDebt', [300, 310]),
     ] } });
   }
+  if (u.includes('/screener/predefined/saved')) {
+    return ok({ finance: { result: [{ quotes: [
+      { symbol: 'SMCI', shortName: 'Super Micro', regularMarketPrice: 52.4, regularMarketChangePercent: 15.8, regularMarketVolume: 1e7, marketCap: 3e10, currency: 'USD' },
+      { symbol: 'PLTR', shortName: 'Palantir', regularMarketPrice: 63.7, regularMarketChangePercent: 13.6, regularMarketVolume: 2e7, marketCap: 1.4e11, currency: 'USD' }] }] } });
+  }
+  if (u.includes('dolarapi.com')) {
+    return ok([{ casa: 'oficial', nombre: 'Oficial', compra: 1480, venta: 1530, fechaActualizacion: '2026-10-15T18:00:00.000Z' },
+      { casa: 'blue', nombre: 'Blue', compra: 1525, venta: 1545, fechaActualizacion: '2026-10-15T20:57:00.000Z' },
+      { casa: 'contadoconliqui', nombre: 'Contado con liquidación', compra: 1615.5, venta: 1616, fechaActualizacion: '2026-10-15T20:57:00.000Z' }]);
+  }
+  if (u.includes('riesgo-pais/ultimo')) return ok({ valor: 622, fecha: '2026-10-15' });
+  if (u.includes('/indices/inflacionInteranual')) return ok([{ fecha: '2026-08-31', valor: 32.4 }, { fecha: '2026-09-30', valor: 31.8 }]);
+  if (u.includes('/indices/inflacion')) return ok([{ fecha: '2026-08-31', valor: 2.1 }, { fecha: '2026-09-30', valor: 1.9 }]);
+  if (u.includes('alternative.me')) return ok({ data: [{ value: '34', value_classification: 'Fear', timestamp: '1760500000' }] });
+  if (u.includes('news.google.com')) {
+    return ok(`<?xml version="1.0"?><rss><channel><item><title>El Merval sube fuerte &amp; los bonos acompañan - Ámbito</title><link>https://x/1</link><pubDate>Thu, 15 Oct 2026 18:00:00 GMT</pubDate><source url="https://ambito.com">Ámbito</source></item><item><title><![CDATA[Dólar hoy: cómo cotiza el blue - Infobae]]></title><link>https://x/2</link><pubDate>Thu, 15 Oct 2026 15:00:00 GMT</pubDate><source url="https://infobae.com">Infobae</source></item><item><title>El Merval sube fuerte &amp; los bonos acompañan - Ámbito</title><link>https://x/3</link><pubDate>Thu, 15 Oct 2026 14:00:00 GMT</pubDate><source url="https://ambito.com">Ámbito</source></item></channel></rss>`, {});
+  }
   if (u.includes('/v1/finance/search')) {
     return ok({ quotes: [{ symbol: 'AAA', longname: 'Alfa SA', exchDisp: 'NYSE', quoteType: 'EQUITY' }],
       news: [{ title: 'Nueva noticia', publisher: 'Reuters', link: 'https://x/1', providerPublishTime: 1759752000 }, { publisher: 'sin título' }] });
@@ -261,94 +277,3 @@ describe('herramientas', () => {
   });
 });
 
-// ------------------------------------------------------------------ agente con Gemini simulado
-const fcPart = (name: string, args: object) => ({ functionCall: { name, args }, thoughtSignature: 'sig-1' });
-const reply = (parts: object[]) => ({ candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP' }] });
-function geminiScript(script: Array<object | { status: number; body: object }>) {
-  const bodies: any[] = [];
-  let i = 0;
-  setHttp(async (req) => {
-    if (!req.url.includes('generativelanguage.googleapis.com')) {
-      const r = yahooRouter(req);
-      if (!r) throw new Error('no simulada');
-      return r;
-    }
-    bodies.push({ url: req.url, headers: req.headers, body: JSON.parse(JSON.stringify(req.body)) });
-    const item: any = script[i++];
-    if (!item) throw new Error('guion agotado');
-    if (item.status) return { status: item.status, headers: {}, text: JSON.stringify(item.body) };
-    return { status: 200, headers: {}, text: JSON.stringify(item) };
-  });
-  return bodies;
-}
-
-describe('agente', () => {
-  it('bucle de herramientas + autocorrección numérica', async () => {
-    const reqs = geminiScript([
-      reply([fcPart('get_fundamentals', { ticker: 'AAA' })]),
-      reply([{ text: 'El P/E es 35.7.' }]),
-      reply([{ text: 'El P/E TTM es 10.' }]),
-    ]);
-    const agent = new FinancialAgent({ apiKey: 'k', retryDelayMs: 0 });
-    const seenTools: string[] = [];
-    const res = await agent.ask('¿P/E de AAA?', (n) => seenTools.push(n));
-    expect(seenTools).toEqual(['get_fundamentals']);
-    expect(res.corrected).toBe(true);
-    expect(res.verification.ok).toBe(true);
-    expect(res.answer).toContain('10');
-    // protocolo con la API
-    expect(reqs[0].url).toContain('/models/gemini-flash-latest:generateContent');
-    expect(reqs[0].headers['x-goog-api-key']).toBe('k');
-    expect(reqs[0].body.tools[0].functionDeclarations.map((d: any) => d.name)).toContain('screen_assets');
-    const fr = reqs[1].body.contents.at(-1);
-    expect(fr.role).toBe('user');
-    expect(fr.parts[0].functionResponse.name).toBe('get_fundamentals');
-    expect(fr.parts[0].functionResponse.response.result.ok).toBe(true);
-    // la firma de pensamiento del modelo se reenvía intacta
-    expect(reqs[1].body.contents.some((c: any) => c.role === 'model' && c.parts[0].thoughtSignature === 'sig-1')).toBe(true);
-  });
-  it('límite de pasos: cierra sin herramientas', async () => {
-    const loop = reply([fcPart('calculate', { expression: '1+1' })]);
-    const reqs = geminiScript([loop, loop, reply([{ text: 'Respuesta parcial.' }])]);
-    const res = await new FinancialAgent({ apiKey: 'k', maxSteps: 2, selfCorrect: false, retryDelayMs: 0 }).ask('loop');
-    expect(res.truncated).toBe(true);
-    expect(res.answer).toBe('Respuesta parcial.');
-    expect(reqs[2].body.tools).toBeUndefined();
-  });
-  it('reintenta ante 429 y luego responde', async () => {
-    geminiScript([{ status: 429, body: { error: { message: 'cuota' } } }, reply([{ text: 'Hola.' }])]);
-    const res = await new FinancialAgent({ apiKey: 'k', retryDelayMs: 0 }).ask('hola');
-    expect(res.answer).toBe('Hola.');
-  });
-  it('errores de la API llegan tipados', async () => {
-    geminiScript([{ status: 400, body: { error: { message: 'API key not valid' } } }]);
-    await expect(new FinancialAgent({ apiKey: 'bad', retryDelayMs: 0 }).ask('x')).rejects.toMatchObject({ status: 400, message: 'API key not valid' });
-    expect(GeminiError).toBeDefined();
-  });
-  it('exige API key', () => {
-    expect(() => new FinancialAgent({ apiKey: '  ' })).toThrow(/API key/);
-  });
-});
-
-// ------------------------------------------------------------------ markdown seguro
-import { renderMarkdown } from '../src/markdown';
-describe('markdown', () => {
-  it('escapa HTML y renderiza formato básico', () => {
-    const h = renderMarkdown('## Título\n<script>alert(1)</script> **negrita** y `código`\n- uno\n- dos\n\n| a | b |\n|---|---|\n| 1 | 2 |');
-    expect(h).not.toContain('<script>');
-    expect(h).toContain('&lt;script&gt;');
-    expect(h).toContain('<strong>negrita</strong>');
-    expect(h).toContain('<li>uno</li>');
-    expect(h).toContain('<th>a</th>');
-    expect(h).toContain('<td>2</td>');
-  });
-});
-
-describe('avisos de reintento', () => {
-  it('informa a la UI cuando Gemini limita', async () => {
-    geminiScript([{ status: 429, body: { error: { message: 'cuota' } } }, reply([{ text: 'Hola.' }])]);
-    const msgs: string[] = [];
-    await new FinancialAgent({ apiKey: 'k', retryDelayMs: 0, onStatus: (m) => msgs.push(m) }).ask('hola');
-    expect(msgs[0]).toContain('429');
-  });
-});

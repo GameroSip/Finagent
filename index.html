@@ -3,46 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="color-scheme" content="light dark" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#05070C" />
   <title>FinAgent</title>
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>📈 FinAgent</h1>
-      <div class="actions">
-        <button id="btn-new" class="ghost" title="Nueva conversación">Nueva</button>
-        <button id="btn-cfg" class="ghost" title="Ajustes" aria-label="Ajustes">⚙</button>
-      </div>
-    </header>
-    <main id="chat" aria-live="polite"></main>
-    <form id="form" autocomplete="off">
-      <textarea id="input" rows="1" placeholder="Preguntá sobre un activo o un screener…" enterkeyhint="send"></textarea>
-      <button id="btn-send" type="submit">Enviar</button>
-    </form>
-  </div>
-
-  <dialog id="settings">
-    <form method="dialog" id="settings-form">
-      <h2>Ajustes</h2>
-      <label>API key de Gemini
-        <input id="cfg-key" type="password" autocomplete="off" placeholder="Pegá tu key de aistudio.google.com/apikey" />
-      </label>
-      <label>Modelo
-        <input id="cfg-model" type="text" autocomplete="off" />
-      </label>
-      <label>Máx. pasos de investigación
-        <input id="cfg-steps" type="number" min="2" max="10" />
-      </label>
-      <label class="row"><input id="cfg-correct" type="checkbox" /> Autocorrección numérica (usa 1-3 requests extra)</label>
-      <p class="note">La key se guarda solo en este teléfono. En el nivel gratuito Google puede usar lo que envíes para mejorar sus
-        modelos: no cargues datos personales ni tu cartera real. Información educativa, no es asesoramiento financiero.</p>
-      <div class="row end">
-        <button value="cancel" class="ghost">Cancelar</button>
-        <button id="cfg-save" value="save">Guardar</button>
-      </div>
-    </form>
-  </dialog>
+  <div id="root"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

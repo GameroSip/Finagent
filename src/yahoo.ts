@@ -102,8 +102,14 @@ async function crumbJson(base: string, path: string, params: Params, what: strin
 
 // ---------------------------------------------------------------- chart
 export interface Bar { t: number; o: number; h: number; l: number; c: number; v: number; adjc: number | null }
+export interface ChartMeta {
+  currency?: string; exchangeName?: string; fullExchangeName?: string; instrumentType?: string; symbol?: string;
+  longName?: string; shortName?: string; regularMarketTime?: number; regularMarketPrice?: number;
+  chartPreviousClose?: number; previousClose?: number; fiftyTwoWeekHigh?: number; fiftyTwoWeekLow?: number;
+  regularMarketDayHigh?: number; regularMarketDayLow?: number; regularMarketVolume?: number;
+}
 export interface ChartData {
-  meta: { currency?: string; exchangeName?: string; instrumentType?: string; regularMarketTime?: number; regularMarketPrice?: number };
+  meta: ChartMeta;
   bars: Bar[];
   dividends: Array<{ t: number; amount: number }>;
 }
@@ -199,4 +205,28 @@ export async function searchSymbols(query: string, quotesCount: number, newsCoun
     quotesQueryId: 'tss_match_phrase_query', newsQueryId: 'news_cie_vespa',
   }, `búsqueda de ${query}`);
   return { quotes: j?.quotes ?? [], news: j?.news ?? [] };
+}
+
+// ---------------------------------------------------------------- rankings (screeners predefinidos de Yahoo)
+export interface Mover {
+  symbol: string; name: string; price: number | null; changePct: number | null;
+  volume: number | null; marketCap: number | null; currency: string | null;
+}
+export const MOVER_KINDS = ['day_gainers', 'day_losers', 'most_actives'] as const;
+export type MoverKind = (typeof MOVER_KINDS)[number];
+
+export async function fetchMovers(kind: MoverKind, count = 10): Promise<Mover[]> {
+  const params = { scrIds: kind, count, formatted: false, lang: 'en-US', region: 'US' };
+  let j: any;
+  try { j = await crumbJson(Q1, '/v1/finance/screener/predefined/saved', params, `ranking ${kind}`); }
+  catch { j = await plainJson(Q1, '/v1/finance/screener/predefined/saved', params, `ranking ${kind}`); }
+  const quotes: any[] = j?.finance?.result?.[0]?.quotes ?? [];
+  const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+  const out = quotes.filter((q) => q?.symbol).map((q) => ({
+    symbol: String(q.symbol), name: String(q.shortName ?? q.longName ?? q.symbol),
+    price: n(q.regularMarketPrice), changePct: n(q.regularMarketChangePercent), volume: n(q.regularMarketVolume),
+    marketCap: n(q.marketCap), currency: q.currency ?? null,
+  }));
+  if (!out.length) throw new YahooError(`Yahoo no devolvió datos para el ranking ${kind}.`);
+  return out;
 }

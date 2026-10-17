@@ -1,7 +1,10 @@
 // Herramientas financieras deterministas que el LLM puede invocar (port de la versión Python).
 // Reglas: el LLM nunca calcula ni recuerda cifras; cada resultado trae fuente, fecha (as_of) y fórmulas.
 import { evaluate } from './calc';
-import { r, snapshot } from './indicators';
+import { fetchDolares, fetchInflacion, fetchRiesgoPais, withBrecha } from './data/argentina';
+import { fetchFearGreed, fetchIndices } from './data/market';
+import { fetchHeadlines, Region } from './data/news';
+import { ema, r, snapshot } from './indicators';
 import { UNIVERSES } from './universes';
 import * as Y from './yahoo';
 
@@ -23,10 +26,17 @@ const sym = (t: unknown): string => {
   if (!s) throw new Error('ticker vacío');
   return s;
 };
-const env = (ticker: string, data: unknown, asOf: unknown = null, notes: string[] = []) => ({
+const env = (ticker: string, data: unknown, asOf: unknown = null, notes: string[] = [], ui?: unknown, source = SOURCE) => ({
   ok: true, ticker, data,
-  meta: { source: SOURCE, as_of: iso(asOf), fetched_at: nowIso(), notes },
+  meta: { source, as_of: iso(asOf), fetched_at: nowIso(), notes },
+  ...(ui ? { ui } : {}),
 });
+const safe = <T>(p: Promise<T>): Promise<T | null> => p.then((v) => v, () => null);
+const thin = <T>(arr: T[], max: number): T[] => {
+  if (arr.length <= max) return arr;
+  const step = (arr.length - 1) / (max - 1);
+  return Array.from({ length: max }, (_, i) => arr[Math.round(i * step)]);
+};
 
 // ---------------------------------------------------------------- registro con cache y errores como dato
 interface ToolDef { ttl: number; fn: (a: Args) => Promise<ToolResult> }
@@ -152,7 +162,13 @@ tool('get_fundamentals', 3600, async (a) => {
     metrics,
   };
   notes.push("Yahoo no informa la hora de los fundamentales; ver 'reporting' para el último período reportado.");
-  return env(s, data, info.mostRecentQuarter, notes);
+  const pick: Array<[string, string]> = [['pe_ttm', 'P/E (TTM)'], ['pe_forward', 'P/E forward'], ['dividend_yield_pct', 'Dividendo'],
+    ['roe_pct', 'ROE'], ['debt_to_equity_ratio', 'Deuda / Patrim.'], ['fcf_yield_pct', 'FCF yield'], ['market_cap', 'Market cap'], ['beta', 'Beta']];
+  const ui = {
+    kind: 'metrics', symbol: s, name: data.profile.name ?? s, currency: data.profile.currency ?? null,
+    items: pick.filter(([k]) => metrics[k]).map(([k, label]) => ({ key: k, label, value: metrics[k].value, unit: metrics[k].unit ?? null, basis: metrics[k].basis })),
+  };
+  return env(s, data, info.mostRecentQuarter, notes, ui);
 });
 
 // ---------------------------------------------------------------- estados contables
@@ -183,7 +199,15 @@ tool('get_technicals', 300, async (a) => {
   const notes = ['Las señales son descriptivas del pasado reciente, no predicciones.',
     'Con el mercado abierto, la última barra puede ser parcial.'];
   if (snap.bars < 200) notes.push("Menos de 200 barras: EMA200 no disponible. Probá con period='2y'.");
-  return env(s, { period, interval, ...snap }, bars[bars.length - 1].t, notes);
+  const closes = bars.map((b) => b.c);
+  const keep = Math.min(bars.length, 260);
+  const emaFor = (span: number) => (closes.length >= span ? ema(closes, span).slice(-keep).map((v) => r(v, 4)) : null);
+  const ui = {
+    kind: 'chart', symbol: s, currency: ch.meta.currency ?? null, period, interval,
+    bars: bars.slice(-keep).map((b) => ({ t: b.t, o: r(b.o, 4), h: r(b.h, 4), l: r(b.l, 4), c: r(b.c, 4) })),
+    ema: { 20: emaFor(20), 50: emaFor(50), 200: emaFor(200) },
+  };
+  return env(s, { period, interval, ...snap }, bars[bars.length - 1].t, notes, ui);
 });
 
 // ---------------------------------------------------------------- noticias
@@ -208,6 +232,7 @@ tool('compare_assets', 0, async (a) => {
   const rows: Record<string, any> = {};
   const problems: string[] = [];
   const currencies = new Set<string>();
+  const lines: Array<{ symbol: string; points: Array<[number, number]> }> = [];
   for (const s of syms) {
     const row: Record<string, any> = {};
     const f = await callTool('get_fundamentals', { ticker: s });
@@ -218,7 +243,11 @@ tool('compare_assets', 0, async (a) => {
       for (const k of COMPARE_KEYS) if (k in f.data.metrics) row[k] = f.data.metrics[k].value;
     } else problems.push(`${s} fundamentales: ${f.error}`);
     const t = await callTool('get_technicals', { ticker: s, period: '2y' });
-    if (t.ok) { row.rsi14 = t.data.rsi14; row.pct_vs_ema200 = t.data.pct_vs_ema200; }
+    if (t.ok) {
+      row.rsi14 = t.data.rsi14; row.pct_vs_ema200 = t.data.pct_vs_ema200;
+      const bars: Array<{ t: number; c: number }> = (t.ui?.bars ?? []).slice(-252);
+      if (bars.length > 1) lines.push({ symbol: s, points: thin(bars, 120).map((b) => [b.t, r((b.c / bars[0].c - 1) * 100, 2) ?? 0] as [number, number]) });
+    }
     else problems.push(`${s} técnico: ${t.error}`);
     rows[s] = row;
   }
@@ -226,7 +255,7 @@ tool('compare_assets', 0, async (a) => {
   if (currencies.size > 1) {
     notes.push(`Monedas distintas (${[...currencies].join(', ')}): precios y market caps no son comparables directamente; los ratios sí, con cautela.`);
   }
-  return env(syms.join(','), { rows }, null, notes);
+  return env(syms.join(','), { rows }, null, notes, lines.length > 1 ? { kind: 'compare', lines } : undefined);
 });
 
 // ---------------------------------------------------------------- screener
@@ -283,7 +312,9 @@ tool('screen_assets', 0, async (a) => {
   return env(syms.join(','), {
     universe: a.universe ?? 'lista personalizada', evaluated: syms.length, filters_applied: filters, passed, excluded,
   }, null, ['Datos de Yahoo; el market cap está en la moneda de cotización de cada activo.',
-    'Un dato faltante excluye al activo (no se asume ningún valor).']);
+    'Un dato faltante excluye al activo (no se asume ningún valor).'],
+  { kind: 'screen', universe: a.universe ?? 'lista personalizada', evaluated: syms.length, filters, passed,
+    excluded: excluded.map((e: any) => ({ ticker: e.ticker, reasons: e.reasons })) });
 });
 
 // ---------------------------------------------------------------- calculadora
@@ -292,4 +323,68 @@ tool('calculate', 0, async (a) => {
   if (!expr || expr.length > 200) throw new Error('expresión vacía o demasiado larga');
   return { ok: true, expression: expr, result: r(evaluate(expr), 6),
     meta: { source: 'cálculo local determinista', as_of: null, fetched_at: nowIso(), notes: [] } };
+});
+
+
+// ================================================================ contexto de mercado (sin clave)
+const SRC_MARKET = 'Yahoo Finance (índices, futuros, cripto) + alternative.me (miedo y codicia)';
+
+tool('get_market_overview', 120, async () => {
+  const [indices, gainers, losers, actives, fng] = await Promise.all([
+    fetchIndices(), safe(Y.fetchMovers('day_gainers', 5)), safe(Y.fetchMovers('day_losers', 5)),
+    safe(Y.fetchMovers('most_actives', 5)), safe(fetchFearGreed()),
+  ]);
+  const ok = indices.filter((i) => i.price !== null);
+  if (!ok.length) throw new Error(indices.find((i) => i.error)?.error ?? 'Sin datos de mercado');
+  const mv = (l: Y.Mover[] | null) => l?.map((m) => ({ symbol: m.symbol, name: m.name, price: r(m.price, 2), change_pct: r(m.changePct, 2) })) ?? null;
+  const data = {
+    indices: ok.map((i) => ({ symbol: i.symbol, name: i.name, price: r(i.price, 2), currency: i.currency,
+      change_pct: r(i.changePct, 2), as_of: iso(i.asOf) })),
+    movers_us: { gainers: mv(gainers), losers: mv(losers), most_active: mv(actives) },
+    crypto_fear_greed: fng ? { value: fng.value, label: fng.labelEs, as_of: iso(fng.ts) } : null,
+    formulas: { change_pct: '(último cierre / cierre anterior - 1) × 100' },
+  };
+  const notes = ['Variación diaria = último cierre vs cierre anterior; durante la rueda, el último valor es parcial.'];
+  if (!gainers && !losers && !actives) notes.push('No se pudieron obtener los rankings de ganadores/perdedores.');
+  if (!fng) notes.push('No se pudo obtener el índice de miedo y codicia cripto.');
+  return env('MERCADO', data, ok[0].asOf, notes, { kind: 'quotes', title: 'Mercados', items: ok }, SRC_MARKET);
+});
+
+tool('get_movers', 120, async (a) => {
+  const kind = String(a.kind ?? 'day_gainers') as Y.MoverKind;
+  if (!Y.MOVER_KINDS.includes(kind)) throw new Error(`kind inválido. Usá: ${Y.MOVER_KINDS.join(', ')}`);
+  const list = await Y.fetchMovers(kind, 10);
+  const titles = { day_gainers: 'Mayores subas (EE.UU.)', day_losers: 'Mayores bajas (EE.UU.)', most_actives: 'Más operadas (EE.UU.)' };
+  return env(kind, { kind, assets: list.map((m) => ({ symbol: m.symbol, name: m.name, price: r(m.price, 2), change_pct: r(m.changePct, 2), market_cap: m.marketCap })) },
+    null, ['Ranking intradía del mercado de EE.UU. según Yahoo Finance; incluye empresas de cualquier tamaño (cuidado con las muy chicas).'],
+    { kind: 'quotes', title: titles[kind], items: list.map((m) => ({ symbol: m.symbol, name: m.name, price: m.price, currency: m.currency, changePct: m.changePct, spark: [], asOf: null })) });
+});
+
+tool('get_argentina_macro', 120, async () => {
+  const [dol, rp, inf] = await Promise.all([safe(fetchDolares()), safe(fetchRiesgoPais()), safe(fetchInflacion())]);
+  if (!dol && !rp && !inf) throw new Error('No se pudieron obtener los datos de Argentina (DolarAPI / ArgentinaDatos).');
+  const rows = dol ? withBrecha(dol) : null;
+  const data = {
+    dolares: rows?.map((d) => ({ tipo: d.nombre, casa: d.casa, compra: d.compra, venta: d.venta, brecha_vs_oficial_pct: d.brecha_pct, actualizado: d.fecha })) ?? null,
+    riesgo_pais: rp ? { puntos_basicos: rp.valor, fecha: rp.fecha } : null,
+    inflacion: inf ? { mensual_pct: inf.mensual, interanual_pct: inf.interanual } : null,
+    formulas: { brecha_vs_oficial_pct: '(venta / venta oficial - 1) × 100' },
+  };
+  const notes: string[] = [];
+  if (!dol) notes.push('No se pudieron obtener las cotizaciones del dólar.');
+  if (!rp) notes.push('No se pudo obtener el riesgo país.');
+  if (!inf || (!inf.mensual && !inf.interanual)) notes.push('No se pudo obtener la inflación.');
+  const asOf = rows?.map((d) => d.fecha).filter(Boolean).sort().pop() ?? rp?.fecha ?? null;
+  return env('ARGENTINA', data, asOf, notes,
+    { kind: 'fx', rows: rows ?? [], riesgoPais: rp, inflacion: inf }, 'DolarAPI.com + ArgentinaDatos.com (BCRA/INDEC/mercado)');
+});
+
+tool('get_headlines', 600, async (a) => {
+  const region: Region = String(a.region ?? 'ar').toLowerCase() === 'us' ? 'us' : 'ar';
+  const limit = Math.max(3, Math.min(Number(a.limit ?? 8) || 8, 12));
+  const items = await fetchHeadlines(a.topic ? String(a.topic) : undefined, region, limit);
+  return env(a.topic ? String(a.topic) : 'MERCADOS',
+    { region, articles: items.map((h) => ({ title: h.title, source: h.source, published: h.published, url: h.url })) },
+    items[0].published, ['Titulares de medios (Google News). Reflejan la narrativa mediática, no son hechos verificados: contrastalos con los datos.'],
+    { kind: 'headlines', items }, 'Google News RSS');
 });

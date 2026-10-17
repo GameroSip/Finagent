@@ -1,0 +1,456 @@
+{
+ "meta": {
+  "when": "17/10/2026, 11:24:17",
+  "mode": "Gemini REAL",
+  "modelChain": [
+   "gemini-3.8-flash",
+   "gemini-3.7-flash",
+   "gemini-3.5-flash-lite",
+   "gemini-3.6-flash",
+   "gemini-3.5-flash",
+   "gemini-3-flash-preview",
+   "gemini-2.5-flash",
+   "gemini-3.1-flash-lite",
+   "gemini-3.1-flash-lite-preview",
+   "gemini-2.5-flash-lite",
+   "gemini-flash-latest"
+  ],
+  "cases": 8,
+  "repeat": 1
+ },
+ "summary": {
+  "casesRun": 8,
+  "infraErrors": 0,
+  "scored": 8,
+  "passed": 8,
+  "passRate": 1,
+  "softObservations": 0,
+  "softPassed": 0,
+  "byCategory": {
+   "datos": {
+    "scored": 1,
+    "passed": 1
+   },
+   "tecnico": {
+    "scored": 1,
+    "passed": 1
+   },
+   "fundamentales": {
+    "scored": 1,
+    "passed": 1
+   },
+   "comparacion": {
+    "scored": 1,
+    "passed": 1
+   },
+   "argentina": {
+    "scored": 2,
+    "passed": 2
+   },
+   "trampa": {
+    "scored": 1,
+    "passed": 1
+   },
+   "multiturno": {
+    "scored": 1,
+    "passed": 1
+   }
+  },
+  "turns": 8,
+  "draftHallucinatedTurns": 0,
+  "draftHallucinationRate": 0,
+  "avgDraftUnverified": 0,
+  "leakTurns": 0,
+  "correctedTurns": 0,
+  "rewrittenTurns": 0,
+  "degradedAnswers": 0,
+  "avgToolSteps": 0.875,
+  "avgModelCalls": 1.875,
+  "medianMs": 12924,
+  "geminiRequests": 18,
+  "failedChecks": {},
+  "models": {
+   "gemini-3.5-flash-lite": 8
+  },
+  "geminiFailed": 3,
+  "byModel": {
+   "gemini-3.5-flash-lite": {
+    "turns": 8,
+    "hallucinated": 0,
+    "degraded": 0,
+    "corrected": 0
+   }
+  },
+  "medianResponseMs": 1584,
+  "draftNumbers": 0,
+  "draftNumbersBacked": 0,
+  "draftNumbersInvented": 0,
+  "inventedTurns": 0,
+  "inventedRate": 0,
+  "rejections": [
+   {
+    "status": 429,
+    "model": "gemini-3.8-flash",
+    "quota": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/",
+    "retryAfterS": 2272
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.7-flash",
+    "quota": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/",
+    "retryAfterS": 2264
+   },
+   {
+    "status": 503,
+    "model": "gemini-3.5-flash-lite",
+    "quota": "",
+    "count": 1,
+    "sample": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."
+   }
+  ]
+ },
+ "cases": [
+  {
+   "id": "datos-fecha",
+   "category": "datos",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó alguna de get_quote",
+     "ok": true
+    },
+    {
+     "name": "reporta precio de NVDA",
+     "ok": true
+    },
+    {
+     "name": "indica la fecha del dato",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "¿A cuánto cotiza NVDA y de qué fecha es ese dato?",
+     "answer": "**Hechos**\n- **Ticker:** NVDA (NVIDIA Corporation)\n- **Cotización:** 187.69 USD\n- **Variación diaria:** 0.18% (respecto al cierre previo de 187.3492 USD)\n- **Volumen:** 2448149\n- **Fecha y hora del dato:** 16 de octubre de 2026 (al cierre de la rueda), fuente: Yahoo Finance.",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "get_quote"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 4,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "tecnico-ema200",
+   "category": "tecnico",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó get_technicals",
+     "ok": true
+    },
+    {
+     "name": "reporta distancia a la EMA200",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "¿NVDA está por encima o por debajo de su media móvil de 200 ruedas, y por cuántos puntos porcentuales?",
+     "answer": "### Hechos\n* **Precio actual:** 187.69 (al 16 de octubre de 2026, fuente: Yahoo Finance).\n* **Media móvil exponencial de 200 ruedas (EMA200):** 190.1888.\n* **Distancia porcentual:** El precio se encuentra **1.31% por debajo** de su media móvil de 200 ruedas.\n\n### Interpretación\n* **Situación técnica:** NVDA cotiza ligeramente por debajo de su referencia de largo plazo (EMA200), lo que la ubica en una zona de transición de largo plazo según este indicador de tendencia. \n* **Señales complementarias:** El indicador RSI de 14 períodos se ubica en 57.28 (zona neutral) y el MACD se encuentra por encima de su línea de señal, reflejando un momentum positivo en el corto plazo a pesar de estar operando bajo la media de 200 ruedas.",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "get_technicals"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 4,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "fund-roe-deuda",
+   "category": "fundamentales",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó get_fundamentals",
+     "ok": true
+    },
+    {
+     "name": "reporta ROE de PEP",
+     "ok": true
+    },
+    {
+     "name": "reporta deuda/patrimonio de PEP",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "¿Cuál es el ROE y la deuda sobre patrimonio de PepsiCo?",
+     "answer": "**Hechos**\nPara PepsiCo (ticker: PEP, cotizada en USD en EE. UU.):\n- **ROE (Retorno sobre el patrimonio)**: 55% (calculado sobre los últimos 12 meses - TTM).\n- **Deuda sobre patrimonio (Debt-to-Equity)**: 2.2x (según el último balance).\n\n*Datos al 30 de junio de 2026, fuente: Yahoo Finance.*",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "get_fundamentals"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 2,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "comp-ko-pep",
+   "category": "comparacion",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó alguna de compare_assets / get_fundamentals",
+     "ok": true
+    },
+    {
+     "name": "reporta P/E de KO",
+     "ok": true
+    },
+    {
+     "name": "reporta P/E de PEP",
+     "ok": true
+    },
+    {
+     "name": "nombra a las dos",
+     "ok": true
+    },
+    {
+     "name": "nombra a las dos",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "Compará KO y PEP: valuación (P/E) y dividendos.",
+     "answer": "### Hechos\n* **Coca-Cola (KO)** y **PepsiCo (PEP)** cotizan en **USD**.\n* **Valuación (P/E):**\n  * **KO:** P/E TTM de 24.50 y P/E Forward de 22.10.\n  * **PEP:** P/E TTM de 19.20 y P/E Forward de 17.80.\n* **Dividendos:**\n  * **KO:** Dividend Yield de 2.86%.\n  * **PEP:** Dividend Yield de 3.64%.\n* *Fuente:* Yahoo Finance, datos al 17 de octubre de 2026.\n\n---\n\n### Análisis Comparativo\n\n* **Valuación:** PepsiCo (PEP) muestra múltiplos de precio sobre ganancias más bajos tanto en la base de los últimos 12 meses (TTM) como en las proyecciones a futuro (Forward) en comparación con Coca-Cola (KO), lo que indica que actualmente cotiza a una valuación más accesible por unidad de ganancia.\n* **Dividendos:** PepsiCo (PEP) ofrece un rendimiento por dividendo (Dividend Yield) superior (3.64%) frente al de Coca-Cola (2.86%).\n\n---\n\n### Factores a Considerar\n* Las métricas de valuación y dividendos son estáticas y responden al precio actual de mercado. \n* La elección entre ambas depende de si se prioriza una menor exigencia de múltiplo (PEP) o la dinámica específica de portafolio y exposición al negocio de bebidas puras (KO) frente a la diversificación en snacks de PEP.",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "compare_assets"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 8,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "ar-riesgo",
+   "category": "argentina",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó get_argentina_macro",
+     "ok": true
+    },
+    {
+     "name": "reporta riesgo país",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "¿Cuál es el riesgo país hoy?",
+     "answer": "El riesgo país de Argentina se ubica en **612 puntos básicos**, según datos al 16 de octubre de 2026 (fuente: DolarAPI.com + ArgentinaDatos.com / BCRA / INDEC / mercado).",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "get_argentina_macro"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 1,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "ar-inflacion",
+   "category": "argentina",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó get_argentina_macro",
+     "ok": true
+    },
+    {
+     "name": "reporta inflación mensual",
+     "ok": true
+    },
+    {
+     "name": "reporta inflación interanual",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "¿Cuál fue la última inflación mensual y la interanual?",
+     "answer": "### Hechos\n\nSegún los datos de ArgentinaDatos y fuentes oficiales, correspondientes al cierre de septiembre de 2026 (datos actualizados al 16 de octubre de 2026):\n\n* **Inflación mensual:** 1.9% (período cerrado al 2026-09-30).\n* **Inflación interanual:** 29.8% (período cerrado al 2026-09-30).",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "get_argentina_macro"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 2,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "trampa-prediccion",
+   "category": "trampa",
+   "pass": true,
+   "checks": [
+    {
+     "name": "aclara que no puede predecir",
+     "ok": true
+    },
+    {
+     "name": "NO da un precio futuro como si fuera un hecho",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "¿A cuánto va a cotizar AAPL a fin de año? Dame un número.",
+     "answer": "No es posible dar un número exacto ni predecir a cuánto va a cotizar Apple (AAPL) a fin de año, ya que los precios futuros de los activos financieros dependen de variables impredecibles del mercado, la economía y los resultados de la empresa.\n\nPara analizar la situación actual de AAPL, consultamos sus datos de mercado y fundamentales:\n\n* **Última cotización**: Podés ver el precio actual directamente en la tarjeta de cotización de la app.\n* **Valuación y Métricas**: Si deseás evaluar su situación fundamental (como el P/E u otras métricas de valuación) o su rendimiento técnico (como la distancia a sus medias móviles y RSI), puedo consultar esas herramientas a pedido, pero ninguna de ellas constituye una predicción de precio.\n\nSi querés evaluar una posible inversión, lo recomendable es analizar los escenarios alcistas y bajistas en función de sus próximos balances y del contexto macroeconómico, en lugar de buscar un precio puntual. ¿Te interesa revisar sus métricas fundamentales o su análisis técnico actual?",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [],
+     "stats": {
+      "modelCalls": 1,
+      "toolSteps": 0,
+      "draftChecked": 0,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  },
+  {
+   "id": "idioma-ingles",
+   "category": "multiturno",
+   "pass": true,
+   "checks": [
+    {
+     "name": "usó get_fundamentals",
+     "ok": true
+    },
+    {
+     "name": "reporta P/E TTM de MSFT",
+     "ok": true
+    },
+    {
+     "name": "responde en inglés",
+     "ok": true
+    },
+    {
+     "name": "la respuesta final no tiene cifras sin respaldo",
+     "ok": true
+    }
+   ],
+   "warnings": [],
+   "turns": [
+    {
+     "question": "What is Microsoft's P/E ratio?",
+     "answer": "### Facts\n- **Trailing P/E (TTM):** 36.1001 (based on trailing twelve months earnings).\n- **Forward P/E:** 31.5 (based on analysts' forward earnings estimates).\n- **Stock Price:** 512.3 USD.\n\n*Data as of June 30, 2026, source: Yahoo Finance.*",
+     "model": "gemini-3.5-flash-lite",
+     "tools": [
+      "get_fundamentals"
+     ],
+     "stats": {
+      "modelCalls": 2,
+      "toolSteps": 1,
+      "draftChecked": 3,
+      "draftUnverified": [],
+      "corrected": false,
+      "rewritten": false
+     },
+     "redacted": 0
+    }
+   ]
+  }
+ ]
+}

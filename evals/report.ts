@@ -23,6 +23,7 @@ export function renderReport(scores: CaseScore[], s: Summary, meta: ReportMeta):
   L.push(`| **Cifras realmente inventadas** (sin respaldo ni después de corregir) | **${s.draftNumbersInvented}** en **${s.inventedTurns}/${s.turns}** respuestas (${pct(s.inventedRate)}) |`);
   L.push(`| Respuestas que necesitaron corrección | ${s.correctedTurns} (de ellas, reescritura sin herramientas: ${s.rewrittenTurns}) |`);
   L.push(`| **Respuestas degradadas** (se quitaron cifras del texto final) | **${s.degradedAnswers}** |`);
+  L.push(`| Respuestas que muestran nombres internos al usuario (campos o herramientas) | ${s.leakTurns}/${s.turns} |`);
   L.push(`| Herramientas por respuesta (promedio) · pedidos al modelo por respuesta | ${s.avgToolSteps.toFixed(1)} · ${s.avgModelCalls.toFixed(1)} |`);
   L.push(`| Tiempo mediano por respuesta | ${(s.medianResponseMs / 1000).toFixed(1)} s (sin contar las pausas del evaluador; con ellas: ${(s.medianMs / 1000).toFixed(1)} s) |`, '');
 

@@ -1,0 +1,8 @@
+node_modules
+dist
+android
+.DS_Store
+e2e/node_modules
+e2e-shots
+evals/.env
+evals/reports/

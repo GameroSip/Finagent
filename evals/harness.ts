@@ -4,6 +4,7 @@ import { FinancialAgent, GeminiError, type AskStats } from '../src/agent';
 import { setHttp, type HttpRequest, type HttpResult } from '../src/http';
 import { parseQuota, type ModelManager } from '../src/models';
 import { clearCache } from '../src/tools';
+import { detectLanguage } from '../src/lang';
 import { scanNumbers, tokenMatchesValue, verifyAnswer } from '../src/verify';
 import type { Category, EvalCase, Fact } from './cases';
 import { frozenHttp } from './frozen-data';
@@ -24,6 +25,11 @@ export interface Check { name: string; ok: boolean; detail?: string }
 export interface CaseScore { id: string; category: Category; soft: boolean; checks: Check[]; pass: boolean; infra?: string; warnings: string[]; run: CaseRun }
 
 export class FatalEvalError extends Error {}
+
+/** Nombres de campos y herramientas que el usuario no tiene por qué ver. */
+const INTERNAL_PATTERN = '`?(?:meta\\.as_of|meta\\.source|\\bas_of\\b|pct_vs_ema200|get_(?:quote|fundamentals|financials|technicals|performance|news|headlines|market_overview|movers|argentina_macro)|search_ticker|compare_assets|screen_assets|\\bcalculate\\b|returnOnEquity|debtToEquity|trailingEps|forwardEps|dividendRate)`?';
+export const INTERNAL_NAMES = new RegExp(INTERNAL_PATTERN);
+const INTERNAL_NAMES_G = new RegExp(INTERNAL_PATTERN, 'g');
 
 // ------------------------------------------------------------------ red: datos congelados + Gemini (real o falso) con ritmo controlado
 export interface Rejection { status: number; model: string; message: string; quota: string; retryAfterMs?: number }
@@ -110,6 +116,7 @@ export async function scoreCase(c: EvalCase, run: CaseRun): Promise<CaseScore> {
   if (c.mentions) for (const tk of await c.mentions()) add(`nombra a ${tk}`, wordIn(answer, tk), `no aparece en la respuesta`);
   for (const [d, re] of c.includes ?? []) add(d, re.test(answer), `no se encontró en: «${answer.replace(/\s+/g, ' ').slice(0, 220)}»`);
   for (const [d, re] of c.excludes ?? []) add(`NO ${d}`, !re.test(answer), `coincidió con ${re}: «${answer.match(re)?.[0] ?? ''}»`);
+  if (c.language) add(`responde en ${c.language === 'en' ? 'inglés' : 'español'}`, detectLanguage(answer) === c.language, `idioma detectado: ${detectLanguage(answer)}; respuesta: «${answer.replace(/\s+/g, ' ').slice(0, 160)}»`);
   if (c.noInvention) {
     const tried = last.stats.draftUnverified;
     add('no intenta inventar cifras (su borrador no tuvo cifras sin respaldo)', tried.length === 0 && last.redacted === 0, `cifras que escribió sin respaldo: ${tried.join(', ') || '(se quitaron del texto)'}`);
@@ -124,6 +131,7 @@ export async function scoreCase(c: EvalCase, run: CaseRun): Promise<CaseScore> {
   for (const [i, t] of run.turns.entries()) {
     if (t.redacted > 0) warnings.push(`turno ${i + 1}: se quitaron ${t.redacted} cifra(s) sin respaldo (respuesta degradada)`);
     if (t.truncated) warnings.push(`turno ${i + 1}: llegó al límite de pasos`);
+    if (INTERNAL_NAMES.test(t.answer)) warnings.push(`turno ${i + 1}: muestra nombres internos al usuario (${[...new Set(t.answer.match(INTERNAL_NAMES_G) ?? [])].join(', ')})`);
     if (t.toolOk.some((ok) => !ok)) warnings.push(`turno ${i + 1}: alguna herramienta devolvió error`);
   }
   return { ...base, checks, warnings, pass: checks.every((x) => x.ok) };
@@ -134,7 +142,7 @@ export interface Summary {
   casesRun: number; infraErrors: number; scored: number; passed: number; passRate: number; softObservations: number; softPassed: number;
   byCategory: Record<string, { scored: number; passed: number }>;
   turns: number; draftHallucinatedTurns: number; draftHallucinationRate: number; avgDraftUnverified: number;
-  correctedTurns: number; rewrittenTurns: number; degradedAnswers: number;
+  correctedTurns: number; rewrittenTurns: number; degradedAnswers: number; leakTurns: number;
   avgToolSteps: number; avgModelCalls: number; medianMs: number; geminiRequests: number;
   failedChecks: Record<string, number>; models: Record<string, number>;
   geminiFailed: number; medianResponseMs: number;
@@ -167,7 +175,7 @@ export function summarize(scores: CaseScore[], geminiRequests: number, geminiFai
     passRate: hard.length ? hard.filter((s) => s.pass).length / hard.length : 0, softObservations: soft.length, softPassed: soft.filter((s) => s.pass).length,
     byCategory: by, turns: turns.length, draftHallucinatedTurns: hallucinated, draftHallucinationRate: turns.length ? hallucinated / turns.length : 0,
     avgDraftUnverified: turns.length ? sum((t) => t.stats.draftUnverified.length) / turns.length : 0,
-    correctedTurns: turns.filter((t) => t.stats.corrected).length, rewrittenTurns: turns.filter((t) => t.stats.rewritten).length, degradedAnswers: turns.filter((t) => t.redacted > 0).length,
+    leakTurns: turns.filter((t) => INTERNAL_NAMES.test(t.answer)).length, correctedTurns: turns.filter((t) => t.stats.corrected).length, rewrittenTurns: turns.filter((t) => t.stats.rewritten).length, degradedAnswers: turns.filter((t) => t.redacted > 0).length,
     avgToolSteps: turns.length ? sum((t) => t.stats.toolSteps) / turns.length : 0, avgModelCalls: turns.length ? sum((t) => t.stats.modelCalls) / turns.length : 0,
     medianMs: ms.length ? ms[Math.floor(ms.length / 2)] : 0, geminiRequests, failedChecks: failed, models, geminiFailed, byModel,
     medianResponseMs: net.length ? net[Math.floor(net.length / 2)] : 0,

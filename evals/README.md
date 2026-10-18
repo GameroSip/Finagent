@@ -12,6 +12,7 @@ mentira, determinista, con valores **distintos de la realidad a propósito** (si
 1. En tu repositorio: *Settings → Secrets and variables → Actions → New repository secret*. Nombre: `GEMINI_API_KEY`. Valor: tu clave.
 2. Pestaña *Actions → "Evaluación con Gemini real" → Run workflow*. Elegí "rápida" la primera vez.
 3. Al terminar, el reporte aparece en la propia página de la ejecución y como descarga (`reporte-evaluacion`).
+4. Para verificar solo algo puntual (unos minutos), completá el campo **casos** con los ids separados por coma, p. ej. `idioma-ingles,trampa-prediccion,ar-riesgo`.
 
 **Opción B — En tu PC** (Node 22 y `npm ci` hechos)
 ```

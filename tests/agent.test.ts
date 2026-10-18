@@ -291,14 +291,24 @@ describe('cupo agotado (429)', () => {
     expect(calls.map((c) => c.model)).toEqual(['A', 'A']);
   });
 
-  it('cupo DIARIO agotado: el modelo se aparta por horas', async () => {
+  it('cupo DIARIO agotado: el modelo se aparta hasta cuando Gemini dice que vuelve (6755 s en tu reporte real)', async () => {
     let t = 1_000_000;
-    const calls = mockGemini((m) => (m === 'A' ? quota429('30s', 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') : text('Listo.')));
+    const calls = mockGemini((m) => (m === 'A' ? quota429('6755s', 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') : text('Listo.')));
     const { agent, models } = agentWith(['A', 'B']);
     models.now = () => t;
     await agent.ask('hola');
     expect(calls.filter((c) => c.model === 'A')).toHaveLength(1);
-    t += 5 * 3600_000; expect(models.pick()).toBe('B');                  // 5 h después sigue apartado (aunque Gemini dijo "30 s")
+    t += 6_700_000; expect(models.pick()).toBe('B');                     // todavía no pasaron 6755 s
+    t += 100_000; expect(models.pick()).toBe('A');                       // ya volvió (antes se lo apartaba 6 h fijas)
+  });
+
+  it('cupo diario sin tiempo informado: se aparta 6 horas', async () => {
+    let t = 1_000_000;
+    mockGemini((m) => (m === 'A' ? quota429(undefined, 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') : text('Listo.')));
+    const { agent, models } = agentWith(['A', 'B']);
+    models.now = () => t;
+    await agent.ask('hola');
+    t += 5 * 3600_000; expect(models.pick()).toBe('B');
     t += 2 * 3600_000; expect(models.pick()).toBe('A');
   });
 
@@ -322,5 +332,29 @@ describe('cupo agotado (429)', () => {
     const { agent } = agentWith(['A', 'B']);
     await agent.ask('hola');
     expect(calls.filter((c) => c.model === 'A')).toHaveLength(3);
+  });
+});
+
+
+// ------------------------------------------------------------------ idioma: se le indica al modelo (la evaluación real mostró que contestaba en español)
+describe('idioma del usuario', () => {
+  const HINT = 'write the ENTIRE answer in English';
+  const userTexts = (c: Call) => c.body.contents.filter((x: any) => x.role === 'user').map((x: any) => x.parts?.[0]?.text ?? '');
+
+  it('si escribe en inglés, la pregunta, la corrección y la reescritura llevan la indicación (y el historial guarda solo la pregunta)', async () => {
+    let n = 0;
+    const calls = mockGemini(() => { n++; return n <= 2 ? text('It yields 24.572%.') : text('No data available.'); }); // cifra inventada: fuerza corrección y reescritura
+    const { agent } = agentWith(['A']);
+    await agent.ask("What is Microsoft's P/E ratio?");
+    expect(calls).toHaveLength(3);
+    for (const c of calls) expect(userTexts(c).at(-1)).toContain(HINT);
+    expect(agent.history[0].q).toBe("What is Microsoft's P/E ratio?");   // sin la indicación
+  });
+
+  it('si escribe en español no se agrega nada', async () => {
+    const calls = mockGemini(() => text('Listo.'));
+    const { agent } = agentWith(['A']);
+    await agent.ask('¿Cuál es el P/E de Microsoft?');
+    expect(userTexts(calls[0]).at(-1)).toBe('¿Cuál es el P/E de Microsoft?');
   });
 });

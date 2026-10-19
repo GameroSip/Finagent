@@ -41,6 +41,12 @@ export function renderDuelReport(rows: DuelRow[], s: DuelSummary, meta: DuelMeta
     L.push('');
   }
 
+  if (s.rejections.length) {
+    L.push('## Rechazos de Gemini', '', '_Qué respondió Gemini cuando no atendió un pedido: dice si se agotó el cupo por minuto o por día y cuánto pidió esperar._', '',
+      '| Estado | Modelo | Veces | Tipo de cupo | Espera que pidió | Mensaje |', '|---|---|---|---|---|---|');
+    for (const r of s.rejections.slice(0, 12)) L.push(`| ${r.status || 'red'} | ${r.model} | ${r.count} | ${r.quota || '—'} | ${r.retryAfterS !== undefined ? `${r.retryAfterS} s` : '—'} | ${clip(r.sample, 110)} |`);
+    L.push('');
+  }
   L.push('## Pregunta por pregunta', '', '✔ correcto · ✘ cifra incorrecta o trampa fallida · ○ se abstiene · ⚠ sin evaluar', '', `| Pregunta | Idioma | ${arms.map((a) => ARM_LABEL[a]).join(' | ')} |`, `|---|---|${arms.map(() => '---').join('|')}|`);
   for (const r of rows) L.push(`| ${r.id} | ${r.lang} | ${arms.map((a) => SYM[r.arms[a]?.verdict ?? ''] ?? '—').join(' | ')} |`);
   L.push('');

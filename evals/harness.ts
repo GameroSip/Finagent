@@ -186,7 +186,7 @@ export function summarize(scores: CaseScore[], geminiRequests: number, geminiFai
   };
 }
 
-function groupRejections(list: Rejection[]): Summary['rejections'] {
+export function groupRejections(list: Rejection[]): Summary['rejections'] {
   const g = new Map<string, Summary['rejections'][number]>();
   for (const r of list) {
     const k = `${r.status}|${r.model}|${r.quota}`;

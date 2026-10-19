@@ -4,7 +4,7 @@ import type { ModelManager } from '../../src/models';
 import { callTool } from '../../src/tools';
 import type { Fact } from '../cases';
 import { frozenHttp } from '../frozen-data';
-import { makeNet } from '../harness';
+import { groupRejections, makeNet } from '../harness';
 import { ARM_LABEL, FatalDuelError, runFinAgent, runGemini, type ArmAnswer, type ArmId } from './arms';
 import type { DuelQuestion, Lang } from './questions';
 import { scoreAnswer, type Verdict } from './score';
@@ -27,7 +27,7 @@ export interface DuelSummaryArm {
   factOk: number; factWrong: number; factAbstain: number; factTotal: number;
   trapOk: number; trapTotal: number; langOk: number; medianMs: number; avgCalls: number; searchUsedRate?: number;
 }
-export interface DuelSummary { arms: DuelSummaryArm[]; geminiRequests: number; geminiFailed: number; searchUnavailable?: string; models: Record<string, number> }
+export interface DuelSummary { arms: DuelSummaryArm[]; geminiRequests: number; geminiFailed: number; searchUnavailable?: string; models: Record<string, number>; rejections: ReturnType<typeof groupRejections> }
 
 export async function runDuel(o: DuelOptions): Promise<{ rows: DuelRow[]; summary: DuelSummary }> {
   const log = o.log ?? (() => {});
@@ -35,6 +35,7 @@ export async function runDuel(o: DuelOptions): Promise<{ rows: DuelRow[]; summar
   setHttp(net.http);
   const rows: DuelRow[] = [];
   let searchUnavailable: string | undefined;
+  let sinRespuesta = 0; // preguntas seguidas en las que Gemini no atendió ningún pedido
   const arms: ArmId[] = o.search ? ['finagent', 'plain', 'search'] : ['finagent', 'plain'];
   try {
     if (o.preflight) { // solo se verifican las fuentes que necesitan las preguntas elegidas
@@ -68,15 +69,23 @@ export async function runDuel(o: DuelOptions): Promise<{ rows: DuelRow[]; summar
         }
       }
       rows.push(row);
+      // Si Gemini no atiende nada (cupo agotado o saturación) varias preguntas seguidas, seguir solo gasta tiempo y cupo: se corta con el motivo.
+      const todoSinAtender = arms.every((a) => !row.arms[a] || row.arms[a]!.verdict === 'infra');
+      sinRespuesta = todoSinAtender ? sinRespuesta + 1 : 0;
+      if (sinRespuesta >= 3) {
+        const top = groupRejections(net.rejections())[0];
+        throw new PreflightError(`Gemini no atendió ningún pedido en 3 preguntas seguidas (cupo agotado o saturación). Se corta para no gastar más cupo.` +
+          (top ? ` Lo más frecuente: HTTP ${top.status || 'red'} en ${top.model}${top.quota ? ` · cupo ${top.quota}` : ''}${top.retryAfterS !== undefined ? ` · Gemini pidió esperar ${top.retryAfterS} s` : ''} — «${top.sample.slice(0, 100)}»` : ''));
+      }
       const sym = (v?: string) => (v === 'ok' ? '✔' : v === 'wrong' ? '✘' : v === 'abstain' ? '○' : v === 'infra' ? '⚠' : '—');
       log(`[${n}/${total}] ${lang} ${q.id.padEnd(22)} FinAgent ${sym(row.arms.finagent?.verdict)}  a secas ${sym(row.arms.plain?.verdict)}  búsqueda ${sym(row.arms.search?.verdict)}`);
       if (o.pauseMs) await new Promise((r) => setTimeout(r, o.pauseMs));
     }
   } finally { setHttp(); }
-  return { rows, summary: summarizeDuel(rows, arms, net.geminiRequests(), net.geminiFailed(), searchUnavailable) };
+  return { rows, summary: summarizeDuel(rows, arms, net.geminiRequests(), net.geminiFailed(), searchUnavailable, groupRejections(net.rejections())) };
 }
 
-export function summarizeDuel(rows: DuelRow[], arms: ArmId[], geminiRequests = 0, geminiFailed = 0, searchUnavailable?: string): DuelSummary {
+export function summarizeDuel(rows: DuelRow[], arms: ArmId[], geminiRequests = 0, geminiFailed = 0, searchUnavailable?: string, rejections: DuelSummary['rejections'] = []): DuelSummary {
   const models: Record<string, number> = {};
   const out: DuelSummaryArm[] = arms.map((arm) => {
     const rs = rows.map((r) => ({ r, a: r.arms[arm] })).filter((x) => x.a) as Array<{ r: DuelRow; a: ArmResult }>;
@@ -95,7 +104,7 @@ export function summarizeDuel(rows: DuelRow[], arms: ArmId[], geminiRequests = 0
       searchUsedRate: searchRows.length ? searchRows.filter((x) => x.a.searchUsed).length / searchRows.length : undefined,
     };
   });
-  return { arms: out, geminiRequests, geminiFailed, searchUnavailable, models };
+  return { arms: out, geminiRequests, geminiFailed, searchUnavailable, models, rejections };
 }
 
 export { FatalDuelError };

@@ -82,8 +82,10 @@ async function main() {
     console.log(`\nReporte: ${base}.md\n`);
   } catch (e) {
     if (e instanceof PreflightError) {
-      writeFileSync(`${base}-diagnostico.md`, `# Duelo: no se pudo correr\n\n${e.message}\n\nEl duelo con datos reales necesita que Yahoo, DolarAPI y ArgentinaDatos respondan desde el entorno donde se ejecuta. ` +
-        `Este resultado también es información: un servidor en un centro de datos puede encontrar el mismo bloqueo, y es una razón más para usar un proveedor de datos con licencia.\n`);
+      const datos = /^(Yahoo|DolarAPI)/.test(e.message);
+      writeFileSync(`${base}-diagnostico.md`, `# Duelo: no se pudo correr\n\n${e.message}\n\n` + (datos
+        ? 'El duelo con datos reales necesita que las fuentes de datos respondan desde el entorno donde se ejecuta. Este resultado también es información: un servidor en un centro de datos puede encontrar el mismo bloqueo, y es una razón más para usar un proveedor de datos con licencia.\n'
+        : 'Con una clave gratuita los cupos de Gemini son chicos y se agotan rápido. Probá más tarde, con menos preguntas (--limit, --lang) o con una clave con facturación activada.\n'));
       console.error(`\n${e.message}\nSe guardó un diagnóstico en ${base}-diagnostico.md`);
       process.exit(3);
     }

@@ -147,3 +147,19 @@ describe('el duelo solo exige las fuentes que usa', () => {
     await expect(run({ preflight: true, dataHttp: yahooBloqueado, questions: DUEL_QUESTIONS.slice(0, 2) })).rejects.toThrow(/Yahoo no responde/);
   });
 });
+
+describe('cuando Gemini no atiende', () => {
+  const cupo = async (): Promise<HttpResult> => ({ status: 429, headers: {}, text: JSON.stringify({ error: { message: 'You exceeded your current quota', details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }, { retryDelay: '3600s' }] } }) });
+  it('se corta después de 3 preguntas seguidas sin atender y dice cuál es el cupo agotado', async () => {
+    await expect(run({ gemini: cupo, search: false })).rejects.toThrow(/3 preguntas seguidas[\s\S]*GenerateRequestsPerDayPerProjectPerModel-FreeTier[\s\S]*3600 s/);
+  });
+  it('si se completa, el reporte incluye la tabla de rechazos', async () => {
+    const fake = fakeDuelGemini(); let n = 0;
+    const gem = async (r: HttpRequest) => (n++ === 2 ? cupo() : fake(r));
+    const { rows, summary } = await run({ gemini: gem, questions: DUEL_QUESTIONS.slice(0, 2) });
+    expect(summary.rejections.length).toBeGreaterThan(0);
+    const md = renderDuelReport(rows, summary, { when: 'hoy', mode: 'prueba', langs: ['es'], modelChain: ['x'], frozen: true });
+    expect(md).toContain('## Rechazos de Gemini');
+    expect(md).toContain('GenerateRequestsPerDayPerProjectPerModel-FreeTier');
+  });
+});

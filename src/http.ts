@@ -25,7 +25,7 @@ function lowerKeys(h: Record<string, unknown> | undefined): Record<string, strin
   return out;
 }
 
-const defaultHttp: HttpFn = async (req) => {
+export const defaultHttp: HttpFn = async (req) => {
   const method = req.method ?? 'GET';
   const timeout = req.timeoutMs ?? 20000;
   if (Capacitor.isNativePlatform()) {
@@ -52,6 +52,10 @@ const defaultHttp: HttpFn = async (req) => {
     });
     const headers: Record<string, string> = {};
     res.headers.forEach((v, k) => (headers[k.toLowerCase()] = v));
+    // Node (undici) entrega cada Set-Cookie por separado y el último pisaba a los anteriores; Yahoo manda varias cookies.
+    // Se unen con coma, como hace la red nativa de Capacitor, para que la sesión de Yahoo funcione también en un servidor.
+    const setCookies = (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.();
+    if (setCookies?.length) headers['set-cookie'] = setCookies.join(', ');
     return { status: res.status, headers, text: await res.text() };
   } finally {
     clearTimeout(timer);

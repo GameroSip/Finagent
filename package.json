@@ -1,6 +1,6 @@
 {
   "name": "finagent-mobile",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "private": true,
   "type": "module",
   "description": "FinAgent móvil: agente financiero que corre 100% en el teléfono (sin servidor).",
@@ -12,7 +12,9 @@
     "assets": "node scripts/make-assets.mjs",
     "eval": "tsx evals/cli.ts",
     "eval:smoke": "tsx evals/cli.ts --smoke",
-    "eval:fake": "tsx evals/cli.ts --fake=bueno"
+    "eval:fake": "tsx evals/cli.ts --fake=bueno",
+    "duel": "tsx evals/duel/cli.ts",
+    "duel:fake": "tsx evals/duel/cli.ts --fake --lang=es"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

@@ -553,6 +553,10 @@ describe('detección de idioma', () => {
     ['¿Cuál es el P/E de Microsoft?', 'es'], ['Dame el precio de YPFD.BA', 'es'], ['mostrame el RSI de AAPL', 'es'], ['Compará KO y PEP: valuación y dividendos.', 'es'],
     ['El ratio P/E refleja la valoración actual que el mercado le asigna', 'es'],            // "ratio" existe en español: no es una pista de inglés
     ['AAPL', 'other'], ['', 'other'], ['RSI NVDA', 'other'],
+    // jerga financiera en inglés dentro de texto en español: no es inglés (antes una respuesta así se leía como inglés)
+    ['**KO** (USD): P/E TTM 24.4999 (base TTM); P/E forward 22.0998; dividend yield 2.8571%; ROE 42%; deuda/patrimonio 1.5x; market cap 999.60B.', 'other'],
+    ['Decime el P/E forward y el dividend yield de KO', 'es'], ['market cap forward yield KO', 'other'],
+    ['Is NVDA overvalued?', 'en'], ['What is the dividend yield of PepsiCo?', 'en'],
   ] as const)('%s -> %s', (text, lang) => expect(detectLanguage(text)).toBe(lang));
   it('solo se agrega indicación cuando el usuario escribe en inglés', () => {
     expect(languageHint('What is the price of AAPL?')).toContain('English');
@@ -566,5 +570,24 @@ describe('prompt: sin nombres internos', () => {
     const { SYSTEM_PROMPT } = await import('../src/agent');
     expect(SYSTEM_PROMPT).not.toMatch(/usá \\?`meta\.as_of/);
     expect(SYSTEM_PROMPT).toMatch(/NUNCA escribas nombres internos de campos ni de herramientas/);
+  });
+});
+
+import { vi } from 'vitest';
+import { http as httpFn, setHttp as restoreHttp } from '../src/http';
+import { extractCookies } from '../src/yahoo';
+describe('http en Node: varias cookies de Yahoo', () => {
+  it('une todos los Set-Cookie (antes quedaba solo el último y la sesión de Yahoo fallaba en un servidor)', async () => {
+    const h = new Headers();
+    h.append('set-cookie', 'A3=d=AQAB&S=AQAAf; Expires=Fri, 17 Oct 2027 10:00:00 GMT; Path=/');
+    h.append('set-cookie', 'A1=d=AQABx; Path=/; Secure');
+    restoreHttp();                                   // otros tests de este archivo dejan un http simulado instalado
+    vi.stubGlobal('fetch', async () => new Response('', { status: 404, headers: h }));
+    try {
+      const r = await httpFn({ url: 'https://fc.yahoo.com' });
+      expect(r.headers['set-cookie']).toContain('A3=');
+      expect(r.headers['set-cookie']).toContain('A1=');
+      expect(extractCookies(r.headers['set-cookie'])).toBe('A3=d=AQAB&S=AQAAf; A1=d=AQABx');
+    } finally { vi.unstubAllGlobals(); }
   });
 });

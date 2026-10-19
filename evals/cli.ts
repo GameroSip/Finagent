@@ -4,38 +4,18 @@
 //   npm run eval -- --category=trampa        solo una categoría   |   --only=id1,id2   |   --limit=10   |   --repeat=3
 //   npm run eval:fake                        modelo falso "bueno" (no gasta cuota): sirve para probar el evaluador
 // La clave va en la variable GEMINI_API_KEY o en evals/.env (ver evals/.env.example). Los datos de mercado son SIEMPRE los congelados.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { setHttp, type HttpRequest, type HttpResult } from '../src/http';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { setHttp } from '../src/http';
 import { GeminiError, ModelManager } from '../src/models';
 import { CASES } from './cases';
+import { EVALS_DIR, flag, loadEnvFile, realGemini } from './common';
 import { fakeGemini, type FakeMode } from './fake-gemini';
 import { FatalEvalError, runEval } from './harness';
 import { renderReport } from './report';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
+const HERE = EVALS_DIR;
 const SMOKE = ['datos-precio-aapl', 'rend-6m-1a', 'calc-upside', 'trampa-sin-dato', 'trampa-prediccion', 'multi-seguimiento'];
-
-function loadEnvFile() {
-  const f = join(HERE, '.env');
-  if (!existsSync(f)) return;
-  for (const line of readFileSync(f, 'utf8').split(/\r?\n/)) {
-    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
-    if (m && !line.trim().startsWith('#') && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-  }
-}
-const flag = (name: string) => { const a = process.argv.find((x) => x === `--${name}` || x.startsWith(`--${name}=`)); return a === undefined ? undefined : a.includes('=') ? a.split('=').slice(1).join('=') : 'true'; };
-
-async function realGemini(req: HttpRequest): Promise<HttpResult> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), req.timeoutMs ?? 120_000);
-  try {
-    const res = await fetch(req.url, { method: req.method ?? 'GET', headers: { 'Content-Type': 'application/json', ...(req.headers ?? {}) },
-      body: req.body !== undefined ? JSON.stringify(req.body) : undefined, signal: ctl.signal });
-    return { status: res.status, headers: {}, text: await res.text() };
-  } finally { clearTimeout(timer); }
-}
 
 async function main() {
   loadEnvFile();

@@ -48,6 +48,15 @@ Con el cupo gratuito, los modelos preferidos se saturan rápido y la app pasa so
 reporte puede mezclar varios modelos: mirá la tabla **"Por modelo"**. Para comparar un modelo puntual usá `--only-model=...`.
 El tiempo que informa el reporte **no incluye** las pausas que el evaluador se impone para no saturar a Gemini.
 
+## El duelo: FinAgent contra otros enfoques (`npm run duel`)
+Hace las **mismas 16 preguntas** (11 de datos verificables y 5 trampas), **en español y en inglés**, a tres brazos con el mismo reparto de modelos:
+**FinAgent** (herramientas + verificador), **Gemini a secas** (sin herramientas) y **Gemini + búsqueda de Google** (si tu clave lo permite).
+Usa datos **reales** (Yahoo, DolarAPI, ArgentinaDatos) y calcula la respuesta correcta justo antes de preguntar.
+- En GitHub: *Actions → "Duelo con Gemini real" → Run workflow* (podés elegir idioma, sacar la búsqueda o correr solo algunas preguntas).
+- En tu PC: `npm run duel` (o `-- --lang=es`, `-- --no-search`, `-- --only=quote-aapl,fx-blue`). `npm run duel:fake` prueba el instrumento sin gastar cuota.
+- **Límites que el reporte avisa:** la respuesta correcta sale de las mismas fuentes que usa FinAgent (no lo valida por sí sola), son pocas preguntas,
+  y si Yahoo no responde desde donde corre, lo dice y guarda un diagnóstico en vez de producir números engañosos.
+
 ## Qué NO mide
 - No comprueba que la *interpretación* sea correcta (p. ej. citar un número real pero atribuido a la empresa equivocada): solo que cada cifra venga de los datos.
 - Los datos son sintéticos: no prueba a Yahoo ni a las demás fuentes reales.

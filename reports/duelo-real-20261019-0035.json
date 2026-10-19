@@ -1,0 +1,219 @@
+{
+ "meta": {
+  "when": "19/10/2026, 12:35:46",
+  "mode": "Gemini REAL con datos de mercado REALES",
+  "langs": [
+   "es"
+  ],
+  "modelChain": [
+   "gemini-3.8-flash",
+   "gemini-3.7-flash",
+   "gemini-3.5-flash-lite",
+   "gemini-3.6-flash",
+   "gemini-3.5-flash",
+   "gemini-3-flash-preview",
+   "gemini-2.5-flash",
+   "gemini-3.1-flash-lite",
+   "gemini-3.1-flash-lite-preview",
+   "gemini-2.5-flash-lite",
+   "gemini-flash-latest"
+  ],
+  "frozen": false
+ },
+ "summary": {
+  "arms": [
+   {
+    "arm": "finagent",
+    "label": "FinAgent",
+    "answered": 1,
+    "infra": 0,
+    "unavailable": 0,
+    "factOk": 1,
+    "factWrong": 0,
+    "factAbstain": 0,
+    "factTotal": 1,
+    "trapOk": 0,
+    "trapTotal": 0,
+    "langOk": 1,
+    "medianMs": 506851,
+    "avgCalls": 2
+   },
+   {
+    "arm": "plain",
+    "label": "Gemini a secas",
+    "answered": 1,
+    "infra": 0,
+    "unavailable": 0,
+    "factOk": 0,
+    "factWrong": 0,
+    "factAbstain": 1,
+    "factTotal": 1,
+    "trapOk": 0,
+    "trapTotal": 0,
+    "langOk": 1,
+    "medianMs": 8952,
+    "avgCalls": 1
+   },
+   {
+    "arm": "search",
+    "label": "Gemini + búsqueda de Google",
+    "answered": 0,
+    "infra": 1,
+    "unavailable": 0,
+    "factOk": 0,
+    "factWrong": 0,
+    "factAbstain": 0,
+    "factTotal": 0,
+    "trapOk": 0,
+    "trapTotal": 0,
+    "langOk": 0,
+    "medianMs": 0,
+    "avgCalls": 0
+   }
+  ],
+  "geminiRequests": 18,
+  "geminiFailed": 15,
+  "models": {
+   "gemini-3.8-flash": 2
+  },
+  "rejections": [
+   {
+    "status": 0,
+    "model": "gemini-3.8-flash",
+    "quota": "",
+    "count": 3,
+    "sample": "This operation was aborted"
+   },
+   {
+    "status": 0,
+    "model": "gemini-3.7-flash",
+    "quota": "",
+    "count": 1,
+    "sample": "This operation was aborted"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.8-flash",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.7-flash",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.5-flash-lite",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.6-flash",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.5-flash",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3-flash-preview",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 404,
+    "model": "gemini-2.5-flash",
+    "quota": "",
+    "count": 1,
+    "sample": "This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash for the latest features and improvements. We recommend you to use the Interactions API (https"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.1-flash-lite",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 429,
+    "model": "gemini-3.1-flash-lite-preview",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   },
+   {
+    "status": 404,
+    "model": "gemini-2.5-flash-lite",
+    "quota": "",
+    "count": 1,
+    "sample": "This model models/gemini-2.5-flash-lite is no longer available to new users. Please update your code to use models/gemini-3.5-flash-lite for the latest features and improvements. We recommend you to use the Interactions "
+   },
+   {
+    "status": 429,
+    "model": "gemini-flash-latest",
+    "quota": "",
+    "count": 1,
+    "sample": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https:/"
+   }
+  ]
+ },
+ "rows": [
+  {
+   "id": "fx-blue",
+   "lang": "es",
+   "kind": "fact",
+   "question": "¿A cuánto está el dólar blue hoy?",
+   "truth": [
+    {
+     "label": "dólar blue",
+     "value": 1555
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "El **dólar blue** cotiza a:\n\n- **Compra:** 1535 ARS\n- **Venta:** 1555 ARS\n\n**Brecha frente al oficial:** 1.3% (con el dólar oficial minorista vendedor en 1535 ARS).\n\n*(Datos actualizados al 18 de octubre de 2026, fuente: DolarAPI.com / ArgentinaDatos)*",
+     "verdict": "ok",
+     "langOk": true,
+     "detail": "dato correcto",
+     "ms": 506851,
+     "model": "gemini-3.8-flash",
+     "modelCalls": 2
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "No tengo acceso a información financiera en tiempo real. \n\nComo la cotización del dólar blue cambia constantemente a lo largo del día, te sugiero consultar sitios especializados como **DolarHoy**, **Ámbito Financiero** o **El Cronista** para ver el valor actualizado al momento.",
+     "verdict": "abstain",
+     "langOk": true,
+     "detail": "no dio cifras",
+     "ms": 8952,
+     "model": "gemini-3.8-flash",
+     "modelCalls": 1
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/",
+     "ms": 77187,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  }
+ ]
+}

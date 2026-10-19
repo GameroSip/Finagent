@@ -1,0 +1,523 @@
+{
+ "meta": {
+  "when": "19/10/2026, 12:31:50",
+  "mode": "Gemini REAL con datos de mercado REALES",
+  "langs": [
+   "es",
+   "en"
+  ],
+  "modelChain": [
+   "gemini-3.8-flash",
+   "gemini-3.7-flash",
+   "gemini-3.5-flash-lite",
+   "gemini-3.6-flash",
+   "gemini-3.5-flash",
+   "gemini-3-flash-preview",
+   "gemini-2.5-flash",
+   "gemini-3.1-flash-lite",
+   "gemini-3.1-flash-lite-preview",
+   "gemini-2.5-flash-lite",
+   "gemini-flash-latest"
+  ],
+  "frozen": false
+ },
+ "summary": {
+  "arms": [
+   {
+    "arm": "finagent",
+    "label": "FinAgent",
+    "answered": 1,
+    "infra": 9,
+    "unavailable": 0,
+    "factOk": 1,
+    "factWrong": 0,
+    "factAbstain": 0,
+    "factTotal": 1,
+    "trapOk": 0,
+    "trapTotal": 0,
+    "langOk": 1,
+    "medianMs": 9556,
+    "avgCalls": 2
+   },
+   {
+    "arm": "plain",
+    "label": "Gemini a secas",
+    "answered": 1,
+    "infra": 9,
+    "unavailable": 0,
+    "factOk": 0,
+    "factWrong": 0,
+    "factAbstain": 1,
+    "factTotal": 1,
+    "trapOk": 0,
+    "trapTotal": 0,
+    "langOk": 1,
+    "medianMs": 8557,
+    "avgCalls": 1
+   },
+   {
+    "arm": "search",
+    "label": "Gemini + búsqueda de Google",
+    "answered": 0,
+    "infra": 10,
+    "unavailable": 0,
+    "factOk": 0,
+    "factWrong": 0,
+    "factAbstain": 0,
+    "factTotal": 0,
+    "trapOk": 0,
+    "trapTotal": 0,
+    "langOk": 0,
+    "medianMs": 0,
+    "avgCalls": 0
+   }
+  ],
+  "geminiRequests": 14,
+  "geminiFailed": 11,
+  "models": {
+   "gemini-3.8-flash": 2
+  }
+ },
+ "rows": [
+  {
+   "id": "fx-blue",
+   "lang": "es",
+   "kind": "fact",
+   "question": "¿A cuánto está el dólar blue hoy?",
+   "truth": [
+    {
+     "label": "dólar blue",
+     "value": 1555
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "El **dólar blue** cotiza a:\n\n- **Compra:** 1535 ARS\n- **Venta:** 1555 ARS\n\n**Datos de contexto:**\n- **Brecha contra el oficial:** 1.3% (con el dólar oficial minorista vendedor en 1535 ARS).\n- **Dólar MEP (Bolsa):** 1534.3 ARS (compra) / 1542.5 ARS (venta).\n- **Contado con liquidación (CCL):** 1618.4 ARS (compra) / 1620.5 ARS (venta).\n\n*(Datos actualizados al 18 de octubre de 2026, fuente: DolarAPI.com / BCRA).*",
+     "verdict": "ok",
+     "langOk": true,
+     "detail": "dato correcto",
+     "ms": 9556,
+     "model": "gemini-3.8-flash",
+     "modelCalls": 2
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "No tengo acceso a cotizaciones en tiempo real. \n\nPara consultar el valor actualizado al instante, te recomiendo revisar sitios especializados como **DolarHoy**, **Ámbito Financiero** o **El Cronista**.",
+     "verdict": "abstain",
+     "langOk": true,
+     "detail": "no dio cifras",
+     "ms": 8557,
+     "model": "gemini-3.8-flash",
+     "modelCalls": 1
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/",
+     "ms": 79540,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "fx-oficial",
+   "lang": "es",
+   "kind": "fact",
+   "question": "¿A cuánto está el dólar oficial?",
+   "truth": [
+    {
+     "label": "dólar oficial",
+     "value": 1535
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "riesgo-pais",
+   "lang": "es",
+   "kind": "fact",
+   "question": "¿Cuál es el riesgo país de Argentina hoy?",
+   "truth": [
+    {
+     "label": "riesgo país",
+     "value": 648
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "brecha",
+   "lang": "es",
+   "kind": "fact",
+   "question": "¿Cuál es la brecha entre el dólar blue y el oficial?",
+   "truth": [
+    {
+     "label": "brecha blue/oficial (%)",
+     "value": 1.3
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 1,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "inflacion",
+   "lang": "es",
+   "kind": "fact",
+   "question": "¿Cuál fue la última inflación mensual de Argentina?",
+   "truth": [
+    {
+     "label": "inflación mensual (%)",
+     "value": 1.9
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "fx-blue",
+   "lang": "en",
+   "kind": "fact",
+   "question": "What is the Argentine blue dollar rate today?",
+   "truth": [
+    {
+     "label": "dólar blue",
+     "value": 1555
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "fx-oficial",
+   "lang": "en",
+   "kind": "fact",
+   "question": "What is the official Argentine peso exchange rate against the dollar today?",
+   "truth": [
+    {
+     "label": "dólar oficial",
+     "value": 1535
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 1,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "riesgo-pais",
+   "lang": "en",
+   "kind": "fact",
+   "question": "What is Argentina's country risk (riesgo país) today?",
+   "truth": [
+    {
+     "label": "riesgo país",
+     "value": 648
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "brecha",
+   "lang": "en",
+   "kind": "fact",
+   "question": "What is the gap between the blue and the official dollar in Argentina?",
+   "truth": [
+    {
+     "label": "brecha blue/oficial (%)",
+     "value": 1.3
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  },
+  {
+   "id": "inflacion",
+   "lang": "en",
+   "kind": "fact",
+   "question": "What was Argentina's latest monthly inflation rate?",
+   "truth": [
+    {
+     "label": "inflación mensual (%)",
+     "value": 1.9
+    }
+   ],
+   "arms": {
+    "finagent": {
+     "arm": "finagent",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "No hay ningún modelo de Gemini disponible para esta clave.",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "plain": {
+     "arm": "plain",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 0,
+     "model": "",
+     "modelCalls": 0
+    },
+    "search": {
+     "arm": "search",
+     "answer": "",
+     "verdict": "infra",
+     "langOk": true,
+     "detail": "Sin modelos disponibles",
+     "ms": 1,
+     "model": "",
+     "modelCalls": 0
+    }
+   }
+  }
+ ]
+}

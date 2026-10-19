@@ -34,6 +34,10 @@ jobs:
           cache: npm
       - run: npm ci
 
+      - name: Diagnóstico de fuentes de datos (qué responde desde estos servidores)
+        continue-on-error: true
+        run: npx tsx evals/duel/cli.ts --diagnose
+
       - name: Correr el duelo
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

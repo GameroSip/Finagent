@@ -3,6 +3,7 @@
 //   npm run duel -- --lang=es       solo español   |   --lang=en   solo inglés
 //   npm run duel -- --no-search     sin el brazo de búsqueda de Google
 //   npm run duel -- --only=quote-aapl,fx-blue   |   --limit=5   |   --rpm=6   |   --model=gemini-3.5-flash-lite
+//   npm run duel -- --diagnose      solo prueba cada fuente de datos desde este entorno (no usa Gemini)
 //   npm run duel:fake               prueba del instrumento con modelos falsos y datos congelados (no gasta cuota)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,13 +12,25 @@ import { GeminiError, ModelManager } from '../../src/models';
 import { EVALS_DIR, flag, loadEnvFile, realGemini } from '../common';
 import { frozenHttp } from '../frozen-data';
 import { FatalDuelError } from './arms';
+import { diagnoseSources, renderSourceChecks } from './diagnose';
 import { fakeDuelGemini } from './fake';
 import { DUEL_QUESTIONS, type Lang } from './questions';
 import { renderDuelReport } from './report';
 import { PreflightError, runDuel } from './run';
 
+async function diagnose() {
+  const checks = await diagnoseSources();
+  const md = renderSourceChecks(checks, process.env.GITHUB_ACTIONS ? 'servidores de GitHub Actions' : 'este equipo');
+  const dir = flag('out') ?? join(EVALS_DIR, 'reports');
+  mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
+  writeFileSync(join(dir, `duelo-fuentes-${stamp}.md`), md);
+  console.log('\n' + md);
+}
+
 async function main() {
   loadEnvFile();
+  if (flag('diagnose') !== undefined) { await diagnose(); return; }
   const fake = flag('fake') !== undefined;
   const frozen = fake || flag('frozen') !== undefined;
   const apiKey = fake ? 'clave-falsa' : process.env.GEMINI_API_KEY ?? '';

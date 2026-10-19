@@ -115,3 +115,17 @@ describe('el duelo completo con los modelos falsos', () => {
     expect(ok.rows).toHaveLength(1);
   });
 });
+
+describe('diagnóstico de fuentes', () => {
+  it('prueba cada fuente por separado e informa cuáles fallan', async () => {
+    const { diagnoseSources, renderSourceChecks } = await import('../evals/duel/diagnose');
+    setHttp(async (r) => (r.url.includes('dolarapi') ? { status: 503, headers: {}, text: 'caído' } : frozenHttp(r)));
+    const checks = await diagnoseSources();
+    expect(checks).toHaveLength(5);
+    expect(checks.find((c) => c.label.startsWith('DolarAPI'))?.ok).toBe(false);
+    expect(checks.find((c) => c.label.includes('chart'))?.ok).toBe(true);
+    const md = renderSourceChecks(checks, 'prueba');
+    expect(md).toContain('✘ falla');
+    expect(md).toContain('licencia');
+  });
+});

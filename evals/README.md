@@ -54,6 +54,8 @@ Hace las **mismas 16 preguntas** (11 de datos verificables y 5 trampas), **en es
 Usa datos **reales** (Yahoo, DolarAPI, ArgentinaDatos) y calcula la respuesta correcta justo antes de preguntar.
 - En GitHub: *Actions → "Duelo con Gemini real" → Run workflow* (podés elegir idioma, sacar la búsqueda o correr solo algunas preguntas).
 - En tu PC: `npm run duel` (o `-- --lang=es`, `-- --no-search`, `-- --only=quote-aapl,fx-blue`). `npm run duel:fake` prueba el instrumento sin gastar cuota.
+- **Yahoo bloquea los servidores de GitHub** (lo medimos: responde 429 al instante). Desde GitHub se puede correr solo la parte del dólar, riesgo país, brecha e inflación
+  (`casos`: `fx-blue,fx-oficial,riesgo-pais,brecha,inflacion`, o `npm run duel -- --solo-argentina`). El duelo completo conviene correrlo en tu PC, donde Yahoo sí responde.
 - **Límites que el reporte avisa:** la respuesta correcta sale de las mismas fuentes que usa FinAgent (no lo valida por sí sola), son pocas preguntas,
   y si Yahoo no responde desde donde corre, lo dice y guarda un diagnóstico en vez de producir números engañosos.
 

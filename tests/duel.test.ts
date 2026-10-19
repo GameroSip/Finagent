@@ -129,3 +129,21 @@ describe('diagnóstico de fuentes', () => {
     expect(md).toContain('licencia');
   });
 });
+
+describe('el duelo solo exige las fuentes que usa', () => {
+  const yahooBloqueado = (r: HttpRequest): HttpResult => (r.url.includes('yahoo') ? { status: 429, headers: {}, text: 'Too Many Requests' } : frozenHttp(r));
+  const argentina = DUEL_QUESTIONS.filter((x) => x.needs.every((n) => n === 'argentina'));
+  it('cada pregunta declara qué fuente necesita (5 del dólar/macro, 11 de Yahoo)', () => {
+    expect(argentina.map((x) => x.id)).toEqual(['fx-blue', 'fx-oficial', 'riesgo-pais', 'brecha', 'inflacion']);
+    expect(DUEL_QUESTIONS.filter((x) => x.needs.includes('yahoo'))).toHaveLength(11);
+  });
+  it('con Yahoo bloqueado (como en GitHub), las preguntas de Argentina igual se pueden medir', async () => {
+    const { rows, summary } = await run({ preflight: true, dataHttp: yahooBloqueado, questions: argentina });
+    expect(rows).toHaveLength(5);
+    expect(summary.arms.find((a) => a.arm === 'finagent')).toMatchObject({ factOk: 5, factWrong: 0 });
+    expect(summary.arms.find((a) => a.arm === 'plain')!.factWrong).toBeGreaterThanOrEqual(4);
+  });
+  it('pero si se piden preguntas que usan Yahoo, avisa que Yahoo no responde', async () => {
+    await expect(run({ preflight: true, dataHttp: yahooBloqueado, questions: DUEL_QUESTIONS.slice(0, 2) })).rejects.toThrow(/Yahoo no responde/);
+  });
+});

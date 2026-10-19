@@ -3,6 +3,7 @@
 //   npm run duel -- --lang=es       solo español   |   --lang=en   solo inglés
 //   npm run duel -- --no-search     sin el brazo de búsqueda de Google
 //   npm run duel -- --only=quote-aapl,fx-blue   |   --limit=5   |   --rpm=6   |   --model=gemini-3.5-flash-lite
+//   npm run duel -- --solo-argentina   solo las preguntas del dólar, riesgo país, brecha e inflación (no usan Yahoo)
 //   npm run duel -- --diagnose      solo prueba cada fuente de datos desde este entorno (no usa Gemini)
 //   npm run duel:fake               prueba del instrumento con modelos falsos y datos congelados (no gasta cuota)
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -42,6 +43,7 @@ async function main() {
   const langs: Lang[] = langFlag === 'es' ? ['es'] : langFlag === 'en' ? ['en'] : ['es', 'en'];
   let questions = DUEL_QUESTIONS;
   const only = flag('only'), limit = Number(flag('limit') ?? 0);
+  if (flag('solo-argentina') !== undefined) questions = questions.filter((q) => q.needs.every((n) => n === 'argentina')); // dólar, riesgo país, brecha, inflación: no usan Yahoo
   if (only) questions = questions.filter((q) => only.split(',').includes(q.id));
   if (limit > 0) questions = questions.slice(0, limit);
   if (!questions.length) { console.error('Ninguna pregunta coincide. Disponibles:\n  ' + DUEL_QUESTIONS.map((q) => q.id).join('\n  ')); process.exit(2); }

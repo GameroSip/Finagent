@@ -37,10 +37,16 @@ export async function runDuel(o: DuelOptions): Promise<{ rows: DuelRow[]; summar
   let searchUnavailable: string | undefined;
   const arms: ArmId[] = o.search ? ['finagent', 'plain', 'search'] : ['finagent', 'plain'];
   try {
-    if (o.preflight) {
-      for (const [tool, args] of [['get_quote', { ticker: 'AAPL' }], ['get_argentina_macro', {}]] as const) {
-        const r = await callTool(tool, args);
-        if (!r.ok) throw new PreflightError(`La fuente de datos no responde desde este entorno (${tool}): ${r.error}`);
+    if (o.preflight) { // solo se verifican las fuentes que necesitan las preguntas elegidas
+      const needs = new Set(o.questions.flatMap((q) => q.needs));
+      if (needs.has('yahoo')) {
+        const r = await callTool('get_quote', { ticker: 'AAPL' });
+        if (!r.ok) throw new PreflightError(`Yahoo no responde desde este entorno (get_quote): ${r.error}`);
+      }
+      if (needs.has('argentina')) {
+        const r = await callTool('get_argentina_macro', {});
+        const d = r.data as { dolares?: unknown; riesgo_pais?: unknown } | undefined;
+        if (!r.ok || !d?.dolares || !d?.riesgo_pais) throw new PreflightError(`DolarAPI o ArgentinaDatos no responden desde este entorno (get_argentina_macro): ${r.ok ? 'datos parciales' : r.error}`);
       }
     }
     let n = 0; const total = o.questions.length * o.langs.length;

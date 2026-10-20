@@ -34,7 +34,7 @@ const INTERNAL_NAMES_G = new RegExp(INTERNAL_PATTERN, 'g');
 // ------------------------------------------------------------------ red: datos congelados + Gemini (real o falso) con ritmo controlado
 export interface Rejection { status: number; model: string; message: string; quota: string; retryAfterMs?: number }
 export interface Net { http: (req: HttpRequest) => Promise<HttpResult>; geminiRequests: () => number; geminiFailed: () => number; waited: () => number; rejections: () => Rejection[] }
-export function makeNet(gemini: (req: HttpRequest) => Promise<HttpResult>, rpm = 8): Net {
+export function makeNet(gemini: (req: HttpRequest) => Promise<HttpResult>, rpm = 8, other: (req: HttpRequest) => HttpResult | Promise<HttpResult> = frozenHttp): Net {
   const gap = 60_000 / Math.max(1, rpm);
   let next = 0, count = 0, failed = 0, waited = 0;
   const rejections: Rejection[] = [];
@@ -54,7 +54,7 @@ export function makeNet(gemini: (req: HttpRequest) => Promise<HttpResult>, rpm =
         try { const res = await gemini(req); if (res.status < 200 || res.status >= 300) { failed++; record(req, res.status, res.text); } return res; }
         catch (e: any) { failed++; record(req, 0, String(e?.message ?? e)); throw e; }
       }
-      return frozenHttp(req);
+      return other(req); // datos congelados (evaluación) o la red real (duelo con datos reales)
     },
   };
 }
@@ -87,7 +87,7 @@ export async function runCase(c: EvalCase, models: ModelManager, apiKey: string,
 // ------------------------------------------------------------------ puntuación
 const wordIn = (text: string, w: string) => new RegExp(`(^|[^A-Za-z0-9.])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^A-Za-z0-9])`, 'i').test(text);
 
-function factPresent(answer: string, f: Fact): boolean {
+export function factPresent(answer: string, f: Fact): boolean {
   const values = [f.value, ...(f.alt ?? [])].filter((v) => typeof v === 'number' && Number.isFinite(v));
   return scanNumbers(answer).some((t) => values.some((v) => tokenMatchesValue(t, v) ||
     (f.tol !== undefined && (!(t.sign < 0 && v > 0) && !(t.sign > 0 && v < 0)) && t.cands.some(([x, d]) => t.scales.some((s) => Math.abs(x * s - Math.abs(v)) <= Math.max(f.tol!, 10 ** -d * s))))));
@@ -186,7 +186,7 @@ export function summarize(scores: CaseScore[], geminiRequests: number, geminiFai
   };
 }
 
-function groupRejections(list: Rejection[]): Summary['rejections'] {
+export function groupRejections(list: Rejection[]): Summary['rejections'] {
   const g = new Map<string, Summary['rejections'][number]>();
   for (const r of list) {
     const k = `${r.status}|${r.model}|${r.quota}`;

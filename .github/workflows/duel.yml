@@ -1,0 +1,89 @@
+name: Duelo con Gemini real
+
+# Se ejecuta a mano: Actions → "Duelo con Gemini real" → Run workflow.
+# Compara FinAgent contra "Gemini a secas" y "Gemini + búsqueda de Google" con las mismas preguntas, en español e inglés, usando datos REALES.
+# Necesita el secreto GEMINI_API_KEY. Si Yahoo no responde desde los servidores de GitHub, lo avisa y guarda un diagnóstico.
+on:
+  workflow_dispatch:
+    inputs:
+      idioma:
+        description: "Idioma de las preguntas"
+        type: choice
+        options: ["ambos", "es", "en"]
+        default: "ambos"
+      busqueda:
+        description: "Incluir el brazo de Gemini con búsqueda de Google (puede no estar disponible con una clave gratuita)"
+        type: boolean
+        default: true
+      casos:
+        description: "Opcional: ids de preguntas separados por coma. Ej.: quote-aapl,fx-blue,trampa-premisa"
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  duelo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Diagnóstico de fuentes de datos (qué responde desde estos servidores)
+        continue-on-error: true
+        run: npx tsx evals/duel/cli.ts --diagnose
+
+      - name: Correr el duelo
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          IDIOMA: ${{ inputs.idioma }}
+          BUSQUEDA: ${{ inputs.busqueda }}
+          CASOS: ${{ inputs.casos }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Falta el secreto GEMINI_API_KEY (Settings → Secrets and variables → Actions → New repository secret)."
+            exit 1
+          fi
+          ARGS="--lang=es"
+          if [ "$IDIOMA" = "ambos" ]; then ARGS="--lang=both"; elif [ "$IDIOMA" = "en" ]; then ARGS="--lang=en"; fi
+          if [ "$BUSQUEDA" = "false" ]; then ARGS="$ARGS --no-search"; fi
+          if [ -n "$CASOS" ]; then ARGS="$ARGS --only=$CASOS"; fi
+          npx tsx evals/duel/cli.ts $ARGS
+
+      - name: Mostrar el reporte en la página de la ejecución
+        if: always()
+        run: |
+          for f in evals/reports/duelo-*.md; do [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"; done || true
+
+      - name: Publicar el reporte en la rama eval-reports
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if ! ls evals/reports/duelo-*.md > /dev/null 2>&1; then echo "No hay reportes para publicar."; exit 0; fi
+          git config --global user.name "FinAgent eval"
+          git config --global user.email "eval@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" eval-reports > /dev/null 2>&1; then
+            git clone -q --depth 1 --branch eval-reports "$URL" .
+          else
+            git init -q . && git checkout -q -b eval-reports && git remote add origin "$URL"
+          fi
+          mkdir -p reports && cp "$GITHUB_WORKSPACE"/evals/reports/duelo-* reports/
+          git add reports && git commit -q -m "Reporte del duelo (ejecución ${RUN_ID})" && git push -q origin eval-reports
+
+      - name: Guardar el reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-duelo
+          path: evals/reports/
+          if-no-files-found: ignore

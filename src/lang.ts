@@ -5,8 +5,10 @@ export type Lang = 'en' | 'es' | 'other';
 // Palabras muy frecuentes de cada idioma. Se evitan las que existen en ambos ("ratio", "stock", "me", "a", "no", "color").
 const EN = new Set(['the', 'is', 'are', 'was', 'were', 'what', 'which', 'who', 'how', 'why', 'when', 'where', 'of', 'and', 'to', 'in', 'for', 'with', 'on',
   'at', 'from', 'by', 'about', 'this', 'that', 'these', 'those', 'it', 'its', 'be', 'been', 'has', 'have', 'had', 'does', 'can', 'could', 'should', 'would',
-  'will', 'you', 'your', 'price', 'current', 'compared', 'than', 'more', 'less', 'much', 'many', 'tell', 'show', 'give', 'today', 'now', 'buy', 'sell',
-  'earnings', 'yield', 'trailing', 'forward', 'market', 'share', 'over', 'last', 'year', 'month', 'my', 'any', 'there', 'their', 'our']);
+  'will', 'you', 'your', 'current', 'compared', 'than', 'more', 'less', 'much', 'many', 'tell', 'show', 'give', 'today', 'now',
+  'over', 'last', 'year', 'month', 'my', 'any', 'there', 'their', 'our']);
+// No se cuentan préstamos del inglés que se usan tal cual en español financiero (yield, forward, market, earnings, buy, sell, price, share, trailing):
+// "P/E forward y dividend yield de KO" está escrito en español.
 const ES = new Set(['el', 'la', 'los', 'las', 'de', 'del', 'que', 'y', 'en', 'un', 'una', 'es', 'son', 'por', 'para', 'con', 'al', 'se', 'su', 'sus', 'como',
   'más', 'mas', 'cuál', 'cual', 'cuánto', 'cuanto', 'qué', 'está', 'esta', 'están', 'estan', 'mi', 'tu', 'lo', 'si', 'pero', 'sobre', 'entre', 'sin', 'hay',
   'hoy', 'tiene', 'tienen', 'dame', 'decime', 'mostrame', 'compará', 'comparame', 'ayer', 'año', 'mes', 'acciones', 'precio', 'cotiza', 'vale']);

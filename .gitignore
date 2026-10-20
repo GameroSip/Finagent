@@ -6,3 +6,8 @@ e2e/node_modules
 e2e-shots
 evals/.env
 evals/reports/
+dist-server
+e2e-shots-server
+*.db
+.wrangler
+.dev.vars

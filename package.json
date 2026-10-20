@@ -1,6 +1,6 @@
 {
   "name": "finagent-mobile",
-  "version": "0.3.9",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "description": "FinAgent móvil: agente financiero que corre 100% en el teléfono (sin servidor).",
@@ -14,7 +14,9 @@
     "eval:smoke": "tsx evals/cli.ts --smoke",
     "eval:fake": "tsx evals/cli.ts --fake=bueno",
     "duel": "tsx evals/duel/cli.ts",
-    "duel:fake": "tsx evals/duel/cli.ts --fake --lang=es"
+    "duel:fake": "tsx evals/duel/cli.ts --fake --lang=es",
+    "server:dev": "tsx server/node.ts",
+    "test:e2e-server": "VITE_API_BASE=https://api.finagent.test vite build --outDir dist-server --emptyOutDir && cd e2e && node run-server.mjs ../dist-server ../e2e-shots"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

@@ -86,3 +86,48 @@ export function geminiReply(url, body) {
   }
   return text('Listo.');
 }
+
+// ------------------------------------------------------------------ servidor de FinAgent simulado (modo beta)
+export const FA_CODE = 'FA-TEST-2222';
+const FREE = { id: 'free', label: 'Gratis', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 3, monthlyLimit: 90, available: true };
+const PLUS = { id: 'plus', label: 'Plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10, monthlyLimit: 200, available: false };
+const PLAN_LIST = [
+  { ...FREE, blurb: 'Respuestas rápidas con un modelo liviano.', deepModelLabel: null, deepMonthlyLimit: 0 },
+  { ...PLUS, blurb: 'Un modelo más potente y más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0 },
+  { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30 },
+];
+export const apiState = { used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [] };
+export const resetApi = () => Object.assign(apiState, { used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [] });
+const planNow = () => (apiState.plan === 'plus' ? PLUS : FREE);
+const remaining = () => ({ day: Math.max(0, planNow().dailyLimit - apiState.used), month: Math.max(0, planNow().monthlyLimit - apiState.month) });
+
+export function finagentApi(method, path, headers, body) {
+  const j = (o, status = 200) => ({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(o) });
+  if (method === 'OPTIONS') return { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type' }, body: '' };
+  if (path === '/v1/plans') return j({ tier: 'free', plans: PLAN_LIST });
+  if (path === '/v1/auth/device') {              // cuenta automática: sin registro ni códigos
+    if (apiState.banned) return j({ error: 'disabled' }, 403);
+    const tok = `tok-e2e-${++apiState.deviceAuths}`; apiState.tokens.add(tok);
+    return j({ token: tok, plan: planNow(), tier: 'free', expiresAt: Date.now() + 90 * 86400e3 });
+  }
+  const tok = (headers.authorization ?? '').replace('Bearer ', '');
+  if (!apiState.tokens.has(tok)) return j({ error: 'session' }, 401);
+  if (path === '/v1/me') return j({ plan: planNow(), remaining: remaining(), resetsOn: '2026-10-20', tier: 'free' });
+  if (path === '/v1/interest') { if (!apiState.interest.includes(body.plan)) apiState.interest.push(body.plan); return j({ ok: true, first: true }); }
+  if (path === '/v1/plan/redeem') {
+    if (body.code !== FA_CODE) return j({ error: 'code' }, 404);
+    apiState.plan = 'plus'; return j({ plan: PLUS, unchanged: false, remaining: remaining() });
+  }
+  if (path === '/v1/generate') {
+    if (apiState.capacity === 'minute') return j({ error: 'capacity', scope: 'minute', retryAfterSec: 30, tier: 'free' }, 503);
+    if (apiState.capacity === 'day') return j({ error: 'capacity', scope: 'day', retryAfterSec: 7200, tier: 'free' }, 503);
+    let turn = body.turn;
+    if (!turn) {                                  // la primera vuelta de cada respuesta descuenta UNA conversación
+      if (remaining().day <= 0) return j({ error: 'limit', reason: 'daily', resetsOn: '2026-10-20', plan: planNow() }, 429);
+      apiState.used++; apiState.month++; turn = `t${++apiState.turn}`;
+    }
+    const data = geminiReply('https://fake/models/m:generateContent', { contents: body.contents, systemInstruction: { parts: [{ text: 'sistema' }] } });
+    return j({ data, model: 'gemini-3.5-flash-lite', turn, remaining: remaining(), plan: planNow(), tier: 'free' });
+  }
+  return j({ error: 'not_found' }, 404);
+}

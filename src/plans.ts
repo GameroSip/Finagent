@@ -5,18 +5,35 @@
 export type PlanId = 'free' | 'plus' | 'pro';
 export interface Plan {
   id: PlanId; label: string;
-  model: string;                // modelo de las consultas normales
+  model: string;                // el modelo FIJO de este plan (el usuario lo ve en la app)
+  modelLabel: string;           // cómo se muestra: "Gemini 3.5 Flash-Lite"
+  fallbacks: string[];          // modelos de respaldo si el principal no tiene cupo (vacío = el plan usa SOLO su modelo)
   deepModel?: string;           // modelo del "análisis profundo" (solo planes que lo incluyen)
+  deepModelLabel?: string;
+  available: boolean;           // ¿ya se puede contratar? Los de pago todavía no: se muestran como "próximamente"
+  blurb: string;                // qué ofrece, en una frase
   thinking: 'low' | 'medium' | 'high'; // nivel de razonamiento (pendiente de conectar al pedido cuando se verifique el nombre del parámetro en la documentación)
   dailyLimit: number; monthlyLimit: number; deepMonthlyLimit: number;
   maxToolSteps: number; maxOutputTokens: number;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: 'free', label: 'Gratis', model: 'gemini-3.5-flash-lite', thinking: 'low', dailyLimit: 3, monthlyLimit: 90, deepMonthlyLimit: 0, maxToolSteps: 3, maxOutputTokens: 700 },
-  plus: { id: 'plus', label: 'Plus', model: 'gemini-3.5-flash-lite', thinking: 'medium', dailyLimit: 15, monthlyLimit: 300, deepMonthlyLimit: 0, maxToolSteps: 5, maxOutputTokens: 1200 },
-  pro: { id: 'pro', label: 'Pro', model: 'gemini-3.5-flash-lite', deepModel: 'gemini-3.8-flash', thinking: 'medium', dailyLimit: 30, monthlyLimit: 600, deepMonthlyLimit: 30, maxToolSteps: 6, maxOutputTokens: 2000 },
+  free: { id: 'free', label: 'Gratis', model: 'gemini-3.5-flash-lite', modelLabel: 'Gemini 3.5 Flash-Lite', fallbacks: [], available: true, thinking: 'low', dailyLimit: 3, monthlyLimit: 90, deepMonthlyLimit: 0, maxToolSteps: 3, maxOutputTokens: 700,
+    blurb: 'Respuestas rápidas con un modelo liviano.' },
+  // Los planes de pago son una PROPUESTA preliminar (el precio no está definido y todavía no se pueden contratar): sirven para mostrar qué vendría y medir el interés.
+  plus: { id: 'plus', label: 'Plus', model: 'gemini-3.8-flash', modelLabel: 'Gemini 3.8 Flash', fallbacks: ['gemini-3.5-flash-lite'], available: false, thinking: 'medium', dailyLimit: 10, monthlyLimit: 200, deepMonthlyLimit: 0, maxToolSteps: 5, maxOutputTokens: 1200,
+    blurb: 'Un modelo más potente y más conversaciones por día.' },
+  pro: { id: 'pro', label: 'Pro', model: 'gemini-3.8-flash', modelLabel: 'Gemini 3.8 Flash', fallbacks: ['gemini-3.5-flash-lite'], deepModel: 'gemini-3.1-pro-preview', deepModelLabel: 'Gemini 3.1 Pro', available: false, thinking: 'medium', dailyLimit: 30, monthlyLimit: 600, deepMonthlyLimit: 30, maxToolSteps: 6, maxOutputTokens: 2000,
+    blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.' },
 };
+export const PLAN_RANK: Record<PlanId, number> = { free: 0, plus: 1, pro: 2 };
+
+/** Texto de contexto para el modelo: así, si el usuario pregunta por su plan o sus límites, FinAgent responde con datos reales y no inventa. */
+export function planNote(p: Plan): string {
+  const paid = (['plus', 'pro'] as const).filter((x) => !PLANS[x].available).map((x) => PLANS[x].label).join(' y ');
+  return `Plan ${p.label}: usa ${p.modelLabel} y permite ${p.dailyLimit} conversaciones por día (${p.monthlyLimit} por mes).` +
+    (p.id === 'free' ? ` Los planes de pago (${paid}) con modelos más potentes y más conversaciones todavía no están disponibles: se pueden anotar para que les avisen en Ajustes → Tu plan. No inventes precios ni fechas.` : '');
+}
 
 /** Contador atómico (en producción: Firestore, Redis o Postgres). */
 export interface UsageStore { incr(key: string, by: number): Promise<number> }

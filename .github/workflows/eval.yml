@@ -8,7 +8,7 @@ on:
       alcance:
         description: "Qué correr"
         type: choice
-        options: ["rapida (6 casos)", "completa (38 casos)"]
+        options: ["rapida (6 casos)", "completa (41 casos)"]
         default: "rapida (6 casos)"
       repeticiones:
         description: "Veces que se repite cada caso"

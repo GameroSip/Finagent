@@ -26,7 +26,7 @@ o copiá `evals/.env.example` a `evals/.env` y pegá la clave (ese archivo no se
 | Comando | Qué hace |
 |---|---|
 | `npm run eval:smoke` | 6 casos, unos minutos. Para ver que todo funciona |
-| `npm run eval` | Los 38 casos (≈ 25–40 min con el cupo gratuito) |
+| `npm run eval` | Los 41 casos (≈ 25–40 min con el cupo gratuito) |
 | `npm run eval -- --category=trampa` | Solo una categoría (`datos`, `tecnico`, `fundamentales`, `rendimiento`, `screener`, `argentina`, `calculo`, `trampa`, `multiturno`…) |
 | `npm run eval -- --only=calc-upside,trampa-prediccion` | Casos puntuales |
 | `npm run eval -- --repeat=3` | Repite cada caso (el modelo no es determinista: así ves la variación) |

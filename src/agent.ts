@@ -2,6 +2,7 @@
 // Modelo y límites son AUTOMÁTICOS: no hay nada que configurar.
 import { http } from './http';
 import { languageHint } from './lang';
+import { NO_TOKENS, type Tokens } from './pricing';
 import { API_ROOT, DAILY_QUOTA_MS, GeminiError, ModelManager, modelLabel, parseQuota } from './models';
 import { callTool, ToolResult } from './tools';
 import { DECLARATIONS } from './toolSpecs';
@@ -13,6 +14,7 @@ const MAX_TURNS = 10;          // turnos de contexto que se reenvían al modelo
 const MAX_KNOWN_NUMBERS = 3000; // cifras de herramientas que se recuerdan por chat para verificar respuestas siguientes
 
 export const SYSTEM_PROMPT = `Sos un analista financiero asistente dentro de una app móvil. El modelo interpreta y redacta; las HERRAMIENTAS son la única fuente de cifras.
+IDENTIDAD: te llamás FinAgent, un asistente de IA especializado en finanzas. Si te preguntan qué sos o cómo funcionás: sos FinAgent y combinás modelos de IA de un proveedor externo con herramientas propias que obtienen y calculan los datos y un verificador de cifras. Si te preguntan directamente qué modelo hay detrás, no lo niegues: decí que FinAgent usa modelos Gemini de Google. NUNCA afirmes que FinAgent entrenó su propio modelo, que tiene licencias de datos, que Google o DeepMind lo respaldan o avalan, ni que usa varios modelos de IA: no es cierto o no lo sabés. Ante esas preguntas decí lo que sí es verdad y que cada dato se cita con su fuente.
 IDIOMA: respondé SIEMPRE en el idioma del último mensaje del usuario (si escribe en inglés, toda la respuesta va en inglés), aunque estas instrucciones estén en español.
 
 REGLAS DE DATOS
@@ -45,6 +47,7 @@ export interface AskStats {
   toolSteps: number;           // consultas a herramientas
   draftChecked: number;        // cifras del PRIMER borrador
   draftUnverified: string[];   // cifras del primer borrador que NO salían de las herramientas (el "índice de alucinación" real)
+  tokens: Tokens;              // tokens REALES que informó Gemini (entrada, salida, razonamiento, en caché)
   corrected: boolean;          // hizo falta la pasada de corrección o de reescritura
   rewritten: boolean;          // hizo falta la reescritura sin herramientas
 }
@@ -116,6 +119,7 @@ export class FinancialAgent {
   priorNumbers: number[] = [];
   private aborted = false;
   private modelCalls = 0;
+  private tokens: Tokens = NO_TOKENS();
   private activeModel: string | null = null;
   private o: Required<AgentOptions>;
 
@@ -196,6 +200,8 @@ export class FinancialAgent {
         this.activeModel = model;
         this.o.models.active = model;
         this.modelCalls++;
+        const u = data?.usageMetadata; // el uso real que informa Gemini: reemplaza las estimaciones de costo
+        if (u) { this.tokens.input += u.promptTokenCount ?? 0; this.tokens.output += u.candidatesTokenCount ?? 0; this.tokens.thoughts += u.thoughtsTokenCount ?? 0; this.tokens.cached += u.cachedContentTokenCount ?? 0; }
         return data;
       } catch (e) {
         if (!(e instanceof GeminiError)) throw e;
@@ -261,6 +267,7 @@ export class FinancialAgent {
   async ask(question: string, hooks: Hooks = {}): Promise<AgentResult> {
     this.aborted = false;
     this.modelCalls = 0;
+    this.tokens = NO_TOKENS();
     this.contents = historyToContents(this.history);
     const hint = languageHint(question); // si el usuario escribe en inglés, se le recuerda al modelo en cada turno (el historial guarda solo la pregunta)
     this.contents.push(userMsg(question + hint));
@@ -308,7 +315,7 @@ export class FinancialAgent {
       this.history = this.history.slice(-MAX_TURNS);
       const numbers = [...new Set(collectNumbers(calls.map((c) => c.result)))];
       this.priorNumbers = [...new Set([...this.priorNumbers, ...numbers])].slice(-MAX_KNOWN_NUMBERS);
-      const stats: AskStats = { modelCalls: this.modelCalls, toolSteps: calls.length, draftChecked: draft.checked, draftUnverified: draft.unverified, corrected, rewritten };
+      const stats: AskStats = { modelCalls: this.modelCalls, toolSteps: calls.length, draftChecked: draft.checked, draftUnverified: draft.unverified, tokens: { ...this.tokens }, corrected, rewritten };
       return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, redacted, stats, numbers };
     } catch (e) {
       this.contents = historyToContents(this.history); // se descarta el turno incompleto

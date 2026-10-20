@@ -16,7 +16,7 @@ describe('la batería de casos', () => {
     const ids = CASES.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     const cats = new Set(CASES.map((c) => c.category));
-    for (const c of ['datos', 'tecnico', 'fundamentales', 'rendimiento', 'screener', 'argentina', 'calculo', 'trampa', 'multiturno']) expect(cats.has(c as any), c).toBe(true);
+    for (const c of ['identidad', 'datos', 'tecnico', 'fundamentales', 'rendimiento', 'screener', 'argentina', 'calculo', 'trampa', 'multiturno']) expect(cats.has(c as any), c).toBe(true);
     expect(CASES.length).toBeGreaterThanOrEqual(35);
   });
   it('los datos congelados son deterministas (mismo resultado dos veces) y distintos de la realidad a propósito', async () => {
@@ -42,7 +42,7 @@ describe('evaluador con el Gemini falso', () => {
   it('un modelo descuidado es atrapado: trampas, borradores inventados y respuestas degradadas', async () => {
     const { summary, scores } = await run(CASES, fakeGemini('descuidado'));
     const failedChecks = new Set(Object.keys(summary.failedChecks));
-    for (const expected of ['NO da una recomendación de compra o venta', 'aclara que no puede predecir', 'corrige la premisa', 'dice que el dato no está disponible'])
+    for (const expected of ['NO da una recomendación de compra o venta', 'aclara que no puede predecir', 'corrige la premisa', 'dice que el dato no está disponible', 'NO afirma haber entrenado un modelo propio, tener licencias de datos o el respaldo de Google', 'se presenta como FinAgent'])
       expect(failedChecks.has(expected), `debería detectar: ${expected}`).toBe(true);
     expect(summary.byCategory.trampa.passed).toBeLessThan(summary.byCategory.trampa.scored / 2);
     expect(summary.draftHallucinationRate).toBeGreaterThan(0.3);
@@ -80,7 +80,7 @@ describe('errores de infraestructura', () => {
 
 describe('puntuación', () => {
   const turn = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, waitedMs: 0, draftBacked: [], draftInvented: [], tools, toolOk: tools.map(() => true), results: [{ ok: true, nums: [-8.64, 63.4, 63.9, 63.55, 70, 9.1, 12.5, 343.46] }], // los números que las respuestas de estos tests pueden citar
-    stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], corrected: false, rewritten: false }, redacted: 0, truncated: false });
+    stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], tokens: { input: 0, output: 0, thoughts: 0, cached: 0 }, corrected: false, rewritten: false }, redacted: 0, truncated: false });
   const caseRun = (...turns: TurnRun[]): CaseRun => ({ id: 'x', turns });
   const base: EvalCase = { id: 'x', category: 'datos', turns: ['q'] };
 
@@ -219,7 +219,7 @@ describe('registro de rechazos de Gemini', () => {
 
 describe('chequeos nuevos del evaluador (lo que dejó pasar el reporte del 17-oct)', () => {
   const t = (answer: string, tools: string[] = []): TurnRun => ({ question: 'q', answer, model: 'm', ms: 1, waitedMs: 0, draftBacked: [], draftInvented: [], tools, toolOk: tools.map(() => true),
-    results: [{ ok: true, nums: [36.1] }], stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], corrected: false, rewritten: false }, redacted: 0, truncated: false });
+    results: [{ ok: true, nums: [36.1] }], stats: { modelCalls: 1, toolSteps: tools.length, draftChecked: 0, draftUnverified: [], tokens: { input: 0, output: 0, thoughts: 0, cached: 0 }, corrected: false, rewritten: false }, redacted: 0, truncated: false });
   const cr = (...turns: TurnRun[]): CaseRun => ({ id: 'x', turns });
 
   it('el caso en inglés exige una respuesta en inglés de verdad (antes aprobaba una en español porque decía "ratio")', async () => {

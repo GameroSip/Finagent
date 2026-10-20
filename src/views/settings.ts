@@ -1,4 +1,5 @@
 // Ajustes: lo mínimo. El modelo y los límites son automáticos; acá solo hay cuenta, tema, diagnóstico y datos.
+import { ABOUT } from '../about';
 import type { Ctx, View } from '../ctx';
 import { fetchFearGreed } from '../data/market';
 import { fetchDolares, fetchRiesgoPais } from '../data/argentina';
@@ -12,7 +13,7 @@ import { icon } from '../ui/icons';
 import { logoSvg } from '../ui/logo';
 import { confirmSheet, openSheet } from '../ui/sheet';
 
-const VERSION = '0.3.8';
+const VERSION = '0.3.9';
 
 interface Probe { name: string; run: () => Promise<unknown> }
 
@@ -64,9 +65,12 @@ export function createSettingsView(ctx: Ctx): View {
         <button class="set-row danger" id="s-wipe"><span class="set-ic">${icon('trash', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Cerrar sesión y borrar todo</div><div class="set-sub">Elimina tu clave y tus datos de este teléfono</div></div></button>
       </div></div>
 
-      <div class="set-group"><div class="set-title">Acerca de</div><div class="card" style="font-size:13px;line-height:1.55" >
-        <p class="text-2">FinAgent es una herramienta de información financiera con fines educativos. No es asesoramiento de inversión: los datos pueden tener demora o errores y las respuestas de la IA pueden equivocarse. Tomá tus decisiones con criterio propio.</p>
-        <p class="muted" style="margin-top:10px">Gráficos: TradingView Lightweight Charts™ (tradingview.com). Iconos: Lucide. Tipografía: Inter. Datos: Yahoo Finance, DolarAPI, ArgentinaDatos, Google News, alternative.me. IA: Google Gemini.</p></div></div>`;
+      <div class="set-group"><div class="set-title">Acerca de</div><div class="card" style="font-size:13px;line-height:1.55">
+        <p class="text-2"><b>Qué es FinAgent.</b> ${esc(ABOUT.what)}</p>
+        <ul class="text-2" style="margin:8px 0 0 18px;padding:0">${ABOUT.how.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>
+        <p class="text-2" style="margin-top:10px">${esc(ABOUT.limits)}</p>
+        <p class="muted" style="margin-top:10px">${esc(ABOUT.privacy)}</p>
+        <p class="muted" style="margin-top:10px">${esc(ABOUT.credits)}</p></div></div>`;
     bind();
   }
 

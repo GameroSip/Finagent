@@ -1,6 +1,6 @@
 // Evaluación de FinAgent contra Gemini REAL (o contra un Gemini falso para probar el evaluador).
 //   npm run eval:smoke                       6 casos (unos minutos): para ver que todo anda
-//   npm run eval                             los 38 casos
+//   npm run eval                             los 41 casos
 //   npm run eval -- --category=trampa        solo una categoría   |   --only=id1,id2   |   --limit=10   |   --repeat=3
 //   npm run eval:fake                        modelo falso "bueno" (no gasta cuota): sirve para probar el evaluador
 // La clave va en la variable GEMINI_API_KEY o en evals/.env (ver evals/.env.example). Los datos de mercado son SIEMPRE los congelados.

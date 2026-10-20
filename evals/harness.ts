@@ -5,6 +5,7 @@ import { setHttp, type HttpRequest, type HttpResult } from '../src/http';
 import { parseQuota, type ModelManager } from '../src/models';
 import { clearCache } from '../src/tools';
 import { detectLanguage } from '../src/lang';
+import { estimateCostUSD } from '../src/pricing';
 import { scanNumbers, tokenMatchesValue, verifyAnswer } from '../src/verify';
 import type { Category, EvalCase, Fact } from './cases';
 import { frozenHttp } from './frozen-data';
@@ -143,6 +144,7 @@ export interface Summary {
   byCategory: Record<string, { scored: number; passed: number }>;
   turns: number; draftHallucinatedTurns: number; draftHallucinationRate: number; avgDraftUnverified: number;
   correctedTurns: number; rewrittenTurns: number; degradedAnswers: number; leakTurns: number;
+  tokenTurns: number; avgInputTokens: number; avgOutputTokens: number; avgThoughtTokens: number; avgCostUSD: number | null;
   avgToolSteps: number; avgModelCalls: number; medianMs: number; geminiRequests: number;
   failedChecks: Record<string, number>; models: Record<string, number>;
   geminiFailed: number; medianResponseMs: number;
@@ -162,6 +164,9 @@ export function summarize(scores: CaseScore[], geminiRequests: number, geminiFai
   const models: Record<string, number> = {};
   for (const t of turns) models[t.model] = (models[t.model] ?? 0) + 1;
   const sum = (f: (t: (typeof turns)[number]) => number) => turns.reduce((a, t) => a + f(t), 0);
+  const withTokens = turns.filter((t) => t.stats.tokens.input + t.stats.tokens.output > 0);
+  const costs = withTokens.map((t) => estimateCostUSD(t.model, t.stats.tokens)).filter((c): c is number => c !== null);
+  const avg = (f: (t: (typeof turns)[number]) => number) => (withTokens.length ? withTokens.reduce((a, t) => a + f(t), 0) / withTokens.length : 0);
   const hallucinated = turns.filter((t) => t.stats.draftUnverified.length > 0).length;
   const ms = turns.map((t) => t.ms).sort((a, b) => a - b);
   const net = turns.map((t) => Math.max(0, t.ms - t.waitedMs)).sort((a, b) => a - b);
@@ -175,7 +180,9 @@ export function summarize(scores: CaseScore[], geminiRequests: number, geminiFai
     passRate: hard.length ? hard.filter((s) => s.pass).length / hard.length : 0, softObservations: soft.length, softPassed: soft.filter((s) => s.pass).length,
     byCategory: by, turns: turns.length, draftHallucinatedTurns: hallucinated, draftHallucinationRate: turns.length ? hallucinated / turns.length : 0,
     avgDraftUnverified: turns.length ? sum((t) => t.stats.draftUnverified.length) / turns.length : 0,
-    leakTurns: turns.filter((t) => INTERNAL_NAMES.test(t.answer)).length, correctedTurns: turns.filter((t) => t.stats.corrected).length, rewrittenTurns: turns.filter((t) => t.stats.rewritten).length, degradedAnswers: turns.filter((t) => t.redacted > 0).length,
+    leakTurns: turns.filter((t) => INTERNAL_NAMES.test(t.answer)).length,
+    tokenTurns: withTokens.length, avgInputTokens: avg((t) => t.stats.tokens.input), avgOutputTokens: avg((t) => t.stats.tokens.output), avgThoughtTokens: avg((t) => t.stats.tokens.thoughts),
+    avgCostUSD: costs.length ? costs.reduce((a, c) => a + c, 0) / costs.length : null, correctedTurns: turns.filter((t) => t.stats.corrected).length, rewrittenTurns: turns.filter((t) => t.stats.rewritten).length, degradedAnswers: turns.filter((t) => t.redacted > 0).length,
     avgToolSteps: turns.length ? sum((t) => t.stats.toolSteps) / turns.length : 0, avgModelCalls: turns.length ? sum((t) => t.stats.modelCalls) / turns.length : 0,
     medianMs: ms.length ? ms[Math.floor(ms.length / 2)] : 0, geminiRequests, failedChecks: failed, models, geminiFailed, byModel,
     medianResponseMs: net.length ? net[Math.floor(net.length / 2)] : 0,

@@ -24,6 +24,10 @@ export function renderReport(scores: CaseScore[], s: Summary, meta: ReportMeta):
   L.push(`| Respuestas que necesitaron corrección | ${s.correctedTurns} (de ellas, reescritura sin herramientas: ${s.rewrittenTurns}) |`);
   L.push(`| **Respuestas degradadas** (se quitaron cifras del texto final) | **${s.degradedAnswers}** |`);
   L.push(`| Respuestas que muestran nombres internos al usuario (campos o herramientas) | ${s.leakTurns}/${s.turns} |`);
+  if (s.tokenTurns) {
+    L.push(`| **Tokens reales por respuesta** (promedio) | entrada ${Math.round(s.avgInputTokens).toLocaleString('es-AR')} · salida ${Math.round(s.avgOutputTokens).toLocaleString('es-AR')} · razonamiento ${Math.round(s.avgThoughtTokens).toLocaleString('es-AR')} |`);
+    if (s.avgCostUSD !== null) L.push(`| **Costo estimado por respuesta** (tokens reales × precios oficiales) | **USD ${s.avgCostUSD.toFixed(4)}** (≈ USD ${(s.avgCostUSD * 1000).toFixed(2)} cada 1.000) |`);
+  }
   L.push(`| Herramientas por respuesta (promedio) · pedidos al modelo por respuesta | ${s.avgToolSteps.toFixed(1)} · ${s.avgModelCalls.toFixed(1)} |`);
   L.push(`| Tiempo mediano por respuesta | ${(s.medianResponseMs / 1000).toFixed(1)} s (sin contar las pausas del evaluador; con ellas: ${(s.medianMs / 1000).toFixed(1)} s) |`, '');
 

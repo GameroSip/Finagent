@@ -358,3 +358,32 @@ describe('idioma del usuario', () => {
     expect(userTexts(calls[0]).at(-1)).toBe('¿Cuál es el P/E de Microsoft?');
   });
 });
+
+// ------------------------------------------------------------------ tokens reales por respuesta
+describe('medición de tokens', () => {
+  const withUsage = (r: HttpResult, u: Record<string, number>): HttpResult => json(200, { ...JSON.parse(r.text), usageMetadata: u });
+  it('suma los tokens que informa Gemini en todos los pedidos de una respuesta (entrada, salida, razonamiento, caché)', async () => {
+    let n = 0;
+    mockGemini(() => (n++ === 0
+      ? withUsage(fcall('1+1'), { promptTokenCount: 1000, candidatesTokenCount: 10, cachedContentTokenCount: 600 })
+      : withUsage(text('Listo.'), { promptTokenCount: 1500, candidatesTokenCount: 40, thoughtsTokenCount: 120 })));
+    const { agent } = agentWith(['A']);
+    const r = await agent.ask('cuánto es 1+1');
+    expect(r.stats.tokens).toEqual({ input: 2500, output: 50, thoughts: 120, cached: 600 });
+    expect(r.stats.modelCalls).toBe(2);
+  });
+  it('cada respuesta empieza de cero y, si Gemini no informa uso, queda en 0 (no se inventa)', async () => {
+    mockGemini(() => text('Listo.'));
+    const { agent } = agentWith(['A']);
+    expect((await agent.ask('hola')).stats.tokens).toEqual({ input: 0, output: 0, thoughts: 0, cached: 0 });
+  });
+});
+
+describe('identidad de FinAgent en el prompt', () => {
+  it('se presenta como FinAgent, no oculta la tecnología de base y prohíbe afirmar lo que no es cierto', async () => {
+    const { SYSTEM_PROMPT } = await import('../src/agent');
+    expect(SYSTEM_PROMPT).toMatch(/te llamás FinAgent/);
+    expect(SYSTEM_PROMPT).toMatch(/no lo niegues: decí que FinAgent usa modelos Gemini de Google/);
+    expect(SYSTEM_PROMPT).toMatch(/NUNCA afirmes que FinAgent entrenó su propio modelo, que tiene licencias de datos, que Google o DeepMind lo respaldan/);
+  });
+});

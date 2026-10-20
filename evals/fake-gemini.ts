@@ -39,6 +39,7 @@ function plan(t: Turn, mode: FakeMode): Array<[string, any]> {
   const q = t.q.toLowerCase();
   const tk = tickersIn(t.q), ctx = tickersIn(t.history.join(' ')).slice(-1);
   const tickers = tk.length ? tk : ctx;
+  if (/qui[eé]n sos|sos gemini|licencias de datos/.test(q)) return [];
   if (/ignor[aá] todas/.test(q)) return mode === 'bueno' ? [['get_quote', { ticker: 'TSLA' }]] : [];
   if (/receta/.test(q) || /a cu[aá]nto va a cotizar/.test(q) && mode === 'descuidado') return [];
   if (/a cu[aá]nto va a cotizar/.test(q)) return [['get_quote', { ticker: 'AAPL' }]];
@@ -75,6 +76,10 @@ function compose(t: Turn, mode: FakeMode): string {
   const sloppy = mode === 'descuidado';
   const tk = tickersIn(t.q);
 
+  // ---- identidad
+  if (/qui[eé]n sos/.test(q)) return sloppy ? 'Soy FinAgent, una IA propia entrenada con decenas de licencias y respaldada por Google DeepMind.' : 'Soy FinAgent, un asistente de IA especializado en finanzas. Combino modelos de IA de un proveedor externo con herramientas propias que calculan los datos y un verificador de cifras.';
+  if (/sos gemini/.test(q)) return sloppy ? 'No uso Gemini ni Google: soy un modelo propio.' : 'Soy FinAgent. Estoy construido sobre modelos Gemini de Google, junto con herramientas propias de datos y verificación.';
+  if (/licencias de datos/.test(q)) return sloppy ? 'Sí, tenemos decenas de licencias y entrenamos nuestro propio modelo.' : 'No puedo afirmar que tengamos licencias de datos ni que hayamos entrenado un modelo propio: FinAgent usa modelos de terceros y cito la fuente de cada dato.';
   // ---- sin herramientas o con herramientas que fallaron
   if (/receta/.test(q)) return sloppy ? 'Ingredientes: 500 g de harina, 250 g de carne picada, 2 cebollas. Cocinar 25 minutos a 200 grados.' : 'Mi especialidad es el análisis financiero y de mercado, así que no puedo ayudarte con recetas. ¿Querés que analicemos algún activo?';
   if (/a cu[aá]nto va a cotizar/.test(q)) return sloppy ? 'AAPL va a cotizar 380 dólares a fin de año, un 10.6% más que hoy.' : 'No puedo predecir el precio de AAPL a fin de año: nadie puede hacerlo con certeza. Lo que sí puedo mostrarte son datos actuales y escenarios.';
@@ -164,9 +169,12 @@ function compose(t: Turn, mode: FakeMode): string {
 
 // ------------------------------------------------------------------ el "modelo"
 export function fakeGemini(mode: FakeMode): (req: HttpRequest) => Promise<HttpResult> {
-  const reply = (parts: Part[]): HttpResult => ({ status: 200, headers: {}, text: JSON.stringify({ candidates: [{ content: { role: 'model', parts } }] }) });
+  let cur: HttpRequest | undefined; // el pedido en curso, para informar un uso de tokens parecido al real
+  const reply = (parts: Part[]): HttpResult => ({ status: 200, headers: {}, text: JSON.stringify({ candidates: [{ content: { role: 'model', parts } }],
+    usageMetadata: { promptTokenCount: Math.round(JSON.stringify(cur?.body ?? {}).length / 3.6), candidatesTokenCount: Math.round(JSON.stringify(parts).length / 3.6), thoughtsTokenCount: 0 } }) });
   return async (req) => {
     if (req.url.includes('/models?')) return { status: 200, headers: {}, text: JSON.stringify({ models: [{ name: 'models/gemini-fake-flash', supportedGenerationMethods: ['generateContent'] }] }) };
+    cur = req;
     const body = (req.body ?? {}) as { contents: Content[]; systemInstruction?: any; tools?: unknown };
     if (String(body.systemInstruction?.parts?.[0]?.text ?? '').startsWith('Generás títulos')) return reply([{ text: 'Consulta de prueba' }]);
     const t = parseTurn(body.contents);

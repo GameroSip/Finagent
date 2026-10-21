@@ -1,9 +1,11 @@
 // Asistente: chats guardados como en ChatGPT/Claude/Gemini. Cada chat tiene su historial, su título automático y su
 // propio contexto; una respuesta en curso sigue aunque cambies de chat o de pestaña.
 import { AbortedError, FinancialAgent, GeminiError, type AgentResult } from '../agent';
+import { ABOUT } from '../about';
+import { AccessDeniedError, busyMessage, fetchMe, isServerMode, LimitError, limitMessage, quotaInfo, ServerBusyError, SessionError, signOut, subscribeQuota, transport } from '../server';
 import { chatExists, createChat, emptyData, getMeta, loadChat, newId, renameChat, saveChat, setAutoTitle, setUnread, subscribeChats,
   traceOf, uiOf, type ChatData, type ChatMeta, type StoredMsg, type TraceItem } from '../chats';
-import type { Ctx, View } from '../ctx';
+import type { Ctx, TabId, View } from '../ctx';
 import { renderMarkdown } from '../markdown';
 import { modelLabel } from '../models';
 import { getSettings, subscribe } from '../store';
@@ -100,6 +102,7 @@ export function createChatView(ctx: Ctx): ChatView {
     send.disabled = !r && !input.value.trim();
   }
   const setModelChip = () => {
+    if (isServerMode()) { const q = quotaInfo(), r = q.remaining, label = q.plan?.label ? `Plan ${q.plan.label}` : 'FinAgent'; $('#c-model .t', el).textContent = r ? `${label} · ${r.day === 1 ? 'te queda 1 conversación' : `te quedan ${r.day} conversaciones`} hoy` : label; refreshPlanBanner(); return; }
     const id = ctx.models.active ?? ctx.models.pick();
     $('#c-model .t', el).textContent = id ? `${modelLabel(id)} · automático` : 'Gemini · automático';
   };
@@ -113,7 +116,7 @@ export function createChatView(ctx: Ctx): ChatView {
   function agentFor(chatId: string): FinancialAgent {
     let a = agents.get(chatId);
     if (!a) {
-      a = new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models });
+      a = new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models, transport: isServerMode() ? transport : undefined }); // con servidor no hay clave
       const d = dataOf(chatId);
       a.restore(d.history, d.numbers);
       agents.set(chatId, a);
@@ -124,6 +127,21 @@ export function createChatView(ctx: Ctx): ChatView {
   // ------------------------------------------------------------ dibujo de mensajes
   const destroyRiches = () => { riches.forEach((r) => r.destroy?.()); riches = []; };
 
+  /** Aviso en el chat vacío (modo servidor): qué plan tenés, qué modelo usa y cuántas conversaciones por día, con acceso a los planes. */
+  function planBannerHtml(): string {
+    const q = quotaInfo(), p = q.plan;
+    if (!p) return '';
+    return `<div class="plan-banner" id="c-plan"><div><b>Plan ${esc(p.label)}</b> · ${esc(p.modelLabel)} · ${p.dailyLimit} conversaciones por día</div>` +
+      (p.id === 'free' ? `<div class="plan-sub">Los planes de pago (próximamente) tendrán modelos más potentes y más conversaciones. <button class="link-btn" data-go="settings">Ver planes</button></div>` : '') +
+      (q.tier === 'free' ? `<div class="plan-sub">${esc(ABOUT.freeTier)}</div>` : '') + `</div>`;
+  }
+  function refreshPlanBanner() {
+    const old = scroll.querySelector<HTMLElement>('#c-plan');
+    if (!old) return;
+    const t = document.createElement('div'); t.innerHTML = planBannerHtml();
+    if (t.firstElementChild) old.replaceWith(t.firstElementChild); else old.remove();
+  }
+
   function showEmpty() {
     destroyRiches();
     scroll.innerHTML = '';
@@ -131,6 +149,7 @@ export function createChatView(ctx: Ctx): ChatView {
     e.innerHTML = `<div class="orb"><div class="orb-core">${icon('sparkles', 34)}</div></div>
       <h2 style="font-size:24px;font-weight:760;letter-spacing:-.03em;margin-top:18px">¿Qué querés saber<br>del mercado?</h2>
       <p class="muted" style="margin-top:8px;max-width:290px">Pregunto a los datos reales, verifico cada cifra y te muestro de dónde salió.</p>
+      ${isServerMode() ? planBannerHtml() : ''}
       <div class="sugg">${SUGGESTIONS.map((s, i) => `<button class="sug" data-i="${i}"><span class="sug-ic">${icon(s.ic, 18)}</span><span style="flex:1;text-align:left"><b>${esc(s.title)}</b><span class="muted">${esc(s.sub)}</span></span>${icon('arrowUpRight', 15)}</button>`).join('')}</div>`;
     scroll.append(e);
   }
@@ -162,6 +181,8 @@ export function createChatView(ctx: Ctx): ChatView {
   function errEl(m: StoredMsg): HTMLElement {
     const box = h('div', { class: 'm-ai', attrs: { 'data-mid': m.id } });
     const action = m.errKind === 'invalid_key' ? `<button class="btn btn-ghost btn-sm" data-go="settings">Cambiar clave</button>`
+      : m.errKind === 'limit' ? `<button class="btn btn-ghost btn-sm" data-go="market">Ver mercados</button> <button class="btn btn-ghost btn-sm" data-go="settings">Ver planes</button>`
+      : m.errKind === 'session' ? `<button class="btn btn-ghost btn-sm" data-signout="1">Reiniciar sesión</button>`
       : m.retry && m.errKind !== 'unavailable' ? `<button class="btn btn-ghost btn-sm" data-retry="1">Reintentar</button>` : '';
     box.innerHTML = `${who(m.errKind !== 'stopped')}<div class="ai-body"><div class="err-bubble${m.errKind === 'stopped' ? ' soft' : ''}">${esc(m.text)}${action ? `<div style="margin-top:10px">${action}</div>` : ''}</div></div>`;
     return box;
@@ -235,7 +256,7 @@ export function createChatView(ctx: Ctx): ChatView {
   async function send_(text: string, label?: string, opts: { echo?: boolean } = {}): Promise<void> {
     const prompt = text.trim();
     if (!prompt) return;
-    if (!getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
+    if (!isServerMode() && !getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
     if (running()) return;
 
     const chatId = ensureChat(prompt);
@@ -291,6 +312,10 @@ export function createChatView(ctx: Ctx): ChatView {
     let kind: NonNullable<StoredMsg['errKind']> = 'other';
     let msg = (e as Error)?.message ?? String(e);
     if (e instanceof AbortedError) { kind = 'stopped'; msg = 'Detuviste la respuesta.'; }
+    else if (e instanceof LimitError) { kind = 'limit'; msg = limitMessage(e); }
+    else if (e instanceof AccessDeniedError) { kind = 'other'; msg = 'Tu acceso a FinAgent fue desactivado. Si creés que es un error, escribinos.'; }
+    else if (e instanceof SessionError) { kind = 'session'; msg = 'No pude renovar tu sesión. Cerrá y volvé a abrir FinAgent.'; }
+    else if (e instanceof ServerBusyError) { kind = 'busy'; msg = busyMessage(e); }
     else if (e instanceof GeminiError) {
       kind = e.kind;
       msg = e.kind === 'invalid_key' ? 'Tu clave de Gemini no es válida o fue revocada.'
@@ -308,6 +333,7 @@ export function createChatView(ctx: Ctx): ChatView {
   }
 
   async function autoTitle(chatId: string, q: string, a: string) {
+    if (isServerMode()) return; // cada título con IA sería una consulta más: con servidor se usa el título provisorio de la pregunta
     const t = await aiTitle(ctx.models, getSettings().apiKey, q, a);
     if (t && chatExists(chatId)) setAutoTitle(chatId, t);
   }
@@ -346,7 +372,8 @@ export function createChatView(ctx: Ctx): ChatView {
     if (sug) { const s = SUGGESTIONS[Number(sug.dataset.i)]; void send_(s.prompt, s.title); return; }
     const link = t.closest<HTMLAnchorElement>('a.mdlink');
     if (link) { ev.preventDefault(); openUrl(link.href); return; }
-    if (t.closest('[data-go]')) { ctx.go('settings'); return; }
+    const goBtn = t.closest<HTMLElement>('[data-go]');
+    if (goBtn) { ctx.go((goBtn.dataset.go as TabId) || 'settings'); return; } // cada botón lleva a SU pestaña (antes todos iban a Ajustes)
     const msgEl = t.closest<HTMLElement>('[data-mid]');
     if (t.closest('[data-retry]') && msgEl) { retry(msgEl.dataset.mid!); return; }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
@@ -383,12 +410,14 @@ export function createChatView(ctx: Ctx): ChatView {
   };
   // Si el chat abierto desaparece (borrado desde el historial o desde Ajustes), se pasa a un chat nuevo.
   subscribeChats(() => { if (cur.id && !chatExists(cur.id)) { agents.delete(cur.id); newChat(); return; } refreshHeader(); });
+  subscribeQuota(() => setModelChip());
+  el.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[data-signout]')) { signOut(); location.reload(); } });
   subscribe(() => { const k = getSettings().apiKey; if (k !== lastKey) { lastKey = k; agents.clear(); } }); // clave nueva: los chats se conservan
 
   showEmpty(); refreshHeader(); updateSend();
   return {
     el,
     ask: (prompt, label) => { newChat(); void send_(prompt, label); }, // "Analizar con IA" desde otra pantalla abre un chat nuevo
-    onShow: () => { setModelChip(); refreshHeader(); },
+    onShow: () => { setModelChip(); refreshHeader(); if (isServerMode()) void fetchMe().then(() => setModelChip()).catch(() => {}); },
   };
 }

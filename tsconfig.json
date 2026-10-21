@@ -21,6 +21,7 @@
     "tests",
     "vite.config.ts",
     "capacitor.config.ts",
-    "evals"
+    "evals",
+    "server"
   ]
 }

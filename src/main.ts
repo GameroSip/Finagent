@@ -4,8 +4,10 @@ import './ui/theme.css';
 import './ui/components.css';
 import { mountApp } from './app';
 import { ModelManager } from './models';
+import { hasSession, isServerMode } from './server';
 import { getSettings, subscribe } from './store';
 import { h } from './ui/dom';
+import { mountSplash } from './views/splash';
 import { mountOnboarding } from './views/onboarding';
 
 function resolvedTheme(): 'dark' | 'light' {
@@ -29,8 +31,10 @@ root.append(h('div', { class: 'aurora' }));
 function start() {
   mountApp(root, models);
   const key = getSettings().apiKey;
-  if (key) void models.discover(key).catch(() => { /* clave inválida: se avisa al usar el chat */ });
+  if (!isServerMode() && key) void models.discover(key).catch(() => { /* clave inválida: se avisa al usar el chat */ });
 }
 
-if (getSettings().apiKey) start();
+// Con servidor (beta) la cuenta se crea sola y se entra directo; sin servidor (desarrollo) se carga la clave de Gemini.
+if (isServerMode()) { if (hasSession()) start(); else mountSplash(root, start); }
+else if (getSettings().apiKey) start();
 else mountOnboarding(root, models, start);

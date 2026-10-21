@@ -38,6 +38,10 @@ async function route(req) {
   log.requests.push(`${req.method()} ${new URL(url).host}${new URL(url).pathname}`);
   const u = new URL(url);
   const delay = async (ms) => sleep(ms);
+  if (u.host === 'api.finagent.test') { // servidor de FinAgent simulado (modo beta)
+    await delay(url.includes('/v1/generate') ? 500 : 20);
+    return req.respond(M.finagentApi(req.method(), u.pathname, req.headers(), req.postData() ? JSON.parse(req.postData()) : {}));
+  }
   if (u.host === 'generativelanguage.googleapis.com') {
     await delay(url.includes('generateContent') ? 700 : 30);
     return req.respond(json(M.geminiReply(url, req.postData() ? JSON.parse(req.postData()) : {})));

@@ -1,0 +1,19 @@
+# Servidor de FinAgent en Cloudflare Workers. Lo despliega el workflow "Servidor (Cloudflare)": ver server/README.md.
+name = "finagent-api"
+main = "server/worker.ts"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "finagent"
+database_id = "REEMPLAZAR_POR_EL_ID_DE_D1"   # el workflow lo completa solo
+migrations_dir = "server/migrations"
+
+[vars]
+# Nivel de la clave de Gemini: "free" (gratuito) o "paid" (de pago). Cambia lo que la app le dice al usuario sobre sus datos y sobre la capacidad.
+GEMINI_TIER = "free"
+# Cuidado del cupo gratuito: el servidor se limita ANTES de chocar con el límite de Google. Subilos cuando pases al nivel de pago.
+GEMINI_RPM = "8"               # pedidos a Gemini por minuto, entre todos los usuarios (una conversación usa ~2)
+GLOBAL_DAILY_ANSWERS = "150"   # conversaciones nuevas por día, entre todos los usuarios
+MAX_NEW_USERS_PER_DAY = "300"  # cuentas automáticas nuevas por día
+DAILY_BUDGET_USD = "5"         # tope de gasto diario en dólares (importa con el nivel de pago): al llegar, el servidor deja de llamar a Gemini hasta el día siguiente

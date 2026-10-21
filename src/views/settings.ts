@@ -1,5 +1,6 @@
 // Ajustes: lo mínimo. El modelo y los límites son automáticos; acá solo hay cuenta, tema, diagnóstico y datos.
 import { ABOUT } from '../about';
+import { fetchMe, fetchPlans, getInterests, isCodeShape, isServerMode, normalizeCode, PlanCodeError, planCodeMessage, quotaInfo, redeemPlanCode, sendInterest, type PlanEntry } from '../server';
 import type { Ctx, View } from '../ctx';
 import { fetchFearGreed } from '../data/market';
 import { fetchDolares, fetchRiesgoPais } from '../data/argentina';
@@ -13,13 +14,45 @@ import { icon } from '../ui/icons';
 import { logoSvg } from '../ui/logo';
 import { confirmSheet, openSheet } from '../ui/sheet';
 
-const VERSION = '0.3.9';
+const VERSION = '0.4.1';
 
 interface Probe { name: string; run: () => Promise<unknown> }
 
 export function createSettingsView(ctx: Ctx): View {
   const el = h('div', { class: 'view' });
   const key = () => getSettings().apiKey;
+  const quotaText = () => { const q = quotaInfo(); return q.remaining && q.plan ? `${q.remaining.day} de ${q.plan.dailyLimit} conversaciones hoy · ${q.remaining.month} este mes` : 'Cargando…'; };
+  const serverAccountHtml = () => { const q = quotaInfo(), p = q.plan;
+    return `<div class="set-group"><div class="set-title">Tu plan</div><div class="card set-card">
+        <div class="set-row"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1"><div class="set-main">Plan ${esc(p?.label ?? '')}</div><div class="set-sub" id="s-quota">${esc(quotaText())}</div></div></div>
+        <div class="set-row"><span class="set-ic">${icon('zap', 18)}</span><div style="flex:1"><div class="set-main">Modelo de IA</div><div class="set-sub">Tu plan usa un modelo fijo</div></div><span class="val" id="s-model">${esc(p?.modelLabel ?? '')}</span></div>
+        <div class="set-note" id="s-tiernote" ${q.tier === 'free' ? '' : 'hidden'}>${esc(ABOUT.freeTier)}</div>
+      </div></div>
+      <div class="set-group"><div class="set-title">Planes de pago</div><div class="card set-card" id="s-plans"><div class="set-row"><div class="set-sub">Cargando…</div></div></div></div>
+      <div class="set-group"><div class="set-title">Tengo un código</div><div class="card set-card">
+        <div class="set-row" style="gap:8px"><input id="s-code" class="set-input" placeholder="FA-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="14" style="flex:1"><button class="btn btn-ghost btn-sm" id="s-redeem">Canjear</button></div>
+        <div class="set-sub" id="s-code-msg" style="padding:0 2px 10px">Un código te da acceso a un plan (por ejemplo, si participás de las pruebas).</div>
+      </div></div>`; };
+  /** Planes de pago: todavía no se pueden contratar ni tienen precio; se ofrece anotarse para que avisen. */
+  function fillPlans(box: HTMLElement, plans: PlanEntry[]) {
+    box.innerHTML = '';
+    const paid = plans.filter((x) => !x.available), mine = new Set(getInterests());
+    if (!paid.length) { box.innerHTML = '<div class="set-row"><div class="set-sub">Por ahora no hay planes de pago.</div></div>'; return; }
+    for (const pl of paid) {
+      const row = h('div', { class: 'set-row plan-row' });
+      row.innerHTML = `<div style="flex:1"><div class="set-main">${esc(pl.label)} <span class="chip-soon">Próximamente</span></div>` +
+        `<div class="set-sub">${esc(pl.modelLabel)} · ${pl.dailyLimit} conversaciones por día${pl.deepModelLabel ? ` · análisis profundo con ${esc(pl.deepModelLabel)}` : ''}</div><div class="set-sub">${esc(pl.blurb)}</div></div>`;
+      const btn = h('button', { class: 'btn btn-ghost btn-sm', text: mine.has(pl.id) ? 'Anotado ✓' : 'Avisame' });
+      btn.disabled = mine.has(pl.id);
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try { await sendInterest(pl.id); btn.textContent = 'Anotado ✓'; toast('Listo: te avisamos cuando esté disponible'); }
+        catch { btn.disabled = false; toast('No pude anotarte ahora. Probá de nuevo.'); }
+      };
+      row.append(btn); box.append(row);
+    }
+    box.append(h('div', { class: 'set-sub', style: 'padding:6px 2px 4px', text: 'Todavía no se pueden contratar ni tienen precio definido. Anotarte no te compromete a nada.' }));
+  }
   const masked = () => (key() ? `••••••••${key().slice(-4)}` : 'Sin clave');
 
   const probes: Probe[] = [
@@ -39,16 +72,16 @@ export function createSettingsView(ctx: Ctx): View {
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Tu cuenta y la app</div><h1 class="title-xl">Ajustes</h1></div></div>
       <div class="card prof"><div style="width:52px;height:52px;border-radius:16px;overflow:hidden;flex:none">${logoSvg(52)}</div>
-        <div><div style="font-weight:750;font-size:18px">FinAgent</div><div class="muted" style="font-size:13px">Versión ${VERSION} · todo en tu teléfono</div></div></div>
+        <div><div style="font-weight:750;font-size:18px">FinAgent</div><div class="muted" style="font-size:13px">Versión ${VERSION} · ${isServerMode() ? 'beta cerrada' : 'todo en tu teléfono'}</div></div></div>
 
-      <div class="set-group"><div class="set-title">Inteligencia artificial</div><div class="card set-card">
+      ${isServerMode() ? serverAccountHtml() : `<div class="set-group"><div class="set-title">Inteligencia artificial</div><div class="card set-card">
         <div class="set-row"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1"><div class="set-main">Modelo</div><div class="set-sub">Automático: usa el mejor disponible y se actualiza solo</div></div><span class="val">${esc(id ? modelLabel(id) : 'Gemini')}</span></div>
         <button class="set-row" id="s-refresh"><span class="set-ic">${icon('refresh', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Buscar modelos nuevos</div></div></button>
       </div></div>
 
       <div class="set-group"><div class="set-title">Cuenta</div><div class="card set-card">
         <div class="set-row"><span class="set-ic">${icon('keyRound', 18)}</span><div style="flex:1"><div class="set-main">Clave de Gemini</div><div class="set-sub num">${masked()}</div></div><button class="btn btn-ghost btn-sm" id="s-key">Cambiar</button></div>
-      </div></div>
+      </div></div>`}
 
       <div class="set-group"><div class="set-title">Apariencia</div><div class="card set-card">
         <div class="set-row"><span class="set-ic">${icon('moon', 18)}</span><div class="set-main" style="flex:1">Tema</div>
@@ -69,9 +102,18 @@ export function createSettingsView(ctx: Ctx): View {
         <p class="text-2"><b>Qué es FinAgent.</b> ${esc(ABOUT.what)}</p>
         <ul class="text-2" style="margin:8px 0 0 18px;padding:0">${ABOUT.how.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>
         <p class="text-2" style="margin-top:10px">${esc(ABOUT.limits)}</p>
-        <p class="muted" style="margin-top:10px">${esc(ABOUT.privacy)}</p>
+        <p class="muted" style="margin-top:10px">${esc(isServerMode() ? ABOUT.privacyServer : ABOUT.privacy)}</p>
         <p class="muted" style="margin-top:10px">${esc(ABOUT.credits)}</p></div></div>`;
     bind();
+    if (isServerMode()) {
+      void fetchMe().then(() => {
+        const q = quotaInfo(), set = (sel: string, t: string) => { const n = el.querySelector(sel); if (n) n.textContent = t; };
+        set('#s-quota', quotaText()); set('#s-model', q.plan?.modelLabel ?? '');
+        const note = el.querySelector<HTMLElement>('#s-tiernote'); if (note) note.hidden = q.tier !== 'free';
+      }).catch(() => {});
+      void fetchPlans().then(({ plans }) => { const box = el.querySelector<HTMLElement>('#s-plans'); if (box) fillPlans(box, plans); })
+        .catch(() => { const box = el.querySelector('#s-plans'); if (box) box.innerHTML = '<div class="set-row"><div class="set-sub">No pude cargar los planes ahora.</div></div>'; });
+    }
   }
 
   function changeKey() {
@@ -107,11 +149,25 @@ export function createSettingsView(ctx: Ctx): View {
   }
 
   function bind() {
-    $('#s-refresh', el).onclick = async () => {
+    const refreshBtn = el.querySelector<HTMLElement>('#s-refresh');
+    if (refreshBtn) refreshBtn.onclick = async () => {
       try { const chain = await ctx.models.discover(key(), true, true); toast(`Usando ${modelLabel(chain[0])}`); render(); }
       catch { toast('No pude consultar los modelos ahora'); }
     };
-    $('#s-key', el).onclick = changeKey;
+    const keyBtn = el.querySelector<HTMLElement>('#s-key');
+    if (keyBtn) keyBtn.onclick = changeKey;
+    const redeemBtn = el.querySelector<HTMLButtonElement>('#s-redeem');
+    if (redeemBtn) redeemBtn.onclick = async () => {
+      const input = $<HTMLInputElement>('#s-code', el), msg = $('#s-code-msg', el), code = normalizeCode(input.value);
+      if (!isCodeShape(code)) { msg.textContent = 'Revisá el código: tiene el formato FA-XXXX-XXXX.'; return; }
+      redeemBtn.disabled = true;
+      try {
+        const r = await redeemPlanCode(code);
+        msg.textContent = r.unchanged ? 'Tu plan ya incluye eso.' : `¡Listo! Ahora tenés el plan ${r.plan.label} (${r.plan.modelLabel}).`;
+        input.value = ''; if (!r.unchanged) setTimeout(render, 600);
+      } catch (e) { msg.textContent = e instanceof PlanCodeError ? planCodeMessage(e) : 'No pude validar el código.'; }
+      finally { redeemBtn.disabled = false; }
+    };
     $('#s-theme', el).addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;
       saveSettings({ theme: b.dataset.t as Theme });
@@ -124,7 +180,7 @@ export function createSettingsView(ctx: Ctx): View {
     };
     $('#s-clear-w', el).onclick = async () => { if (await confirmSheet({ title: '¿Borrar todos tus favoritos?', confirm: 'Borrar', danger: true })) { clearWatchlist(); toast('Favoritos borrados'); } };
     $('#s-wipe', el).onclick = async () => {
-      if (await confirmSheet({ title: '¿Cerrar sesión y borrar todo?', text: 'Se eliminan tu clave, tus favoritos y todos tus chats de este teléfono. No se puede deshacer.', confirm: 'Borrar todo', danger: true })) ctx.logout();
+      if (await confirmSheet({ title: '¿Cerrar sesión y borrar todo?', text: isServerMode() ? 'Se eliminan tu sesión, tus favoritos y todos tus chats de este teléfono. No se puede deshacer.' : 'Se eliminan tu clave, tus favoritos y todos tus chats de este teléfono. No se puede deshacer.', confirm: 'Borrar todo', danger: true })) ctx.logout();
     };
   }
 

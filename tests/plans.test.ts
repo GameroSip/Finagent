@@ -57,10 +57,24 @@ describe('planes: límites por usuario', () => {
     expect((await consume(store, 'p', pro, now, TZ, { deep: true })).ok).toBe(false);
     expect((await consume(store, 'p', pro, now, TZ)).ok).toBe(true);                       // las consultas normales siguen
   });
-  it('el plan gratis usa el modelo barato y el pro puede pedir el profundo', () => {
+  it('cada plan tiene UN modelo fijo: el gratis usa el liviano (sin respaldo) y los de pago uno más potente', () => {
     expect(modelFor(PLANS.free)).toBe('gemini-3.5-flash-lite');
     expect(modelFor(PLANS.free, true)).toBe('gemini-3.5-flash-lite');
-    expect(modelFor(PLANS.pro, true)).toBe('gemini-3.8-flash');
+    expect(PLANS.free.fallbacks).toEqual([]);                         // "solo tenés acceso a Gemini 3.5 Flash-Lite": es verdad
+    expect(PLANS.free.modelLabel).toBe('Gemini 3.5 Flash-Lite');
+    expect(modelFor(PLANS.plus)).toBe('gemini-3.8-flash');
+    expect(modelFor(PLANS.pro, true)).toBe('gemini-3.1-pro-preview');
+    expect(PLANS.free.available).toBe(true);
+    expect(PLANS.plus.available || PLANS.pro.available).toBe(false);  // todavía no se puede pagar: se muestran como "próximamente"
+  });
+  it('le da al modelo el contexto real del plan para que no invente precios ni límites', async () => {
+    const { planNote } = await import('../src/plans');
+    const n = planNote(PLANS.free);
+    expect(n).toContain('Plan Gratis');
+    expect(n).toContain('Gemini 3.5 Flash-Lite');
+    expect(n).toContain('3 conversaciones por día');
+    expect(n).toContain('todavía no están disponibles');
+    expect(n).toContain('No inventes precios ni fechas');
   });
 });
 

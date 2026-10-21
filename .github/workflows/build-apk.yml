@@ -28,7 +28,7 @@ jobs:
       - name: Tests
         run: npm test
 
-      - name: Compilar la web
+      - name: Compilar la web (modo desarrollo, para la prueba en navegador)
         run: npm run build
 
       # Informativo: abre la app en un Chromium real (tamaño de teléfono) con Gemini y los datos simulados, verifica que
@@ -40,6 +40,14 @@ jobs:
           npm ci
           node run.mjs ../dist ../e2e-shots
 
+      # La beta: la app compilada con servidor (sin clave de Gemini) contra un servidor de FinAgent simulado, en un Chromium real.
+      - name: Pruebas en navegador real (beta con servidor)
+        continue-on-error: true
+        run: |
+          VITE_API_BASE=https://api.finagent.test npx vite build --outDir dist-server --emptyOutDir
+          cd e2e
+          node run-server.mjs ../dist-server ../e2e-shots
+
       - name: Publicar capturas de la app
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,6 +55,15 @@ jobs:
           name: capturas-de-la-app
           path: e2e-shots/
           if-no-files-found: ignore
+
+      # El APK: si el repositorio tiene la variable API_BASE (Settings → Secrets and variables → Actions → Variables), es el APK de la BETA
+      # (entra con código de invitación, sin clave de Gemini). Si no la tiene, es el APK de desarrollo (pide la clave de Gemini).
+      - name: Compilar la web para el APK
+        env:
+          VITE_API_BASE: ${{ vars.API_BASE }}
+        run: |
+          if [ -n "$VITE_API_BASE" ]; then echo "APK de la BETA: usa el servidor $VITE_API_BASE (sin clave de Gemini)"; else echo "APK de DESARROLLO: pide la clave de Gemini (no hay variable API_BASE)"; fi
+          npm run build
 
       - name: Generar proyecto Android
         run: |

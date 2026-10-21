@@ -29,7 +29,7 @@ export interface StoredMsg {
   trace?: TraceItem[];
   ui?: any[];                                         // tarjetas gráficas (acotadas en tamaño)
   model?: string;
-  errKind?: 'invalid_key' | 'busy' | 'unavailable' | 'other' | 'stopped';
+  errKind?: 'invalid_key' | 'busy' | 'unavailable' | 'other' | 'stopped' | 'limit' | 'session';
   retry?: string;                                     // mensaje para reintentar
 }
 

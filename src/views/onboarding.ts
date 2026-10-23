@@ -4,6 +4,7 @@ import { saveSettings } from '../store';
 import { $, esc, h, openUrl } from '../ui/dom';
 import { icon } from '../ui/icons';
 import { logoSvg } from '../ui/logo';
+import { t } from '../i18n';
 
 export function mountOnboarding(root: HTMLElement, models: ModelManager, onDone: () => void): void {
   const el = h('div', { class: 'onb' });
@@ -48,7 +49,7 @@ export function mountOnboarding(root: HTMLElement, models: ModelManager, onDone:
     try {
       const chain = await models.discover(key, true, true);
       saveSettings({ apiKey: key });
-      go.innerHTML = `${icon('check', 18)} Conectado · ${esc(modelLabel(chain[0]))}`;
+      go.innerHTML = `${icon('check', 18)} ${t('Conectado')} · ${esc(modelLabel(chain[0]))}`;
       setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); onDone(); }, 280); }, 700);
     } catch (e) {
       go.disabled = false; go.textContent = 'Empezar';

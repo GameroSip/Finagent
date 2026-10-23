@@ -1,10 +1,12 @@
 // Servidor de FinAgent: cuentas automáticas (sin registro), planes con un modelo fijo y límites, y puente con Gemini.
 // Es una función (Request → Response) sin dependencias de la plataforma: corre en Cloudflare Workers, en Node o en cualquier otro lado.
+import { DEFAULT_PARAMS, allPlansEconomics } from '../src/economics';
 import { estimateCostUSD } from '../src/pricing';
 import { consume, localDates, PLAN_RANK, PLANS, planNote, refund, type Plan, type PlanId, type Ticket } from '../src/plans';
 import { ADMIN_HTML } from './admin-page';
 import { CODE_RE, newId, newInviteCode, signToken, timingSafeEqual, verifyToken } from './auth';
 import { chainFor, type ModelRouter } from './gemini';
+import { googleJwks, verifyGoogleIdToken, type JwksFetcher } from './google';
 import type { SqlStore, UserRow } from './store';
 
 export interface Env {
@@ -15,8 +17,9 @@ export interface Env {
   GEMINI_RPM?: string;              // pedidos por minuto que el servidor se permite hacerle a Gemini (cuida el cupo gratuito)
   GLOBAL_DAILY_ANSWERS?: string;    // respuestas nuevas por día en total (cuida el cupo gratuito)
   MAX_NEW_USERS_PER_DAY?: string;   // cuentas automáticas nuevas por día en total
+  GOOGLE_CLIENT_ID?: string;        // client ID(s) de Google (separados por coma): si está, se habilita el inicio de sesión con Google
 }
-export interface Deps { store: SqlStore; env: Env; router: ModelRouter; now?: () => Date; tz?: string; version?: string }
+export interface Deps { store: SqlStore; env: Env; router: ModelRouter; now?: () => Date; tz?: string; version?: string; jwks?: JwksFetcher }
 
 const TOKEN_TTL_SEC = 90 * 24 * 3600;     // la sesión dura 90 días
 const TURN_TTL_MS = 10 * 60_000;          // una respuesta tiene 10 minutos para completarse
@@ -95,6 +98,33 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
     return json(200, { token: await signToken({ sub: user.id, iat, exp: iat + TOKEN_TTL_SEC }, env.JWT_SECRET), plan: planInfo(PLANS[user.plan] ?? PLANS.free), tier, expiresAt: (iat + TOKEN_TTL_SEC) * 1000 });
   }
 
+  /** Inicio de sesión con Google. Si la persona ya usaba la app como invitada, esa cuenta pasa a ser la de Google (conserva plan y uso). */
+  async function googleAuth(req: Request): Promise<Response> {
+    const audiences = (env.GOOGLE_CLIENT_ID ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (!audiences.length) return json(501, { error: 'google_disabled' });
+    const ip = clientIp(req), dt = localDates(now(), tz);
+    if (await store.incr(`rl:google:${ip}:${Math.floor(now().getTime() / 3_600_000)}`, 1) > DEVICE_AUTH_PER_HOUR) return json(429, { error: 'rate', retryAfterSec: 3600 });
+    const b = await readJson(req);
+    const id = await verifyGoogleIdToken(String(b.idToken ?? ''), { audiences, nowSec: Math.floor(now().getTime() / 1000), jwks: d.jwks ?? googleJwks });
+    if (!id) return json(401, { error: 'google_token' });
+    const code = `google:${id.sub}`;
+    let user = await store.findUser(code, '-'), linked = false;
+    if (!user) {
+      const m = /^Bearer (.+)$/.exec(req.headers.get('authorization') ?? '');
+      const p = m ? await verifyToken(m[1], env.JWT_SECRET, Math.floor(now().getTime() / 1000)) : null;
+      const cur = p ? await store.getUser(p.sub) : null;
+      if (cur && !cur.disabled && cur.code === 'device') { await store.convertUser(cur.id, code, '-'); user = { ...cur, code, device_id: '-' }; linked = true; }   // la cuenta de invitado pasa a Google
+      else {
+        if (await store.peek(`new:all:${dt.day}`) >= num(env.MAX_NEW_USERS_PER_DAY, 300)) return capacity('signups', secondsToMidnight(now(), tz));
+        user = { id: newId(), code, device_id: '-', plan: 'free', created_at: now().toISOString(), disabled: 0, plan_code: null };
+        await store.createUser(user); await store.incr(`new:all:${dt.day}`, 1);
+      }
+    }
+    if (user.disabled) return json(403, { error: 'disabled' });
+    const iat = Math.floor(now().getTime() / 1000);
+    return json(200, { token: await signToken({ sub: user.id, iat, exp: iat + TOKEN_TTL_SEC }, env.JWT_SECRET), plan: planInfo(PLANS[user.plan] ?? PLANS.free), tier, linked, expiresAt: (iat + TOKEN_TTL_SEC) * 1000 });
+  }
+
   async function me(req: Request): Promise<Response> {
     const { user, plan } = await authUser(req);
     return json(200, { plan: planInfo(plan), remaining: await remainingFor(user, plan), resetsOn: localDates(now(), tz).nextDay, tier });
@@ -103,7 +133,7 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
   /** Catálogo público de planes: la app lo muestra tal cual (una sola fuente de verdad). */
   function plans(): Response {
     return json(200, { tier, plans: Object.values(PLANS).map((p) => ({ id: p.id, label: p.label, available: p.available, blurb: p.blurb, modelLabel: p.modelLabel, deepModelLabel: p.deepModelLabel ?? null,
-      dailyLimit: p.dailyLimit, monthlyLimit: p.monthlyLimit, deepMonthlyLimit: p.deepMonthlyLimit })) });
+      dailyLimit: p.dailyLimit, monthlyLimit: p.monthlyLimit, deepMonthlyLimit: p.deepMonthlyLimit, hasFallback: p.fallbacks.length > 0 })) });
   }
 
   /** Un código de acceso desbloquea un plan (para testers): no se usa para entrar. */
@@ -217,6 +247,17 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
       total: { ...total, answers: rep.answers, costPerAnswer: rep.answers ? total.cost / rep.answers : null } });
   }
 
+  /** Calculadora de precios: costo de cada plan y precio que conviene, con los costos REALES medidos cuando hay muestra (si no, estimados con el precio oficial). */
+  async function adminPricing(req: Request, url: URL): Promise<Response> {
+    admin(req);
+    const f = (name: string, dflt: number, lo: number, hi: number) => { const v = Number(url.searchParams.get(name)); return url.searchParams.get(name) !== null && Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : dflt; };
+    const measured = await store.measuredCostPerAnswer(now().getTime() - f('days', 30, 1, 90) * 86_400_000);
+    const params = { ...DEFAULT_PARAMS, measured, now: now(), daysActive: f('daysActive', DEFAULT_PARAMS.daysActive, 1, 30), utilization: f('utilization', DEFAULT_PARAMS.utilization, 0.01, 1),
+      playFee: f('playFee', DEFAULT_PARAMS.playFee, 0, 0.5), taxRate: f('tax', DEFAULT_PARAMS.taxRate, 0, 0.6), targetMargin: f('margin', DEFAULT_PARAMS.targetMargin, 0.05, 0.95), fixedPerUserMonth: f('fixed', 0, 0, 20) };
+    return json(200, { params: { ...params, now: undefined }, measuredModels: Object.keys(measured), plans: allPlansEconomics(params),
+      note: 'Los costos por respuesta son estimados con el precio oficial y los tokens medidos con Gemini 3.5 Flash-Lite, salvo los modelos con costo medido por este servidor. No incluye tokens de razonamiento.' });
+  }
+
   async function adminUsers(req: Request): Promise<Response> {
     admin(req);
     const b = await readJson(req);
@@ -232,9 +273,10 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
       const route = `${req.method} ${url.pathname.replace(/\/+$/, '') || '/'}`;
       switch (route) {
         case 'GET /admin': return new Response(ADMIN_HTML, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'", 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY' } });
-        case 'GET /health': return json(200, { ok: true, version: d.version ?? 'dev', tier });
+        case 'GET /health': return json(200, { ok: true, version: d.version ?? 'dev', tier, google: !!(env.GOOGLE_CLIENT_ID ?? '').trim() });
         case 'GET /v1/plans': return plans();
         case 'POST /v1/auth/device': return await deviceAuth(req);
+        case 'POST /v1/auth/google': return await googleAuth(req);
         case 'GET /v1/me': return await me(req);
         case 'POST /v1/plan/redeem': return await planRedeem(req);
         case 'POST /v1/interest': return await interest(req);
@@ -242,6 +284,7 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
         case 'POST /v1/turn/abandon': return await abandon(req);
         case 'POST /v1/admin/invites': return await adminInvites(req);
         case 'GET /v1/admin/usage': return await adminUsage(req, url);
+        case 'GET /v1/admin/pricing': return await adminPricing(req, url);
         case 'POST /v1/admin/users': return await adminUsers(req);
         default: return json(404, { error: 'not_found' });
       }

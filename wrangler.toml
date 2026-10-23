@@ -16,4 +16,5 @@ GEMINI_TIER = "free"
 GEMINI_RPM = "8"               # pedidos a Gemini por minuto, entre todos los usuarios (una conversación usa ~2)
 GLOBAL_DAILY_ANSWERS = "150"   # conversaciones nuevas por día, entre todos los usuarios
 MAX_NEW_USERS_PER_DAY = "300"  # cuentas automáticas nuevas por día
+# GOOGLE_CLIENT_ID = "TU-ID.apps.googleusercontent.com"   # habilita el inicio de sesión con Google en el servidor (ver server/README.md)
 DAILY_BUDGET_USD = "5"         # tope de gasto diario en dólares (importa con el nivel de pago): al llegar, el servidor deja de llamar a Gemini hasta el día siguiente

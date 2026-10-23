@@ -2,11 +2,11 @@
 import { AccessDeniedError, busyMessage, ensureSession, ServerBusyError } from '../server';
 import { $, esc, h } from '../ui/dom';
 import { icon } from '../ui/icons';
-import { logoSvg } from '../ui/logo';
+import { logo3dHtml } from '../ui/logo3d';
 
-export function mountSplash(root: HTMLElement, onDone: () => void): void {
+export function mountSplash(root: HTMLElement, onDone: () => void, o: { server?: boolean } = { server: true }): void {
   const el = h('div', { class: 'onb' });
-  el.innerHTML = `<div class="onb-inner" style="text-align:center"><div class="onb-logo">${logoSvg(88)}</div>
+  el.innerHTML = `<div class="onb-inner" style="text-align:center">${logo3dHtml(130)}
     <h1 class="onb-title" style="margin-top:18px">FinAgent</h1>
     <p class="onb-sub" id="sp-msg"><span class="spin"></span> Preparando tu cuenta…</p>
     <div id="sp-err" class="error-box hide" style="margin-top:16px"></div>
@@ -17,7 +17,7 @@ export function mountSplash(root: HTMLElement, onDone: () => void): void {
   const run = async () => {
     err.classList.add('hide'); retry.classList.add('hide'); msg.innerHTML = '<span class="spin"></span> Preparando tu cuenta…';
     try {
-      await ensureSession();
+      await Promise.all([o.server === false ? Promise.resolve() : ensureSession(), new Promise((r) => setTimeout(r, 1100))]);
       msg.innerHTML = `${icon('check', 18)} Listo`;
       setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); onDone(); }, 280); }, 350);
     } catch (e) {

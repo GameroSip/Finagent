@@ -1,7 +1,8 @@
-// Formato en español rioplatense (es-AR).
-const nf = (min: number, max: number) => new Intl.NumberFormat('es-AR', { minimumFractionDigits: min, maximumFractionDigits: max });
+// Formato de números y fechas según el idioma elegido (es-AR, en-US o pt-BR).
+import { locale, t } from '../i18n';
+const nf = (min: number, max: number) => new Intl.NumberFormat(locale(), { minimumFractionDigits: min, maximumFractionDigits: max });
 const cache = new Map<string, Intl.NumberFormat>();
-const fmt = (min: number, max: number) => { const k = `${min}-${max}`; if (!cache.has(k)) cache.set(k, nf(min, max)); return cache.get(k)!; };
+const fmt = (min: number, max: number) => { const k = `${locale()}-${min}-${max}`; if (!cache.has(k)) cache.set(k, nf(min, max)); return cache.get(k)!; };
 
 export function fmtNum(n: number | null | undefined, max = 2): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
@@ -37,21 +38,21 @@ export function fmtCompact(n: number | null | undefined): string {
 export const dirClass = (n: number | null | undefined) => (n === null || n === undefined || !Number.isFinite(n) || Math.abs(n) < 0.005 ? 'flat' : n > 0 ? 'up' : 'down');
 
 export function timeAgo(ts: number | string | null | undefined, now = Date.now()): string {
-  const t = typeof ts === 'string' ? Date.parse(ts) : ts;
-  if (!t || !Number.isFinite(t)) return '';
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 60) return 'ahora';
+  const at = typeof ts === 'string' ? Date.parse(ts) : ts;
+  if (!at || !Number.isFinite(at)) return '';
+  const s = Math.max(0, Math.round((now - at) / 1000));
+  if (s < 60) return t('ahora');
   const m = Math.floor(s / 60);
-  if (m < 60) return `hace ${m} min`;
+  if (m < 60) return t('hace {n} min', { n: m });
   const hr = Math.floor(m / 60);
-  if (hr < 24) return `hace ${hr} h`;
+  if (hr < 24) return t('hace {n} h', { n: hr });
   const d = Math.floor(hr / 24);
-  return d === 1 ? 'ayer' : `hace ${d} d`;
+  return d === 1 ? t('ayer') : t('hace {n} d', { n: d });
 }
 
 export function greeting(d = new Date()): string {
   const hr = d.getHours();
-  return hr < 6 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
+  return t(hr < 6 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches');
 }
 
 /** Color estable por símbolo (para los avatares). */
@@ -67,5 +68,5 @@ export const initials = (sym: string) => sym.replace(/[^A-Za-z0-9]/g, '').slice(
 export function fmtDate(s: string | null | undefined): string {
   if (!s) return '';
   const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T12:00:00` : s);
-  return Number.isFinite(d.getTime()) ? d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }).replace('.', '') : s;
+  return Number.isFinite(d.getTime()) ? d.toLocaleDateString(locale(), { day: 'numeric', month: 'short' }).replace('.', '') : s;
 }

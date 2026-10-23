@@ -1,6 +1,7 @@
 // Cliente del servidor de FinAgent: cuenta automática (sin registro), plan y límites, y transporte de las consultas al modelo.
 // Si la app se compila con VITE_API_BASE, funciona SIN que el usuario cargue ninguna clave de Gemini ni ningún código.
 import { http } from './http';
+import { t } from './i18n';
 import type { GenerateArgs, GenerateResult, Transport } from './transport';
 
 let apiBase: string = String((import.meta as any).env?.VITE_API_BASE ?? '').replace(/\/+$/, '');
@@ -24,7 +25,7 @@ export type Tier = 'free' | 'paid';
 export interface PlanInfo { id: string; label: string; modelLabel: string; dailyLimit: number; monthlyLimit: number; available?: boolean }
 export interface Remaining { day: number; month: number }
 export interface Session { token: string; expiresAt: number; plan: PlanInfo }
-export interface PlanEntry extends PlanInfo { blurb: string; deepModelLabel: string | null; deepMonthlyLimit: number; available: boolean }
+export interface PlanEntry extends PlanInfo { blurb: string; deepModelLabel: string | null; deepMonthlyLimit: number; available: boolean; hasFallback?: boolean }
 
 export function deviceId(): string {
   let d = store.get(DEVICE_KEY);
@@ -68,40 +69,40 @@ export class PlanCodeError extends Error {
 /** "2026-10-20" → "mañana a las 00:00" / "el 20/10" (según el día de hoy en el teléfono). */
 export function resetLabel(resetsOn: string, today = new Date()): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resetsOn);
-  if (!m) return 'más tarde';
-  const t = new Date(today.getTime() + 86_400_000);
-  const tomorrow = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-  return resetsOn === tomorrow ? 'mañana a las 00:00' : `el ${m[3]}/${m[2]}`;
+  if (!m) return t('más tarde');
+  const tm = new Date(today.getTime() + 86_400_000);
+  const tomorrow = `${tm.getFullYear()}-${String(tm.getMonth() + 1).padStart(2, '0')}-${String(tm.getDate()).padStart(2, '0')}`;
+  return resetsOn === tomorrow ? t('mañana a las 00:00') : t('el {d}/{m}', { d: m[3], m: m[2] });
 }
-const fmtWait = (s: number) => (s < 60 ? `${Math.max(1, s)} segundos` : s < 5400 ? `${Math.ceil(s / 60)} minutos` : `${Math.ceil(s / 3600)} horas`);
-const fmtLater = (s: number) => (s <= 3600 ? 'en menos de una hora' : s < 6 * 3600 ? `en unas ${Math.ceil(s / 3600)} horas` : 'mañana');
+const fmtWait = (s: number) => (s < 60 ? t('{n} segundos', { n: Math.max(1, s) }) : s < 5400 ? t('{n} minutos', { n: Math.ceil(s / 60) }) : t('{n} horas', { n: Math.ceil(s / 3600) }));
+const fmtLater = (s: number) => (s <= 3600 ? t('en menos de una hora') : s < 6 * 3600 ? t('en unas {n} horas', { n: Math.ceil(s / 3600) }) : t('mañana'));
 
 export function limitMessage(e: LimitError, today = new Date()): string {
-  const when = resetLabel(e.resetsOn, today), p = e.plan, plan = p?.label ? ` de tu plan ${p.label}` : '';
-  const upsell = p?.id === 'free' ? ' Los planes de pago (próximamente) tendrán más conversaciones y modelos más potentes: podés anotarte en Ajustes → Tu plan.' : '';
-  if (e.reason === 'daily') return `Usaste las ${p?.dailyLimit ?? ''} conversaciones de hoy${plan}. Se reinician ${when}. Mientras tanto podés mirar Mercados, el dólar y los gráficos, que no gastan conversaciones.${upsell}`.replace('las  conversaciones', 'las conversaciones');
-  if (e.reason === 'monthly') return `Llegaste al límite mensual${plan}. Se reinicia ${when}.${upsell}`;
-  return 'Tu plan actual no incluye esta función.';
+  const when = resetLabel(e.resetsOn, today), p = e.plan, label = p?.label ? t(p.label) : '';
+  const upsell = p?.id === 'free' ? ` ${t('Los planes de pago (próximamente) tendrán más conversaciones y modelos más potentes: podés anotarte en Ajustes → Tu plan.')}` : '';
+  if (e.reason === 'daily') return `${p?.label ? t('Usaste las {n} conversaciones de hoy de tu plan {p}.', { n: p.dailyLimit, p: label }) : t('Usaste todas las conversaciones de hoy.')} ${t('Se reinician {when}.', { when })} ${t('Mientras tanto podés mirar Mercados, el dólar y los gráficos, que no gastan conversaciones.')}${upsell}`;
+  if (e.reason === 'monthly') return `${p?.label ? t('Llegaste al límite mensual de tu plan {p}.', { p: label }) : t('Llegaste al límite mensual.')} ${t('Se reinicia {when}.', { when })}${upsell}`;
+  return t('Tu plan actual no incluye esta función.');
 }
 export function busyMessage(e: ServerBusyError): string {
   const free = e.tier !== 'paid';
   switch (e.kind) {
-    case 'network': return 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.';
-    case 'maintenance': return 'FinAgent está en mantenimiento. Volvé a intentar en unos minutos.';
-    case 'budget': return 'FinAgent alcanzó su límite de uso de hoy. Probá de nuevo mañana: tu conversación no se descontó.';
-    case 'config': return 'FinAgent tiene un problema de configuración. Ya estamos al tanto: tu conversación no se descontó.';
-    case 'rate': return 'Estás consultando muy rápido. Esperá un momento e intentá de nuevo.';
+    case 'network': return t('No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.');
+    case 'maintenance': return t('FinAgent está en mantenimiento. Volvé a intentar en unos minutos.');
+    case 'budget': return t('FinAgent alcanzó su límite de uso de hoy. Probá de nuevo mañana: tu conversación no se descontó.');
+    case 'config': return t('FinAgent tiene un problema de configuración. Ya estamos al tanto: tu conversación no se descontó.');
+    case 'rate': return t('Estás consultando muy rápido. Esperá un momento e intentá de nuevo.');
     case 'capacity':
-      if (e.scope === 'day') return `Hoy se agotó la capacidad ${free ? 'gratuita ' : ''}de FinAgent. Se reinicia ${fmtLater(e.retryAfterSec ?? 0)}. Tu conversación no se descontó.${free ? ' Los planes de pago (próximamente) tendrán capacidad reservada.' : ''}`;
-      if (e.scope === 'signups') return 'FinAgent llegó hoy a su límite de usuarios nuevos. Probá de nuevo mañana.';
-      return `Hay mucha demanda en este momento${free ? ' (FinAgent usa un cupo gratuito compartido)' : ''}. Probá de nuevo en ${fmtWait(e.retryAfterSec ?? 30)}. Tu conversación no se descontó.`;
-    default: return `FinAgent tuvo un problema momentáneo${e.retryAfterSec ? `; probá de nuevo en ${fmtWait(e.retryAfterSec)}` : ''}. Tu conversación no se descontó.`;
+      if (e.scope === 'day') return `${t(free ? 'Hoy se agotó la capacidad gratuita de FinAgent.' : 'Hoy se agotó la capacidad de FinAgent.')} ${t('Se reinicia {when}.', { when: fmtLater(e.retryAfterSec ?? 0) })} ${t('Tu conversación no se descontó.')}${free ? ` ${t('Los planes de pago (próximamente) tendrán capacidad reservada.')}` : ''}`;
+      if (e.scope === 'signups') return t('FinAgent llegó hoy a su límite de usuarios nuevos. Probá de nuevo mañana.');
+      return `${t(free ? 'Hay mucha demanda en este momento (FinAgent usa un cupo gratuito compartido).' : 'Hay mucha demanda en este momento.')} ${t('Probá de nuevo en {w}.', { w: fmtWait(e.retryAfterSec ?? 30) })} ${t('Tu conversación no se descontó.')}`;
+    default: return `${e.retryAfterSec ? t('FinAgent tuvo un problema momentáneo; probá de nuevo en {w}.', { w: fmtWait(e.retryAfterSec) }) : t('FinAgent tuvo un problema momentáneo.')} ${t('Tu conversación no se descontó.')}`;
   }
 }
 export function planCodeMessage(e: PlanCodeError): string {
-  return ({ code: 'Ese código no es válido. Revisá que lo hayas escrito completo (FA-XXXX-XXXX).', used: 'Ese código ya se usó el máximo de veces. Pedí uno nuevo.',
+  return t(({ code: 'Ese código no es válido. Revisá que lo hayas escrito completo (FA-XXXX-XXXX).', used: 'Ese código ya se usó el máximo de veces. Pedí uno nuevo.',
     rate: 'Demasiados intentos. Esperá un rato e intentá de nuevo.', network: 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.',
-    other: 'No pude validar el código. Intentá de nuevo en un momento.' } as const)[e.code];
+    other: 'No pude validar el código. Intentá de nuevo en un momento.' } as const)[e.code]);
 }
 
 /** Acepta el código con o sin guiones y en minúsculas: "fak7p29xqm" → "FA-K7P2-9XQM". */
@@ -202,3 +203,38 @@ export class ServerTransport implements Transport {
   }
 }
 export const transport = new ServerTransport();
+
+// ------------------------------------------------------------------ inicio de sesión con Google
+// El servidor verifica el token de Google. En el teléfono, quien obtiene ese token es un "proveedor" (un plugin nativo de Google Sign-In) que se registra al arrancar;
+// hasta que exista, el botón de Google se muestra como "próximamente". Así la parte de FinAgent está lista y probada sin depender de un plugin que no se puede probar sin un teléfono.
+export type GoogleProvider = () => Promise<string>;
+let googleProvider: GoogleProvider | null = null;
+let serverGoogle = false;
+export const registerGoogleProvider = (p: GoogleProvider | null): void => { googleProvider = p; };
+export const googleAvailable = (): boolean => !!googleProvider && serverGoogle;
+export class GoogleError extends Error { constructor(public code: 'unavailable' | 'cancelled' | 'token' | 'rate' | 'network' | 'other') { super(code); this.name = 'GoogleError'; } }
+export function googleMessage(e: GoogleError): string {
+  return t(({ unavailable: 'El inicio de sesión con Google todavía no está disponible.', cancelled: 'Cancelaste el inicio de sesión con Google.', token: 'Google no pudo verificar tu cuenta. Intentá de nuevo.',
+    rate: 'Demasiados intentos. Esperá un rato e intentá de nuevo.', network: 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.', other: 'No pude iniciar sesión con Google. Intentá de nuevo en un momento.' } as const)[e.code]);
+}
+/** Pregunta al servidor si tiene habilitado el inicio de sesión con Google. */
+export async function fetchServerFlags(): Promise<{ google: boolean }> {
+  try { const r = await call('GET', '/health', undefined, false); serverGoogle = r.status === 200 && !!r.json?.google; } catch { serverGoogle = false; }
+  return { google: serverGoogle };
+}
+export async function signInWithGoogle(): Promise<Session> {
+  if (!googleProvider) throw new GoogleError('unavailable');
+  let idToken: string;
+  try { idToken = await googleProvider(); } catch { throw new GoogleError('cancelled'); }
+  let r: { status: number; json: any };
+  try { r = await call('POST', '/v1/auth/google', { idToken }); } catch { throw new GoogleError('network'); }   // si ya hay sesión de invitado, viaja con ella: la cuenta pasa a ser la de Google
+  if (r.status === 200 && r.json?.token) {
+    const s: Session = { token: r.json.token, expiresAt: r.json.expiresAt, plan: r.json.plan };
+    store.set(SESSION_KEY, JSON.stringify(s));
+    setQuota({ plan: s.plan, tier: r.json.tier, remaining: undefined });
+    void fetchMe().catch(() => {});
+    return s;
+  }
+  if (r.status === 403) throw new AccessDeniedError();
+  throw new GoogleError(r.status === 401 ? 'token' : r.status === 501 ? 'unavailable' : r.status === 429 ? 'rate' : 'other');
+}

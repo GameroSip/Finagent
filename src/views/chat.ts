@@ -2,6 +2,9 @@
 // propio contexto; una respuesta en curso sigue aunque cambies de chat o de pestaña.
 import { AbortedError, FinancialAgent, GeminiError, type AgentResult } from '../agent';
 import { ABOUT } from '../about';
+import { maybeUpsellCard } from '../ui/upsell';
+import { noteAnswer } from '../upsell';
+import { openPlans } from './plans';
 import { AccessDeniedError, busyMessage, fetchMe, isServerMode, LimitError, limitMessage, quotaInfo, ServerBusyError, SessionError, signOut, subscribeQuota, transport } from '../server';
 import { chatExists, createChat, emptyData, getMeta, loadChat, newId, renameChat, saveChat, setAutoTitle, setUnread, subscribeChats,
   traceOf, uiOf, type ChatData, type ChatMeta, type StoredMsg, type TraceItem } from '../chats';
@@ -15,26 +18,28 @@ import { icon, type IconName } from '../ui/icons';
 import { promptSheet } from '../ui/sheet';
 import { renderRich, type Rich } from './cards';
 import { openHistory } from './history';
+import { t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
 
 export interface ChatView extends View { ask(prompt: string, label?: string): void }
 
 const SUGGESTIONS: Array<{ ic: IconName; title: string; sub: string; prompt: string }> = [
-  { ic: 'activity', title: 'Resumen del mercado', sub: 'Índices, movimientos y titulares', prompt: 'Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.' },
-  { ic: 'landmark', title: 'Dólar y riesgo país', sub: 'Brecha, MEP, CCL e inflación', prompt: '¿Cómo están el dólar, la brecha y el riesgo país hoy? ¿Qué te dice eso del momento de Argentina?' },
-  { ic: 'scale', title: 'Merval barato con dividendos', sub: 'Screener con motivos de exclusión', prompt: 'Buscá en los líderes del Merval acciones con P/E menor a 12 y dividend yield mayor a 2%. Mostrame las que pasan y por qué se excluyeron las demás.' },
-  { ic: 'layers', title: 'Comparar KO vs PEP', sub: 'Valuación, deuda y rendimiento', prompt: 'Compará KO y PEP: valuación, dividendos, deuda y rendimiento del último año. ¿Cuál tiene mejor perfil y qué riesgos tiene cada una?' },
+  { ic: 'activity', title: 'Resumen del mercado', sub: 'Índices, movimientos y titulares', prompt: 'Hacé un resumen de cómo está el mercado hoy en el mundo: los principales índices de EE.UU., Europa y Asia, qué se mueve más y qué narrativa hay en los medios.' },
+  { ic: 'globe', title: 'Comparar mercados del mundo', sub: 'S&P 500, DAX, Nikkei y Bovespa', prompt: 'Compará el rendimiento de los últimos 6 meses del S&P 500, el DAX, el Nikkei 225 y el Bovespa. ¿Cuál rindió más y cuál fue más volátil?' },
   { ic: 'lineChart', title: 'Técnico de AAPL', sub: 'RSI, medias y soportes', prompt: '¿Cuál es el estado técnico de AAPL? Mostrame RSI, medias móviles y qué señales hay.' },
+  { ic: 'bitcoin', title: 'Bitcoin y cripto', sub: 'Tendencia, RSI y sentimiento', prompt: '¿Cómo está Bitcoin? Mostrame su estado técnico, su rendimiento reciente y el sentimiento del mercado cripto.' },
+  { ic: 'layers', title: 'Comparar KO vs PEP', sub: 'Valuación, deuda y rendimiento', prompt: 'Compará KO y PEP: valuación, dividendos, deuda y rendimiento del último año. ¿Cuál tiene mejor perfil y qué riesgos tiene cada una?' },
+  { ic: 'landmark', title: 'Dólar y riesgo país', sub: 'Argentina: brecha, MEP, CCL e inflación', prompt: '¿Cómo están el dólar, la brecha y el riesgo país hoy? ¿Qué te dice eso del momento de Argentina?' },
 ];
 
 const who = (bad = false) => `<div class="ai-who"><span class="ai-av ${bad ? 'bad' : ''}">${icon(bad ? 'warn' : 'sparkles', 14)}</span><b>FinAgent</b></div>`;
 
 const LABELS: Record<string, (a: any) => string> = {
-  search_ticker: (a) => `Buscando "${a.query ?? ''}"`, get_quote: (a) => `Cotización de ${a.ticker}`, get_fundamentals: (a) => `Fundamentales de ${a.ticker}`,
-  get_financials: (a) => `Estados contables de ${a.ticker}`, get_technicals: (a) => `Análisis técnico de ${a.ticker}`, get_news: (a) => `Noticias de ${a.ticker}`,
-  compare_assets: (a) => `Comparando ${(a.tickers ?? []).join(', ')}`, screen_assets: () => 'Filtrando activos', calculate: () => 'Calculando',
-  get_market_overview: () => 'Panorama de mercado', get_movers: () => 'Rankings del día', get_argentina_macro: () => 'Dólar, brecha y riesgo país',
-  get_performance: (a) => `Rendimiento y riesgo de ${a.ticker}`,
-  get_headlines: (a) => `Titulares de medios${a.topic ? `: ${a.topic}` : ''}`,
+  search_ticker: (a) => t('Buscando "{q}"', { q: a.query ?? '' }), get_quote: (a) => t('Cotización de {s}', { s: a.ticker }), get_fundamentals: (a) => t('Fundamentales de {s}', { s: a.ticker }),
+  get_financials: (a) => t('Estados contables de {s}', { s: a.ticker }), get_technicals: (a) => t('Análisis técnico de {s}', { s: a.ticker }), get_news: (a) => t('Noticias de {s}', { s: a.ticker }),
+  compare_assets: (a) => t('Comparando {s}', { s: (a.tickers ?? []).join(', ') }), screen_assets: () => t('Filtrando activos'), calculate: () => t('Calculando'),
+  get_market_overview: () => t('Panorama de mercado'), get_movers: () => t('Rankings del día'), get_argentina_macro: () => t('Dólar, brecha y riesgo país'),
+  get_performance: (a) => t('Rendimiento y riesgo de {s}', { s: a.ticker }),
+  get_headlines: (a) => `${t('Titulares de medios')}${a.topic ? `: ${a.topic}` : ''}`,
 };
 const labelFor = (name: string, args: any) => (LABELS[name] ?? (() => name))(args ?? {});
 
@@ -42,11 +47,11 @@ function traceHtml(items: TraceItem[]): string {
   if (!items.length) return '';
   const rows = items.map((t) => {
     const body = t.ok
-      ? `<div>Fuente: ${esc(t.source ?? 'n/d')}</div><div>Dato al: ${esc(t.asOf ?? 'n/d')} · consultado: ${esc(t.fetchedAt ?? '')}</div>${(t.notes ?? []).map((n) => `<div>ℹ️ ${esc(n)}</div>`).join('')}`
+      ? `<div>${esc(tx('Fuente: {s}', { s: tx(t.source ?? 'n/d') }))}</div><div>${esc(tx('Dato al: {a} · consultado: {c}', { a: t.asOf ?? 'n/d', c: t.fetchedAt ?? '' }))}</div>${(t.notes ?? []).map((n) => `<div>ℹ️ ${esc(tx(n))}</div>`).join('')}`
       : `<div class="down">${esc(t.error)}</div>`;
     return `<div class="trace-item"><b>${esc(labelFor(t.name, t.args))}</b>${body}</div>`;
   });
-  return `<details class="trace"><summary>${icon('shield', 14)} Fuentes y cálculos (${items.length})</summary>${rows.join('')}</details>`;
+  return `<details class="trace"><summary>${icon('shield', 14)} ${tx('Fuentes y cálculos')} (${items.length})</summary>${rows.join('')}</details>`;
 }
 
 async function copyText(text: string): Promise<void> {
@@ -70,7 +75,7 @@ export function createChatView(ctx: Ctx): ChatView {
   el.innerHTML = `
     <div class="chat-head">
       <button class="icon-btn" id="c-hist" aria-label="Historial de chats">${icon('menu', 20)}</button>
-      <button class="chat-title" id="c-title" aria-label="Renombrar chat"><span class="t" id="c-title-t">Nuevo chat</span>
+      <button class="chat-title" id="c-title" aria-label="Renombrar chat"><span class="t" id="c-title-t" data-notrans>Nuevo chat</span>
         <span class="model-chip" id="c-model">${icon('sparkles', 12)}<span class="t">Gemini · automático</span></span></button>
       <button class="icon-btn" id="c-new" aria-label="Nuevo chat">${icon('squarePen', 20)}</button>
     </div>
@@ -102,9 +107,9 @@ export function createChatView(ctx: Ctx): ChatView {
     send.disabled = !r && !input.value.trim();
   }
   const setModelChip = () => {
-    if (isServerMode()) { const q = quotaInfo(), r = q.remaining, label = q.plan?.label ? `Plan ${q.plan.label}` : 'FinAgent'; $('#c-model .t', el).textContent = r ? `${label} · ${r.day === 1 ? 'te queda 1 conversación' : `te quedan ${r.day} conversaciones`} hoy` : label; refreshPlanBanner(); return; }
+    if (isServerMode()) { const q = quotaInfo(), r = q.remaining, label = q.plan?.label ? t('Plan {name}', { name: t(q.plan.label) }) : 'FinAgent'; $('#c-model .t', el).textContent = r ? `${label} · ${r.day === 1 ? t('te queda 1 conversación hoy') : t('te quedan {n} conversaciones hoy', { n: r.day })}` : label; refreshPlanBanner(); return; }
     const id = ctx.models.active ?? ctx.models.pick();
-    $('#c-model .t', el).textContent = id ? `${modelLabel(id)} · automático` : 'Gemini · automático';
+    $('#c-model .t', el).textContent = id ? t('{m} · automático', { m: modelLabel(id) }) : t('Gemini · automático');
   };
   function refreshHeader() {
     cur.meta = cur.id ? getMeta(cur.id) : null;
@@ -131,8 +136,8 @@ export function createChatView(ctx: Ctx): ChatView {
   function planBannerHtml(): string {
     const q = quotaInfo(), p = q.plan;
     if (!p) return '';
-    return `<div class="plan-banner" id="c-plan"><div><b>Plan ${esc(p.label)}</b> · ${esc(p.modelLabel)} · ${p.dailyLimit} conversaciones por día</div>` +
-      (p.id === 'free' ? `<div class="plan-sub">Los planes de pago (próximamente) tendrán modelos más potentes y más conversaciones. <button class="link-btn" data-go="settings">Ver planes</button></div>` : '') +
+    return `<div class="plan-banner" id="c-plan"><div><b>${esc(t('Plan {name}', { name: t(p.label) }))}</b> · ${esc(p.modelLabel)} · ${esc(t('{n} conversaciones por día', { n: p.dailyLimit }))}</div>` +
+      (p.id === 'free' ? `<div class="plan-sub">Los planes de pago (próximamente) tendrán modelos más potentes y más conversaciones. <button class="link-btn" data-plans="1">Ver planes</button></div>` : '') +
       (q.tier === 'free' ? `<div class="plan-sub">${esc(ABOUT.freeTier)}</div>` : '') + `</div>`;
   }
   function refreshPlanBanner() {
@@ -165,10 +170,10 @@ export function createChatView(ctx: Ctx): ChatView {
     const v = m.verification;
     let pills = '';
     // Nunca se muestran cifras sin respaldo: el agente las quita antes de responder y acá solo se avisa cuántas fueron.
-    if (v && v.ok && v.checked > 0) pills += `<span class="vpill ok">${icon('shield', 13)} ${v.checked} cifras verificadas con datos</span>`;
+    if (v && v.ok && v.checked > 0) pills += `<span class="vpill ok">${icon('shield', 13)} ${tx(v.checked === 1 ? '1 cifra verificada con datos' : '{n} cifras verificadas con datos', { n: v.checked })}</span>`;
     if (v && !v.ok) pills += `<span class="vpill warn">${icon('warn', 13)} Algunas cifras no se pudieron verificar</span>`; // chats guardados con versiones anteriores
     const nr = m.flags?.redacted ?? 0;
-    if (nr) pills += `<span class="vpill">${icon('info', 13)} Quité ${nr} ${nr === 1 ? 'cifra' : 'cifras'} que no pude respaldar con datos</span>`;
+    if (nr) pills += `<span class="vpill">${icon('info', 13)} ${tx(nr === 1 ? 'Quité 1 cifra que no pude respaldar con datos' : 'Quité {n} cifras que no pude respaldar con datos', { n: nr })}</span>`;
     if (m.flags?.corrected) pills += `<span class="vpill">${icon('check', 13)} corregida tras verificar</span>`;
     if (m.flags?.truncated) pills += `<span class="vpill warn">${icon('clock', 13)} respuesta parcial</span>`;
     body.append(h('div', { class: 'ai-foot', html: `<div class="vrow">${pills}</div>
@@ -181,7 +186,7 @@ export function createChatView(ctx: Ctx): ChatView {
   function errEl(m: StoredMsg): HTMLElement {
     const box = h('div', { class: 'm-ai', attrs: { 'data-mid': m.id } });
     const action = m.errKind === 'invalid_key' ? `<button class="btn btn-ghost btn-sm" data-go="settings">Cambiar clave</button>`
-      : m.errKind === 'limit' ? `<button class="btn btn-ghost btn-sm" data-go="market">Ver mercados</button> <button class="btn btn-ghost btn-sm" data-go="settings">Ver planes</button>`
+      : m.errKind === 'limit' ? `<button class="btn btn-ghost btn-sm" data-go="market">Ver mercados</button> <button class="btn btn-ghost btn-sm" data-plans="1">Ver planes</button>`
       : m.errKind === 'session' ? `<button class="btn btn-ghost btn-sm" data-signout="1">Reiniciar sesión</button>`
       : m.retry && m.errKind !== 'unavailable' ? `<button class="btn btn-ghost btn-sm" data-retry="1">Reintentar</button>` : '';
     box.innerHTML = `${who(m.errKind !== 'stopped')}<div class="ai-body"><div class="err-bubble${m.errKind === 'stopped' ? ' soft' : ''}">${esc(m.text)}${action ? `<div style="margin-top:10px">${action}</div>` : ''}</div></div>`;
@@ -300,10 +305,17 @@ export function createChatView(ctx: Ctx): ChatView {
     data.messages.push(am);
     data.history = run.agent.history; data.numbers = run.agent.priorNumbers;
     if (!saveChat(chatId, data)) toast('No hay espacio para guardar este chat');
-    if (isCurrent(chatId)) { run.el?.remove(); run.el = null; appendMsg(am); setModelChip(); toBottom(); }
-    else { setUnread(chatId, true); toast(`Respuesta lista: ${getMeta(chatId)?.title ?? 'chat'}`); }
+    if (isServerMode()) noteAnswer();
+    if (isCurrent(chatId)) { run.el?.remove(); run.el = null; appendMsg(am); setModelChip(); toBottom(); if (isServerMode()) void showUpsell('low-quota'); }
+    else { setUnread(chatId, true); toast(t('Respuesta lista: {t}', { t: getMeta(chatId)?.title ?? 'chat' })); }
     const meta = getMeta(chatId);
     if (meta?.titleAuto && data.history.length === 1) void autoTitle(chatId, prompt, res.answer);
+  }
+
+  /** Sugerencia de planes al final de la conversación (solo si las reglas de src/upsell.ts lo permiten). */
+  async function showUpsell(trigger: 'low-quota' | 'weekly') {
+    const card = await maybeUpsellCard(trigger, () => void openPlans());
+    if (card) { scroll.append(card); toBottom(); }
   }
 
   function finishError(run: Run, prompt: string, e: unknown) {
@@ -321,7 +333,7 @@ export function createChatView(ctx: Ctx): ChatView {
       msg = e.kind === 'invalid_key' ? 'Tu clave de Gemini no es válida o fue revocada.'
         : e.kind === 'busy' ? 'Gemini está saturado o llegaste al límite del nivel gratuito. Esperá un momento y reintentá.'
         : e.kind === 'unavailable' ? 'No hay ningún modelo disponible para tu clave en este momento.'
-        : `Gemini respondió con un error: ${e.message}`;
+        : t('Gemini respondió con un error: {m}', { m: e.message });
     }
     const data = dataOf(chatId);
     const em: StoredMsg = { id: newId(), role: 'error', at: Date.now(), text: msg, errKind: kind, retry: prompt };
@@ -369,9 +381,10 @@ export function createChatView(ctx: Ctx): ChatView {
   scroll.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
     const sug = t.closest<HTMLElement>('.sug');
-    if (sug) { const s = SUGGESTIONS[Number(sug.dataset.i)]; void send_(s.prompt, s.title); return; }
+    if (sug) { const s = SUGGESTIONS[Number(sug.dataset.i)]; void send_(tx(s.prompt), tx(s.title)); return; }
     const link = t.closest<HTMLAnchorElement>('a.mdlink');
     if (link) { ev.preventDefault(); openUrl(link.href); return; }
+    if (t.closest('[data-plans]')) { void openPlans(); return; }
     const goBtn = t.closest<HTMLElement>('[data-go]');
     if (goBtn) { ctx.go((goBtn.dataset.go as TabId) || 'settings'); return; } // cada botón lleva a SU pestaña (antes todos iban a Ajustes)
     const msgEl = t.closest<HTMLElement>('[data-mid]');

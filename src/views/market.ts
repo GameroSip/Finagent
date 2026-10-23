@@ -1,14 +1,19 @@
 // Pantalla "Mercados": panorama del día con datos reales, sin gastar cuota de IA.
 import type { Ctx, View } from '../ctx';
 import { fetchDolares, fetchInflacion, fetchRiesgoPais, withBrecha } from '../data/argentina';
-import { fetchFearGreed, fetchIndices, type FearGreed, type QuoteCard } from '../data/market';
+import { fetchFearGreed, fetchIndices, fetchWorldGroup, type FearGreed, type QuoteCard, type WorldGroup } from '../data/market';
 import { fetchHeadlines, type Headline, type Region } from '../data/news';
 import { fetchMovers, MOVER_KINDS, type Mover, type MoverKind } from '../yahoo';
 import { getCache, setCache } from '../ui/cache';
 import { $, esc, h, openUrl, toast } from '../ui/dom';
-import { dirClass, fmtDate, fmtNum, fmtPct, fmtPrice, greeting, initials, symbolColor, timeAgo } from '../ui/format';
+import { assetIcon } from '../ui/assetIcon';
+import { maybeUpsellCard } from '../ui/upsell';
+import { isServerMode } from '../server';
+import { openPlans } from './plans';
+import { dirClass, fmtDate, fmtNum, fmtPct, fmtPrice, greeting, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 import { sparkSvg } from '../ui/spark';
+import { t } from '../i18n';
 
 const STALE_MS = 2 * 60_000;
 const INVERTED = new Set(['^VIX']); // si el VIX sube, es una mala señal: se pinta al revés
@@ -48,8 +53,12 @@ export function createMarketView(ctx: Ctx): View {
         <button class="icon-btn" id="m-search" aria-label="Buscar">${icon('search', 19)}</button>
       </div>
     </div>
+    <div id="m-upsell"></div>
     <div id="m-hero"></div>
     <div class="section"><div class="section-head"><h2>${icon('activity', 19)} Índices y activos clave</h2></div><div class="scroll-x" id="m-indices"></div></div>
+    <div class="section"><div class="section-head"><h2>${icon('globe', 19)} Mercados del mundo</h2></div>
+      <div class="seg" id="m-seg-world" style="margin-bottom:12px"><button data-g="indices" class="on">Índices</button><button data-g="fx">Divisas</button><button data-g="crypto">Cripto</button><button data-g="commodities">Materias primas</button></div>
+      <div class="scroll-x" id="m-world"></div></div>
     <div class="section"><div class="section-head"><h2>${icon('landmark', 19)} Argentina</h2><span class="more" id="m-ar-time"></span></div><div id="m-ar"></div></div>
     <div class="section"><div class="section-head"><h2>${icon('flame', 19)} Más movidos (EE.UU.)</h2></div>
       <div class="seg" id="m-seg-movers" style="margin-bottom:12px"><button data-k="day_gainers" class="on">Suben</button><button data-k="day_losers">Bajan</button><button data-k="most_actives">Operadas</button></div>
@@ -57,7 +66,7 @@ export function createMarketView(ctx: Ctx): View {
     <div class="section"><div class="section-head"><h2>${icon('gauge', 19)} Sentimiento cripto</h2></div><div id="m-fng"></div></div>
     <div class="section"><div class="section-head"><h2>${icon('newspaper', 19)} Titulares</h2></div>
       <div class="seg" id="m-seg-news" style="margin-bottom:12px"><button data-r="ar" class="on">Argentina</button><button data-r="us">Global</button></div>
-      <div id="m-news" style="display:flex;flex-direction:column;gap:10px"></div></div>
+      <div id="m-news" data-notrans style="display:flex;flex-direction:column;gap:10px"></div></div>
     <p class="muted" style="font-size:11.5px;text-align:center;margin-top:28px;line-height:1.5">Datos de Yahoo Finance, DolarAPI, ArgentinaDatos, Google News y alternative.me.<br>Pueden tener demora. Información educativa, no es asesoramiento financiero.</p>`;
 
   const q = <T extends HTMLElement>(id: string) => $<T>(`#${id}`, el);
@@ -71,29 +80,32 @@ export function createMarketView(ctx: Ctx): View {
       <div class="card hero" style="position:relative;overflow:hidden;padding:18px 18px 16px;border-color:var(--line-2);background:linear-gradient(160deg,var(--surface-2),var(--surface))">
         <div style="position:absolute;right:-60px;top:-70px;width:220px;height:220px;border-radius:50%;background:radial-gradient(closest-side,var(--aurora-a),transparent)"></div>
         <div style="position:relative">
-          <div class="eyebrow" style="display:flex;align-items:center;gap:6px">${esc(sp.name)} · hoy</div>
+          <div class="eyebrow" style="display:flex;align-items:center;gap:6px">${esc(sp.name)} · ${esc(t('hoy'))}</div>
           <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px"><span class="num" style="font-size:34px;font-weight:750;letter-spacing:-.03em">${fmtNum(sp.price)}</span>
             <span class="pill ${cls}" style="font-size:13.5px">${cls === 'up' ? icon('arrowUp', 13) : cls === 'down' ? icon('arrowDown', 13) : ''}${fmtPct(sp.changePct, false)}</span></div>
           <div style="margin:12px -4px 4px;height:62px">${sparkSvg(sp.spark, { w: 320, h: 62, stroke: 2.2 })}</div>
           <button class="btn btn-primary btn-block" id="m-ai" style="margin-top:12px">${icon('sparkles', 18)} Resumen del día con IA</button>
         </div>
       </div>`;
-    $('#m-ai', el).onclick = () => ctx.askAI('Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.', 'Resumen del día');
+    $('#m-ai', el).onclick = () => ctx.askAI(t('Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.'), t('Resumen del día'));
   }
 
-  function renderIndices(list: QuoteCard[]) {
-    q('m-indices').innerHTML = '';
+  /** Tarjetas horizontales (índices, divisas, cripto…) con el ícono de cada activo. */
+  function renderCards(targetId: string, list: QuoteCard[]) {
+    q(targetId).innerHTML = '';
     for (const i of list) {
       const card = h('button', { class: 'card idx', attrs: { 'aria-label': i.name }, style: 'width:156px;padding:13px 13px 8px;text-align:left' });
+      const head = `<div style="display:flex;align-items:center;gap:7px;min-width:0">${assetIcon(i.symbol, { style: 'width:22px;height:22px;border-radius:8px;font-size:8px;flex:none' })}<div class="eyebrow" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div></div>`;
       card.innerHTML = i.price === null
-        ? `<div class="eyebrow" style="font-weight:600">${esc(i.name)}</div><div class="muted" style="font-size:12px;margin:10px 0 22px">No disponible</div>`
-        : `<div class="eyebrow" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div>
-           <div class="num" style="font-size:17px;font-weight:700;margin:5px 0 6px;letter-spacing:-.01em">${fmtNum(i.price, i.price > 1000 ? 0 : 2)}</div>
+        ? `${head}<div class="muted" style="font-size:12px;margin:10px 0 22px">No disponible</div>`
+        : `${head}
+           <div class="num" style="font-size:17px;font-weight:700;margin:5px 0 6px;letter-spacing:-.01em">${fmtNum(i.price, i.price > 1000 ? 0 : i.price < 10 ? 4 : 2)}</div>
            ${pill(i.changePct, INVERTED.has(i.symbol))}<div style="margin:8px -2px 0;height:32px">${sparkSvg(i.spark, { w: 130, h: 32, up: INVERTED.has(i.symbol) ? !(i.changePct! >= 0) : undefined })}</div>`;
       card.onclick = () => ctx.openAsset(i.symbol, i.name);
-      q('m-indices').append(card);
+      q(targetId).append(card);
     }
   }
+  const renderIndices = (list: QuoteCard[]) => renderCards('m-indices', list);
 
   function renderArgentina(d: { dol: ReturnType<typeof withBrecha> | null; rp: { valor: number; fecha: string } | null; inf: Awaited<ReturnType<typeof fetchInflacion>> | null }) {
     const box = q('m-ar');
@@ -124,7 +136,7 @@ export function createMarketView(ctx: Ctx): View {
     box.innerHTML = '';
     list.slice(0, 7).forEach((m, idx) => {
       const row = h('button', { class: 'row', style: `display:flex;align-items:center;gap:12px;width:100%;padding:11px 0;text-align:left;${idx ? 'border-top:1px solid var(--line)' : ''}` });
-      row.innerHTML = `<div class="avatar" style="background:${symbolColor(m.symbol)}">${esc(initials(m.symbol))}</div>
+      row.innerHTML = `${assetIcon(m.symbol)}
         <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(m.symbol)}</div><div class="muted" style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div></div>
         <div style="text-align:right"><div class="num" style="font-weight:650;margin-bottom:3px">${fmtPrice(m.price, m.currency === 'USD' || !m.currency ? 'USD' : m.currency)}</div>${pill(m.changePct)}</div>`;
       row.onclick = () => ctx.openAsset(m.symbol, m.name);
@@ -179,6 +191,15 @@ export function createMarketView(ctx: Ctx): View {
     if (!l.some((i) => i.price !== null)) throw new Error('sin datos'); // falla total: se conserva lo último que andaba
     return l;
   };
+  let worldGroup: WorldGroup = 'indices';
+  const loadWorld = (force: boolean) => {
+    const g = worldGroup;
+    return load(`world:${g}`, async () => {
+      const l = await fetchWorldGroup(g);
+      if (!l.some((i) => i.price !== null)) throw new Error('sin datos');
+      return l;
+    }, (l) => renderCards('m-world', l), () => { q('m-world').innerHTML = errorBox('No se pudieron cargar estos mercados.', 'world'); }, force, () => g === worldGroup);
+  };
   const loadIndices = (force: boolean) => load('indices', fetchIndicesOk, (l) => { renderHero(l); renderIndices(l); },
     () => { q('m-indices').innerHTML = errorBox('No se pudieron cargar los índices.', 'idx'); }, force);
   const loadAr = (force: boolean) => load('argentina', async () => {
@@ -194,11 +215,12 @@ export function createMarketView(ctx: Ctx): View {
 
   function refresh(force = false) {
     lastRefresh = Date.now();
-    void loadIndices(force); void loadAr(force); void loadMovers(force); void loadFng(force); void loadNews(force);
+    void loadIndices(force); void loadWorld(force); void loadAr(force); void loadMovers(force); void loadFng(force); void loadNews(force);
   }
 
   // skeletons iniciales
   q('m-indices').innerHTML = Array.from({ length: 4 }, () => `<div class="skeleton" style="width:156px;height:118px;border-radius:22px"></div>`).join('');
+  q('m-world').innerHTML = Array.from({ length: 4 }, () => `<div class="skeleton" style="width:156px;height:118px;border-radius:22px"></div>`).join('');
   q('m-ar').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${skeleton(4, 92)}</div>`;
   q('m-movers').innerHTML = Array.from({ length: 4 }, () => `<div class="skeleton" style="height:44px;margin:9px 0"></div>`).join('');
   q('m-news').innerHTML = skeleton(3, 78);
@@ -213,6 +235,13 @@ export function createMarketView(ctx: Ctx): View {
     $('#m-seg-movers', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     void loadMovers(false);
   });
+  $('#m-seg-world', el).addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button'); if (!b) return;
+    worldGroup = b.dataset.g as WorldGroup;
+    $('#m-seg-world', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    q('m-world').innerHTML = Array.from({ length: 4 }, () => `<div class="skeleton" style="width:156px;height:118px;border-radius:22px"></div>`).join('');
+    void loadWorld(false);
+  });
   $('#m-seg-news', el).addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button'); if (!b) return;
     region = b.dataset.r as Region;
@@ -225,6 +254,12 @@ export function createMarketView(ctx: Ctx): View {
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !el.classList.contains('hide') && Date.now() - lastRefresh > STALE_MS) refresh(); });
 
+  const weeklyNudge = async () => {
+    if (!isServerMode() || q('m-upsell').childElementCount) return;
+    const card = await maybeUpsellCard('weekly', () => void openPlans());
+    if (card) q('m-upsell').append(card);
+  };
   refresh();
-  return { el, onShow: () => { if (Date.now() - lastRefresh > STALE_MS) refresh(); } };
+  setTimeout(() => void weeklyNudge(), 1500);
+  return { el, onShow: () => { if (Date.now() - lastRefresh > STALE_MS) refresh(); void weeklyNudge(); } };
 }

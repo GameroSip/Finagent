@@ -5,6 +5,7 @@ import { timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 import { actionSheet, confirmSheet, promptSheet } from '../ui/sheet';
 import type { Overlay } from './asset';
+import { t } from '../i18n';
 
 export interface HistoryOpts {
   currentId: string | null;
@@ -41,7 +42,7 @@ export function openHistory(o: HistoryOpts): Overlay {
   function item(m: ChatMeta, snippet?: string): HTMLElement {
     const busy = o.busy().has(m.id);
     const row = h('div', { class: `chat-item${m.id === o.currentId ? ' active' : ''}`, attrs: { 'data-id': m.id, role: 'button', tabindex: '0' } });
-    row.innerHTML = `<div class="ci-main"><div class="ci-title">${esc(m.title)}</div>
+    row.innerHTML = `<div class="ci-main"><div class="ci-title" data-notrans>${esc(m.title)}</div>
         <div class="ci-sub">${esc(snippet ?? (m.preview || 'Sin mensajes'))}</div></div>
       ${busy ? '<span class="sp" title="Respondiendo…"></span>' : m.unread ? '<span class="ci-dot" title="Respuesta nueva"></span>' : `<span class="ci-time">${esc(timeAgo(m.updatedAt))}</span>`}
       <button class="ci-more" aria-label="Opciones del chat">${icon('ellipsis', 19)}</button>`;
@@ -54,12 +55,12 @@ export function openHistory(o: HistoryOpts): Overlay {
     list.innerHTML = '';
     if (!rows.length) {
       list.innerHTML = q
-        ? `<div class="empty-note" style="margin-top:34px">${icon('search', 26)}<div>No encontré chats con "${esc(q)}".</div></div>`
+        ? `<div class="empty-note" style="margin-top:34px">${icon('search', 26)}<div>${esc(t('No encontré chats con "{q}".', { q }))}</div></div>`
         : `<div class="empty-note" style="margin-top:34px">${icon('messageSquare', 28)}<div style="font-weight:700">Todavía no tenés chats</div><div class="muted" style="font-size:13px;max-width:230px">Tus conversaciones se guardan acá para que puedas retomarlas.</div></div>`;
       return;
     }
     const snippets = new Map(rows.map((r) => [r.meta.id, r.snippet]));
-    const groups = q ? [{ label: `Resultados (${rows.length})`, items: rows.map((r) => r.meta) }] : groupByDate(rows.map((r) => r.meta));
+    const groups = q ? [{ label: t('Resultados ({n})', { n: rows.length }), items: rows.map((r) => r.meta) }] : groupByDate(rows.map((r) => r.meta));
     for (const g of groups) {
       list.append(h('div', { class: 'd-group', text: g.label }));
       g.items.forEach((m) => list.append(item(m, snippets.get(m.id))));

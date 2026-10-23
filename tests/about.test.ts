@@ -9,6 +9,17 @@ describe('textos de presentación de FinAgent', () => {
     const wanted = 'FinAgent es una IA propia, con entrenamiento propio, respaldada por Google DeepMind y con decenas de licencias a su favor. Usa varias IA y es 100% confiable.';
     expect(FORBIDDEN_CLAIMS.filter(([, re]) => re.test(wanted)).map(([d]) => d)).toHaveLength(5);
   });
+  it('el control atrapa también las promesas de cobertura total y de tiempo real, y la presentación internacional dice sus límites', () => {
+    for (const bad of ['Cubrimos todos los mercados del mundo.', 'Cotizaciones en tiempo real de cualquier bolsa.', 'Cobertura total de activos.']) {
+      expect(FORBIDDEN_CLAIMS.some(([, re]) => re.test(bad)), bad).toBe(true);
+    }
+    expect(ABOUT.what).toMatch(/mercados de todo el mundo/);
+    expect(ABOUT.what).toMatch(/Argentina/);                       // sigue siendo su especialidad, pero ya no lo único
+    expect(ABOUT.coverage).toMatch(/depende de las fuentes/);
+    expect(ABOUT.coverage).toMatch(/pueden no estar disponibles/);
+    expect(ABOUT.coverage).toMatch(/demora/);
+    expect(ABOUT.limits).not.toMatch(/agente registrado ante la CNV/);   // el texto legal ya no es solo argentino
+  });
   it('en cambio, lo que SÍ es cierto está dicho con sus nombres reales y sin esconder la tecnología de base', () => {
     expect(ABOUT.what).toMatch(/especializado en finanzas/);
     expect(ABOUT.what).toMatch(/Gemini/);

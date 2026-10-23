@@ -1,13 +1,14 @@
 import { fakeGemini } from '../../evals/fake-gemini';
 import { createApp, type Env } from '../../server/app';
 import { ModelRouter, type GeminiFetch } from '../../server/gemini';
+import type { JwksFetcher } from '../../server/google';
 import { NodeSql } from '../../server/node-sql';
 import { SqlStore } from '../../server/store';
 
 export const ADMIN = 'admin-de-prueba';
 export const user = (text: string) => [{ role: 'user', parts: [{ text }] }];
 
-export async function makeServer(opts: { gemini?: GeminiFetch; env?: Partial<Env> } = {}) {
+export async function makeServer(opts: { gemini?: GeminiFetch; env?: Partial<Env>; jwks?: JwksFetcher } = {}) {
   const store = new SqlStore(new NodeSql(':memory:'));
   await store.migrate();
   let clock = new Date('2026-10-19T15:00:00Z');
@@ -16,7 +17,7 @@ export async function makeServer(opts: { gemini?: GeminiFetch; env?: Partial<Env
   const gemini: GeminiFetch = opts.gemini ?? (async (model, body) => { seen.push({ model, body }); const r = await fake({ url: `https://x/models/${model}:generateContent`, method: 'POST', body }); return { status: r.status, text: r.text }; });
   const router = new ModelRouter(gemini, () => clock.getTime(), async () => {});
   const env: Env = { JWT_SECRET: 'secreto-de-prueba', ADMIN_TOKEN: ADMIN, DAILY_BUDGET_USD: '5', ...opts.env };
-  const app = createApp({ store, env, router, now: () => clock, version: 'test' });
+  const app = createApp({ store, env, router, now: () => clock, version: 'test', jwks: opts.jwks });
   const call = async (method: string, path: string, o: { body?: unknown; token?: string; headers?: Record<string, string> } = {}) => {
     const res = await app(new Request(`https://api.test${path}`, { method, headers: { ...(o.body !== undefined ? { 'content-type': 'application/json' } : {}), ...(o.token ? { authorization: `Bearer ${o.token}` } : {}), ...o.headers }, body: o.body !== undefined ? JSON.stringify(o.body) : undefined }));
     return { status: res.status, json: (await res.json().catch(() => null)) as any, headers: res.headers };

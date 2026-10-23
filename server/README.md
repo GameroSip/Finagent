@@ -55,10 +55,16 @@ Al terminar, en el registro aparece la dirección, algo como `https://finagent-a
 **F. (Opcional) Códigos de plan para testers:** abrí `https://TU-DIRECCIÓN/admin`, pegá tu `ADMIN_TOKEN`, elegí plan, cantidad y usos por código. Cada tester lo canjea en *Ajustes → Tengo un código*.
 > Los códigos **no** se crean desde GitHub Actions a propósito: el repositorio es público y los registros también.
 
+## Inicio de sesión con Google (preparado, falta el lado del teléfono)
+El **servidor ya lo soporta y está probado** (verifica la firma del token de Google, conserva el plan y el uso de quien venía como invitado, y guarda solo un identificador de la cuenta: ni correo ni nombre). Para activarlo hacen falta dos cosas que dependen de tu cuenta:
+1. En Google Cloud: crear el *OAuth client ID* de tipo Web y el de Android (con el SHA-1 de tu firma) y poner el ID web en `GOOGLE_CLIENT_ID` (`wrangler.toml`; acepta varios separados por coma).
+2. En la app: instalar un plugin nativo de Google Sign-In y registrarlo con `registerGoogleProvider(...)`. No está incluido a propósito: sin un teléfono real y tu proyecto de Google no se puede probar, y un plugin sin probar podría romper la compilación. Mientras tanto el botón se muestra como "Próximamente".
+
 ## Operación
 - **Panel (`/admin`):** respuestas, tokens y dólares por día y por modelo; cuentas; **cuántas veces faltó cupo** (de Gemini y del servidor); **cuánta gente quiere Plus y Pro** (el dato para decidir precios); bloquear o cambiar de plan.
 - **Antiabuso sin pedir registro:** 5 cuentas nuevas por dirección y día, `MAX_NEW_USERS_PER_DAY` en total, freno por ráfagas y tope de gasto (`DAILY_BUDGET_USD`, importa con el nivel de pago). Una cuenta es un teléfono: reinstalar la app crea otra (otro cupo gratis); por eso los topes. **Para abrir al público hace falta inicio de sesión con Google** (1 cuenta de Google = 1 cupo) y verificar que la app es la original (Play Integrity).
 - **Planes** (`src/plans.ts`, una sola fuente para la app y el servidor): Gratis 3 por día / 90 por mes con Gemini 3.5 Flash-Lite · Plus 10 y 200 con Gemini 3.8 Flash · Pro 30 y 600 con Gemini 3.8 Flash y análisis profundo con Gemini 3.1 Pro. **Plus y Pro son una propuesta preliminar** (sin precio, no contratables): ajustalos con el costo real y el interés medido.
+- **Calculadora de precios** (panel → "Calculadora de precios"): cuánto cuesta atender a una persona de cada plan (uso moderado y peor caso) y qué precio conviene cobrar, con tu comisión, impuestos y margen. Usa el **costo real medido** de cada modelo cuando hay al menos 5 respuestas; si no, lo estima con el precio oficial de Gemini. Ojo: el 3.8 Flash duplica su precio el 1-ene-2027.
 - **Emergencia:** poné `KILL_SWITCH = "1"` en `[vars]` y volvé a desplegar: el servidor responde "en mantenimiento".
 
 ## Qué se probó y qué no

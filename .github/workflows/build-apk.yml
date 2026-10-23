@@ -46,7 +46,10 @@ jobs:
         run: |
           VITE_API_BASE=https://api.finagent.test npx vite build --outDir dist-server --emptyOutDir
           cd e2e
-          node run-server.mjs ../dist-server ../e2e-shots
+          node run-server.mjs ../dist-server ../e2e-shots; a=$?
+          node run-intro.mjs ../dist-server ../e2e-shots; b=$?
+          node run-i18n.mjs ../dist-server ../e2e-shots; c=$?
+          exit $((a + b + c))
 
       - name: Publicar capturas de la app
         if: always()
@@ -55,6 +58,15 @@ jobs:
           name: capturas-de-la-app
           path: e2e-shots/
           if-no-files-found: ignore
+
+      # Herramientas del gráfico (Fibonacci, sesiones, perfil de volumen…) e íconos de los activos, en un Chromium real.
+      - name: Pruebas en navegador real (gráficos e íconos)
+        continue-on-error: true
+        run: |
+          cd e2e
+          node run-charts.mjs ../dist ../e2e-shots; a=$?
+          node run-icons.mjs ../dist ../e2e-shots; b=$?
+          exit $((a + b))
 
       # El APK: si el repositorio tiene la variable API_BASE (Settings → Secrets and variables → Actions → Variables), es el APK de la BETA
       # (entra con código de invitación, sin clave de Gemini). Si no la tiene, es el APK de desarrollo (pide la clave de Gemini).

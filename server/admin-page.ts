@@ -19,6 +19,11 @@ button{background:var(--ac);color:#04140d;border:0;font-weight:650;cursor:pointe
 <div class="card" id="login"><h2>Ingresar</h2><label for="tok">Token de administrador</label><input id="tok" type="password" autocomplete="off" placeholder="El ADMIN_TOKEN del servidor"><button id="go">Entrar</button><p class="mu err" id="lerr"></p></div>
 <div id="app" hidden>
  <div class="card"><h2>Uso y costo (últimos 7 días)</h2><div class="kpis" id="kpis"></div><div style="overflow:auto"><table id="byday"></table></div><p class="mu" id="top"></p><button class="sec" id="refresh">Actualizar</button></div>
+ <div class="card"><h2>Calculadora de precios</h2><p class="mu">Cuánto cuesta atender a una persona de cada plan y qué precio conviene cobrar. Usa los costos reales medidos cuando hay muestra suficiente; si no, estima con el precio oficial de Gemini.</p>
+  <div class="row"><div><label for="p-util">Uso del cupo diario (%)</label><input id="p-util" type="number" min="1" max="100" value="40"></div><div><label for="p-days">Días de uso por mes</label><input id="p-days" type="number" min="1" max="30" value="15"></div></div>
+  <div class="row"><div><label for="p-fee">Comisión de Google Play (%)</label><input id="p-fee" type="number" min="0" max="50" value="15"></div><div><label for="p-tax">Impuestos incluidos en el precio (%)</label><input id="p-tax" type="number" min="0" max="60" value="0"></div></div>
+  <label for="p-margin">Margen que querés ganar (%)</label><input id="p-margin" type="number" min="5" max="95" value="60">
+  <button id="p-go">Calcular</button><div id="p-out"></div></div>
  <div class="card"><h2>Crear códigos de acceso a un plan</h2><p class="mu">La app se abre sin código. Estos códigos son para tus testers: al canjearlos en Ajustes, su cuenta pasa al plan elegido.</p>
   <div class="row"><div><label for="cnt">Cantidad de códigos</label><input id="cnt" type="number" min="1" max="200" value="5"></div><div><label for="plan">Plan que desbloquean</label><select id="plan"><option value="plus">Plus</option><option value="pro">Pro</option></select></div></div>
   <label for="uses">Personas que pueden canjear cada código</label><input id="uses" type="number" min="1" max="1000" value="1">
@@ -38,6 +43,15 @@ async function load(){const{s,j}=await api('GET','/v1/admin/usage?days=7');if(s!
  for(const r of j.byDay){const tr=document.createElement('tr');for(const x of[r.day,r.model,r.calls,r.input,r.output,r.thoughts,r.cost.toFixed(4)])cell(tr,x);tb.appendChild(tr)}
  $('top').textContent=j.topUsers.length?'Mayor gasto: '+j.topUsers.map(u=>u.user_id.slice(0,8)+' ('+u.calls+' pedidos, USD '+u.cost.toFixed(4)+')').join(' · '):'Todavía no hay uso.';return true}
 $('go').onclick=async()=>{T=$('tok').value.trim();sessionStorage.setItem('fa-admin',T);await load()};
+$('p-go').onclick=async()=>{const q=new URLSearchParams({utilization:$('p-util').value/100,daysActive:$('p-days').value,playFee:$('p-fee').value/100,tax:$('p-tax').value/100,margin:$('p-margin').value/100});
+ const{s,j}=await api('GET','/v1/admin/pricing?'+q);const o=$('p-out');o.replaceChildren();if(s!==200){o.textContent='Error '+s;return}
+ const usd=(n,d=2)=>'USD '+n.toFixed(d);
+ for(const e of j.plans){const h=document.createElement('h2');h.style.marginTop='14px';h.textContent=e.plan.toUpperCase()+' · '+e.model;o.appendChild(h);
+  const p=document.createElement('p');p.className='mu';p.textContent='Costo por respuesta: '+usd(e.costPerAnswer,4)+' ('+(e.source==='measured'?'medido en este servidor':'estimado')+') · uso moderado: '+Math.round(e.answersAvg)+' respuestas/mes = '+usd(e.costAvg)+' · peor caso: '+e.answersMax+' = '+usd(e.costMax);o.appendChild(p);
+  const p2=document.createElement('p');p2.textContent='Precio mínimo (equilibrio): '+usd(e.breakEven)+' · recomendado: '+usd(e.recommended)+' · mínimo aguantando el peor caso: '+usd(e.breakEvenWorst);o.appendChild(p2);
+  const tb=document.createElement('table');const h2=document.createElement('tr');for(const x of['Precio','Te queda','Margen (uso moderado)','Margen (peor caso)'])cell(h2,x,1);tb.appendChild(h2);
+  for(const r of e.rows){const tr=document.createElement('tr');for(const x of[usd(r.price),usd(r.net),(r.marginAvg*100).toFixed(0)+'%',(r.marginWorst*100).toFixed(0)+'%'])cell(tr,x);tb.appendChild(tr)}o.appendChild(tb)}
+ const n=document.createElement('p');n.className='mu';n.textContent=j.note;o.appendChild(n)};
 $('refresh').onclick=load;
 $('mk').onclick=async()=>{const{s,j}=await api('POST','/v1/admin/invites',{count:+$('cnt').value,plan:$('plan').value,uses:+$('uses').value,note:$('note').value});const c=$('codes');if(s!==200){c.hidden=false;c.textContent='Error '+s;return}
  c.hidden=false;c.textContent=j.codes.join('\\n');$('copy').hidden=false;$('copy').onclick=()=>navigator.clipboard.writeText(j.codes.join('\\n'))};

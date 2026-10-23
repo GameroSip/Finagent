@@ -42,6 +42,7 @@ async function route(req) {
     await delay(url.includes('/v1/generate') ? 500 : 20);
     return req.respond(M.finagentApi(req.method(), u.pathname, req.headers(), req.postData() ? JSON.parse(req.postData()) : {}));
   }
+  if (['cdn.jsdelivr.net', 'assets.coincap.io', 'www.google.com'].includes(u.host)) return req.respond(M.iconResponse(u)); // logos de activos (simulados)
   if (u.host === 'generativelanguage.googleapis.com') {
     await delay(url.includes('generateContent') ? 700 : 30);
     return req.respond(json(M.geminiReply(url, req.postData() ? JSON.parse(req.postData()) : {})));
@@ -68,7 +69,7 @@ async function route(req) {
 }
 
 const browser = await puppeteer.launch({ args: [...chromium.args, '--no-sandbox', '--disable-web-security'], executablePath: process.env.CHROME_PATH || await chromium.executablePath(), headless: 'shell' });
-async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915 } = {}) {
+async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, intro = false, lang = 'es' } = {}) {
   const page = await browser.newPage();
   await page.setViewport({ width: 412, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36');
@@ -84,8 +85,9 @@ async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915 } =
       if (k) localStorage.setItem('finagent.settings.v2', JSON.stringify({ apiKey: k, theme: 'auto' }));
       for (const [kk, vv] of Object.entries(extraObj)) localStorage.setItem(kk, vv);
     }
-  }, key, extra);
+  }, key, { ...(intro ? {} : { 'finagent.intro.v1': '1' }), ...(lang ? { 'finagent.lang.v1': lang } : {}), ...extra });   // por defecto: sin introducción y en español (las pruebas de cada función no dependen de ella)
   await page.goto('http://localhost:4173/', { waitUntil: 'load' });
+  if (!intro && key) await page.waitForSelector('.tabbar', { timeout: 15000 }).catch(() => {}); // pasó el splash corto y la app está lista
   return page;
 }
 const shot = async (page, name, opts = {}) => {

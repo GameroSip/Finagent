@@ -5,6 +5,7 @@ import { ModelManager } from '../src/models';
 import { clearCache } from '../src/tools';
 import { AccessDeniedError, busyMessage, deviceId, ensureSession, fetchMe, forgetDevice, fetchPlans, getInterests, getSession, hasSession, isCodeShape, LimitError, limitMessage, normalizeCode, PlanCodeError,
   planCodeMessage, quotaInfo, redeemPlanCode, registerDevice, resetLabel, sendInterest, ServerBusyError, ServerTransport, setApiBase, signOut } from '../src/server';
+import { fetchServerFlags, GoogleError, googleAvailable, googleMessage, registerGoogleProvider, signInWithGoogle } from '../src/server';
 import { frozenHttp } from '../evals/frozen-data';
 import { ADMIN, makeServer } from './helpers/make-server';
 
@@ -205,3 +206,50 @@ describe('planes: lo que ve la persona', () => {
   });
 });
 
+
+describe('inicio de sesión con Google desde la app', () => {
+  const b64u = (b: ArrayBuffer | string) => Buffer.from(typeof b === 'string' ? b : new Uint8Array(b)).toString('base64url');
+  async function kit() {
+    const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', kp.publicKey), keys = [{ kid: 'k1', n: jwk.n!, e: jwk.e!, kty: 'RSA' }];
+    const nowSec = Date.parse('2026-10-19T15:00:00Z') / 1000;
+    const token = async (aud = 'cid-app') => { const h = b64u(JSON.stringify({ alg: 'RS256', kid: 'k1' })), p = b64u(JSON.stringify({ iss: 'accounts.google.com', aud, sub: '777', exp: nowSec + 3600, iat: nowSec })); return `${h}.${p}.${b64u(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(`${h}.${p}`)))}`; };
+    return { jwks: async () => keys, token };
+  }
+  afterEach(() => registerGoogleProvider(null));
+  it('el botón de Google solo está disponible si hay proveedor en el teléfono Y el servidor lo habilitó', async () => {
+    const k = await kit(), on = await makeServer({ env: { GOOGLE_CLIENT_ID: 'cid-app' }, jwks: k.jwks }), off = await makeServer();
+    bridge(off); await fetchServerFlags(); registerGoogleProvider(async () => 'x');
+    expect(googleAvailable()).toBe(false);
+    bridge(on); await fetchServerFlags();
+    expect(googleAvailable()).toBe(true);
+    registerGoogleProvider(null);
+    expect(googleAvailable()).toBe(false);
+    await expect(signInWithGoogle()).rejects.toMatchObject({ code: 'unavailable' });
+  });
+  it('un invitado con plan y uso inicia sesión con Google y lo conserva todo', async () => {
+    const k = await kit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: 'cid-app' }, jwks: k.jwks }); bridge(s);
+    await ensureSession();
+    await newAgent().ask(ASK);
+    registerGoogleProvider(async () => k.token());
+    const g = await signInWithGoogle();
+    expect(g.plan.id).toBe('free');
+    await settle();
+    expect((await fetchMe()).remaining?.day).toBe(2);
+    expect(await s.store.usersByPlan()).toEqual({});
+  });
+  it('los fallos se explican: cancelado, token inválido, cuenta desactivada', async () => {
+    const k = await kit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: 'cid-app' }, jwks: k.jwks }); bridge(s);
+    registerGoogleProvider(async () => { throw new Error('usuario canceló'); });
+    const c = await signInWithGoogle().catch((e) => e);
+    expect(c).toBeInstanceOf(GoogleError); expect(c.code).toBe('cancelled'); expect(googleMessage(c)).toContain('Cancelaste');
+    registerGoogleProvider(async () => k.token('otra-app'));
+    const bad = await signInWithGoogle().catch((e) => e);
+    expect(bad.code).toBe('token'); expect(googleMessage(bad)).toContain('no pudo verificar');
+    registerGoogleProvider(async () => k.token());
+    const ok = await signInWithGoogle();
+    const uid = JSON.parse(Buffer.from(ok.token.split('.')[1], 'base64url').toString()).sub;
+    await s.call('POST', '/v1/admin/users', { token: ADMIN, body: { userId: uid, disabled: true } });
+    await expect(signInWithGoogle()).rejects.toBeInstanceOf(AccessDeniedError);
+  });
+});

@@ -3,13 +3,15 @@
 // Cuando algo pase a ser cierto (se compra una licencia, se suma un segundo proveedor de IA), se agrega acá con su nombre concreto.
 
 export const ABOUT = {
-  what: 'FinAgent es un asistente de inteligencia artificial especializado en finanzas. Combina modelos Gemini, desarrollados por Google DeepMind, con herramientas propias que obtienen y calculan los datos, y un verificador que controla cada cifra antes de mostrártela.',
+  what: 'FinAgent es un asistente de inteligencia artificial especializado en finanzas. Te ayuda a ver y analizar mercados de todo el mundo (acciones, ETF, cripto, divisas, índices y materias primas), con herramientas especiales para Argentina. Combina modelos Gemini, desarrollados por Google DeepMind, con herramientas propias que obtienen y calculan los datos, y un verificador que controla cada cifra antes de mostrártela.',
+  // La cobertura depende de las fuentes (Yahoo Finance no es una fuente oficial ni licenciada). Se dice tal cual: no se promete "todos los mercados" ni "tiempo real".
+  coverage: 'La cobertura depende de las fuentes de datos: están disponibles la mayoría de las bolsas del mundo, cripto, divisas y materias primas. Algunos mercados o activos pueden no estar disponibles y los precios pueden tener demora.',
   how: [
     'La IA redacta; no calcula. Los porcentajes, indicadores y comparaciones los calculan las herramientas de FinAgent.',
     'Cada cifra se compara con los datos. Si no se puede respaldar, se corrige o se quita de la respuesta.',
     'Cada respuesta indica la fuente y la fecha de los datos.',
   ],
-  limits: 'FinAgent es una herramienta de información con fines educativos. No es asesoramiento de inversión ni un agente registrado ante la CNV, no recomienda comprar o vender y no predice precios. Los datos pueden tener demora o errores y la IA puede equivocarse: tomá tus decisiones con criterio propio.',
+  limits: 'FinAgent es una herramienta de información con fines educativos. No es asesoramiento de inversión ni está registrada como asesora ante ningún regulador (como la CNV en Argentina o la SEC en EE.UU.), no recomienda comprar o vender y no predice precios. Los datos pueden tener demora o errores y la IA puede equivocarse: tomá tus decisiones con criterio propio.',
   // Versión actual de la app: todo corre en el teléfono con la clave del propio usuario.
   // Cuando exista el servidor de FinAgent, este texto DEBE cambiar (las consultas pasarán por servidores de FinAgent y proveedores de IA externos).
   privacy: 'Tus preguntas se envían a Google (Gemini) con tu propia clave. FinAgent no tiene servidor propio ni guarda tus datos fuera de tu teléfono.',
@@ -17,11 +19,13 @@ export const ABOUT = {
   privacyServer: 'Tus preguntas se procesan en los servidores de FinAgent y se envían a Google (Gemini) para generar la respuesta. FinAgent no guarda el texto de tus consultas en el servidor: solo cuenta cuántas hacés y cuántos tokens usan, para aplicar los límites de tu plan. Tu historial queda en este teléfono.',
   // Se muestra mientras el servidor use el nivel GRATUITO de Gemini (el servidor informa su nivel): en ese nivel Google puede usar las consultas para mejorar sus productos.
   freeTier: 'Por ahora FinAgent usa el nivel gratuito de Gemini: Google puede usar lo que escribas para mejorar sus productos. No incluyas datos personales ni información financiera sensible en tus consultas.',
+  // Solo si la persona inicia sesión con Google: el servidor guarda únicamente el identificador de la cuenta (lo verifica tests/server.test.ts).
+  privacyGoogle: 'Si iniciás sesión con Google, FinAgent guarda solo un identificador de tu cuenta de Google: no guarda tu correo ni tu nombre.',
   credits: 'Gráficos: TradingView Lightweight Charts™ (tradingview.com). Iconos: Lucide. Tipografía: Inter. Datos: Yahoo Finance, DolarAPI, ArgentinaDatos, Google News, alternative.me. IA: Google Gemini.',
 };
 
 /** Todo el texto visible de la presentación, en una lista (para controlarlo). */
-export const aboutTexts = (): string[] => [ABOUT.what, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.freeTier, ABOUT.credits];
+export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
 
 /** Frases que NO pueden aparecer en la presentación de la app mientras no sean ciertas. */
 export const FORBIDDEN_CLAIMS: Array<[string, RegExp]> = [
@@ -29,5 +33,6 @@ export const FORBIDDEN_CLAIMS: Array<[string, RegExp]> = [
   ['promete licencias que no existen', /decenas\s+de\s+licencias|licencias\s+a\s+su\s+favor|datos\s+licenciados|licenciad[oa]s/i],
   ['dice que Google o DeepMind la respaldan o avalan', /(respaldad[oa]|avalad[oa]|certificad[oa]|patrocinad[oa])\s+por\s+(google|deepmind)|alianza\s+con\s+google/i],
   ['dice que usa varias IA sin que sea así', /varias\s+(ia|ias|inteligencias)|m[úu]ltiples\s+(ia|modelos)|respaldos?\s+de\s+otras\s+ia/i],
+  ['promete cobertura total o datos en tiempo real', /todos\s+los\s+mercados|cobertura\s+(total|completa)|\ben\s+tiempo\s+real\b/i],
   ['promete precisión absoluta', /100\s*%\s*(preciso|exacto|confiable|seguro)|sin\s+errores|garantiz/i],
 ];

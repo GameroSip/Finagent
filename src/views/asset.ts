@@ -56,7 +56,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
       <div class="section"><div class="section-head"><h2>${icon('newspaper', 19)} Noticias</h2></div><div id="a-news" data-notrans style="display:flex;flex-direction:column;gap:10px"></div></div>
       <p class="muted" style="font-size:11.5px;text-align:center;margin:22px 0 100px;line-height:1.5">Datos de Yahoo Finance con posible demora. Información educativa, no es asesoramiento financiero.</p>
     </div>
-    <div class="ov-cta"><button class="btn btn-primary btn-block" id="a-ai">${icon('sparkles', 18)} Analizar con IA</button></div>`;
+    <div class="ov-cta"><button class="btn btn-primary btn-block" id="a-ai">Analizar con IA</button></div>`;
 
   const q = <T extends HTMLElement>(sel: string) => $<T>(sel, el);
 
@@ -70,7 +70,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
     q('#a-head').innerHTML = `
       <div class="num" style="font-size:38px;font-weight:780;letter-spacing:-.035em;line-height:1.05">${fmtPrice(shown, currency)}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <span class="pill ${cls}" style="font-size:13.5px">${cls === 'up' ? icon('arrowUp', 13) : cls === 'down' ? icon('arrowDown', 13) : ''}${fmtPct(chg, false)}</span>
+        <span class="pill ${cls}" style="font-size:13.5px">${cls === 'up' ? icon('arrowUp', 13) : cls === 'down' ? icon('arrowDown', 13) : ''}${fmtPct(chg)}</span>
         <span class="num ${cls === 'flat' ? 'muted' : cls}" style="font-size:14px;font-weight:600">${abs === null ? '' : (abs > 0 ? '+' : '') + fmtNum(abs, abs !== null && Math.abs(abs) < 1 ? 4 : 2)}</span>
         <span class="muted" style="font-size:13px">${esc(when)}</span></div>`;
   }

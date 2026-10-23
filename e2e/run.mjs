@@ -69,7 +69,7 @@ async function route(req) {
 }
 
 const browser = await puppeteer.launch({ args: [...chromium.args, '--no-sandbox', '--disable-web-security'], executablePath: process.env.CHROME_PATH || await chromium.executablePath(), headless: 'shell' });
-async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, intro = false, lang = 'es' } = {}) {
+async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, intro = false, lang = 'es', motion = false } = {}) {
   const page = await browser.newPage();
   await page.setViewport({ width: 412, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36');
@@ -86,6 +86,7 @@ async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, in
       for (const [kk, vv] of Object.entries(extraObj)) localStorage.setItem(kk, vv);
     }
   }, key, { ...(intro ? {} : { 'finagent.intro.v1': '1' }), ...(lang ? { 'finagent.lang.v1': lang } : {}), ...extra });   // por defecto: sin introducción y en español (las pruebas de cada función no dependen de ella)
+  if (!motion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);   // salvo en las pruebas de la animación, el logo queda fijo: no depende de la velocidad de dibujo
   await page.goto('http://localhost:4173/', { waitUntil: 'load' });
   if (!intro && key) await page.waitForSelector('.tabbar', { timeout: 15000 }).catch(() => {}); // pasó el splash corto y la app está lista
   return page;
@@ -116,6 +117,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // 4-6) chat: vacío, trabajando y con respuesta (cards, markdown, pills)
   p = await newPage(); await sleep(1200); await tab(p, 'chat'); await sleep(600); await shot(p, '04-chat-vacio');
+  // Regresión (v0.6.0): un logo flotante se colaba en el medio del chat vacío y tapaba las sugerencias. Nada puede quedar encima de ninguna sugerencia.
+  check('en el chat vacío ninguna sugerencia está tapada por otro elemento', await p.evaluate(() => { const bs = [...document.querySelectorAll('.sug')]; return bs.length >= 4 && bs.every((b) => { const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!top && b.contains(top); }); }));
+  check('el chat vacío no tiene logos grandes sueltos ni destellos de IA', await p.evaluate(() => ![...document.querySelectorAll('.chat-empty svg, .chat-empty img, .chat-empty canvas')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 40 && r.height > 40 && !e.closest('button'); })));
   await say(p, 'Dame el análisis técnico de AAPL'); await sleep(450); await shot(p, '05-chat-trabajando');
   await waitAnswer(p); await sleep(1500); await shot(p, '06-chat-respuesta-fin');
   const ans = await p.evaluate(() => [...document.querySelectorAll('.m-ai:not(.working)')].at(-1).innerText);

@@ -10,19 +10,21 @@ import { assetIcon } from '../ui/assetIcon';
 import { maybeUpsellCard } from '../ui/upsell';
 import { isServerMode } from '../server';
 import { openPlans } from './plans';
-import { dirClass, fmtDate, fmtNum, fmtPct, fmtPrice, greeting, timeAgo } from '../ui/format';
+import { dirClass, fmtDate, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 import { sparkSvg } from '../ui/spark';
-import { t } from '../i18n';
+import { locale, t } from '../i18n';
 
 const STALE_MS = 2 * 60_000;
 const INVERTED = new Set(['^VIX']); // si el VIX sube, es una mala señal: se pinta al revés
 
+/** "Viernes 23 de octubre", en el idioma elegido. */
+const today = (): string => { const d = new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }); return d.charAt(0).toUpperCase() + d.slice(1); };
 const pill = (pct: number | null, invert = false) => {
   const cls = dirClass(pct);
   const shown = invert && cls !== 'flat' ? (cls === 'up' ? 'down' : 'up') : cls;
   const arrow = cls === 'up' ? icon('arrowUp', 12) : cls === 'down' ? icon('arrowDown', 12) : '';
-  return `<span class="pill ${shown}">${arrow}${fmtPct(pct, false)}</span>`;
+  return `<span class="pill ${shown}">${arrow}${fmtPct(pct)}</span>`;
 };
 
 const skeleton = (n: number, hgt: number) => Array.from({ length: n }, () => `<div class="skeleton" style="height:${hgt}px"></div>`).join('');
@@ -47,7 +49,7 @@ export function createMarketView(ctx: Ctx): View {
 
   el.innerHTML = `
     <div class="page-head">
-      <div><div class="eyebrow">${greeting()}</div><h1 class="title-xl">Mercados</h1></div>
+      <div><div class="eyebrow" data-notrans>${esc(today())}</div><h1 class="title-xl">Mercados</h1></div>
       <div style="display:flex;gap:8px">
         <button class="icon-btn" id="m-refresh" aria-label="Actualizar">${icon('refresh', 19)}</button>
         <button class="icon-btn" id="m-search" aria-label="Buscar">${icon('search', 19)}</button>
@@ -55,10 +57,10 @@ export function createMarketView(ctx: Ctx): View {
     </div>
     <div id="m-upsell"></div>
     <div id="m-hero"></div>
-    <div class="section"><div class="section-head"><h2>${icon('activity', 19)} Índices y activos clave</h2></div><div class="scroll-x" id="m-indices"></div></div>
+    <div class="section"><div class="section-head"><h2>${icon('activity', 19)} Índices y activos clave</h2></div><div class="qlist" id="m-indices"></div></div>
     <div class="section"><div class="section-head"><h2>${icon('globe', 19)} Mercados del mundo</h2></div>
       <div class="seg" id="m-seg-world" style="margin-bottom:12px"><button data-g="indices" class="on">Índices</button><button data-g="fx">Divisas</button><button data-g="crypto">Cripto</button><button data-g="commodities">Materias primas</button></div>
-      <div class="scroll-x" id="m-world"></div></div>
+      <div class="qlist" id="m-world"></div></div>
     <div class="section"><div class="section-head"><h2>${icon('landmark', 19)} Argentina</h2><span class="more" id="m-ar-time"></span></div><div id="m-ar"></div></div>
     <div class="section"><div class="section-head"><h2>${icon('flame', 19)} Más movidos (EE.UU.)</h2></div>
       <div class="seg" id="m-seg-movers" style="margin-bottom:12px"><button data-k="day_gainers" class="on">Suben</button><button data-k="day_losers">Bajan</button><button data-k="most_actives">Operadas</button></div>
@@ -77,58 +79,44 @@ export function createMarketView(ctx: Ctx): View {
     if (!sp) { q('m-hero').innerHTML = ''; return; }
     const cls = dirClass(sp.changePct);
     q('m-hero').innerHTML = `
-      <div class="card hero" style="position:relative;overflow:hidden;padding:18px 18px 16px;border-color:var(--line-2);background:linear-gradient(160deg,var(--surface-2),var(--surface))">
-        <div style="position:absolute;right:-60px;top:-70px;width:220px;height:220px;border-radius:50%;background:radial-gradient(closest-side,var(--aurora-a),transparent)"></div>
-        <div style="position:relative">
-          <div class="eyebrow" style="display:flex;align-items:center;gap:6px">${esc(sp.name)} · ${esc(t('hoy'))}</div>
-          <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px"><span class="num" style="font-size:34px;font-weight:750;letter-spacing:-.03em">${fmtNum(sp.price)}</span>
-            <span class="pill ${cls}" style="font-size:13.5px">${cls === 'up' ? icon('arrowUp', 13) : cls === 'down' ? icon('arrowDown', 13) : ''}${fmtPct(sp.changePct, false)}</span></div>
-          <div style="margin:12px -4px 4px;height:62px">${sparkSvg(sp.spark, { w: 320, h: 62, stroke: 2.2 })}</div>
-          <button class="btn btn-primary btn-block" id="m-ai" style="margin-top:12px">${icon('sparkles', 18)} Resumen del día con IA</button>
-        </div>
-      </div>`;
+      <div class="headline-q"><div class="lbl">${esc(sp.name)} · ${esc(t('hoy'))}</div>
+        <div class="big"><span class="num">${fmtNum(sp.price)}</span><span class="pill ${cls}" style="font-size:15px">${fmtPct(sp.changePct)}</span></div>
+        <div style="margin:10px -2px 0;height:56px">${sparkSvg(sp.spark, { w: 340, h: 56, stroke: 1.6 })}</div></div>
+      <button class="link-row" id="m-ai"><span>Resumen del día con IA</span>${icon('arrowUpRight', 16)}</button>`;
     $('#m-ai', el).onclick = () => ctx.askAI(t('Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.'), t('Resumen del día'));
   }
 
-  /** Tarjetas horizontales (índices, divisas, cripto…) con el ícono de cada activo. */
+  /** Filas de cotizaciones (índices, divisas, cripto…): ícono, nombre, mini gráfico, precio y variación. */
   function renderCards(targetId: string, list: QuoteCard[]) {
     q(targetId).innerHTML = '';
     for (const i of list) {
-      const card = h('button', { class: 'card idx', attrs: { 'aria-label': i.name }, style: 'width:156px;padding:13px 13px 8px;text-align:left' });
-      const head = `<div style="display:flex;align-items:center;gap:7px;min-width:0">${assetIcon(i.symbol, { style: 'width:22px;height:22px;border-radius:8px;font-size:8px;flex:none' })}<div class="eyebrow" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div></div>`;
-      card.innerHTML = i.price === null
-        ? `${head}<div class="muted" style="font-size:12px;margin:10px 0 22px">No disponible</div>`
-        : `${head}
-           <div class="num" style="font-size:17px;font-weight:700;margin:5px 0 6px;letter-spacing:-.01em">${fmtNum(i.price, i.price > 1000 ? 0 : i.price < 10 ? 4 : 2)}</div>
-           ${pill(i.changePct, INVERTED.has(i.symbol))}<div style="margin:8px -2px 0;height:32px">${sparkSvg(i.spark, { w: 130, h: 32, up: INVERTED.has(i.symbol) ? !(i.changePct! >= 0) : undefined })}</div>`;
-      card.onclick = () => ctx.openAsset(i.symbol, i.name);
-      q(targetId).append(card);
+      const row = h('button', { class: 'qrow2 idx', attrs: { 'aria-label': i.name } });
+      const inv = INVERTED.has(i.symbol);
+      row.innerHTML = `${assetIcon(i.symbol, { style: 'width:30px;height:30px;font-size:10px;flex:none' })}<div class="nm"><b>${esc(i.name)}</b><span data-notrans>${esc(i.symbol.replace(/^\^/, ''))}</span></div>` + (i.price === null
+        ? `<div></div><div class="px muted" style="font-size:12px">${esc(t('No disponible'))}</div>`
+        : `<div>${sparkSvg(i.spark, { w: 64, h: 26, up: inv ? !(i.changePct! >= 0) : undefined })}</div><div class="px"><span class="num">${fmtNum(i.price, i.price > 1000 ? 0 : i.price < 10 ? 4 : 2)}</span>${pill(i.changePct, inv)}</div>`);
+      row.onclick = () => ctx.openAsset(i.symbol, i.name);
+      q(targetId).append(row);
     }
   }
   const renderIndices = (list: QuoteCard[]) => renderCards('m-indices', list);
 
   function renderArgentina(d: { dol: ReturnType<typeof withBrecha> | null; rp: { valor: number; fecha: string } | null; inf: Awaited<ReturnType<typeof fetchInflacion>> | null }) {
     const box = q('m-ar');
-    const tiles: string[] = [];
+    const rows: string[] = [];
+    const krow = (name: string, sub: string, value: string) => `<div class="krow"><div class="nm"><b>${esc(name)}</b><span>${esc(sub)}</span></div><div class="px"><span class="num">${value}</span></div></div>`;
     const pick: Array<[string, string]> = [['oficial', 'Oficial'], ['blue', 'Blue'], ['bolsa', 'MEP'], ['contadoconliqui', 'CCL']];
     for (const [casa, label] of pick) {
       const r = d.dol?.find((x) => x.casa === casa);
       if (!r) continue;
-      tiles.push(`<div class="card" style="padding:14px"><div class="eyebrow" style="font-weight:600">Dólar ${label}</div>
-        <div class="num" style="font-size:22px;font-weight:750;letter-spacing:-.02em;margin:4px 0 8px">${fmtPrice(r.venta, 'ARS')}</div>
-        <div class="tile-sub"><span class="muted num" style="font-size:12.5px">Compra ${fmtNum(r.compra, 0)}</span>
-        ${r.brecha_pct === null ? '<span class="pill flat">referencia</span>' : `<span class="pill flat">brecha ${r.brecha_pct > 0 ? '+' : ''}${fmtNum(r.brecha_pct, 1)}%</span>`}</div></div>`);
+      rows.push(krow(`${t('Dólar')} ${t(label)}`, `${t('Compra')} ${fmtNum(r.compra, 0)} · ${r.brecha_pct === null ? t('referencia') : `${t('brecha')} ${r.brecha_pct > 0 ? '+' : ''}${fmtNum(r.brecha_pct, 1)}%`}`, esc(fmtPrice(r.venta, 'ARS'))));
     }
-    if (d.rp) tiles.push(`<div class="card" style="padding:14px"><div class="eyebrow" style="font-weight:600">Riesgo país</div>
-        <div class="num" style="font-size:22px;font-weight:750;letter-spacing:-.02em;margin:4px 0 8px">${fmtNum(d.rp.valor, 0)} <span class="muted" style="font-size:13px;font-weight:600">pb</span></div>
-        <span class="muted" style="font-size:12.5px">al ${esc(fmtDate(d.rp.fecha))}</span></div>`);
+    if (d.rp) rows.push(krow(t('Riesgo país'), `${t('al')} ${fmtDate(d.rp.fecha)}`, `${fmtNum(d.rp.valor, 0)} <small class="muted">pb</small>`));
     const m = d.inf?.mensual, a = d.inf?.interanual;
-    if (m || a) tiles.push(`<div class="card" style="padding:14px"><div class="eyebrow" style="font-weight:600">Inflación</div>
-        <div class="num" style="font-size:22px;font-weight:750;letter-spacing:-.02em;margin:4px 0 8px">${m ? fmtNum(m.valor, 1) + '%' : '—'} <span class="muted" style="font-size:13px;font-weight:600">mens.</span></div>
-        <span class="muted" style="font-size:12px">${a ? fmtNum(a.valor, 1) + '% interanual' : esc(m?.fecha ?? '')}</span></div>`);
-    box.innerHTML = tiles.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${tiles.join('')}</div>` : errorBox('No se pudieron cargar los datos de Argentina.', 'ar');
-    const t = d.dol?.map((x) => x.fecha).filter(Boolean).sort().pop();
-    q('m-ar-time').textContent = t ? timeAgo(t) : '';
+    if (m || a) rows.push(krow(t('Inflación'), a ? `${fmtNum(a.valor, 1)}% ${t('interanual')}` : (m?.fecha ?? ''), `${m ? fmtNum(m.valor, 1) + '%' : '—'} <small class="muted">${esc(t('mens.'))}</small>`));
+    box.innerHTML = rows.length ? `<div class="qlist">${rows.join('')}</div>` : errorBox('No se pudieron cargar los datos de Argentina.', 'ar');
+    const tm = d.dol?.map((x) => x.fecha).filter(Boolean).sort().pop();
+    q('m-ar-time').textContent = tm ? timeAgo(tm) : '';
   }
 
   function renderMovers(list: Mover[]) {

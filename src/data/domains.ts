@@ -16,11 +16,24 @@ BYMA=byma.com.ar MIRG=mirgor.com.ar TRAN=transener.com.ar HARG=holcim.com.ar
 SPY=ssga.com DIA=ssga.com XLK=ssga.com XLF=ssga.com XLE=ssga.com XLV=ssga.com XLY=ssga.com XLP=ssga.com XLI=ssga.com XLU=ssga.com XLB=ssga.com XLRE=ssga.com
 QQQ=invesco.com IWM=ishares.com EEM=ishares.com EWZ=ishares.com SLV=ishares.com TLT=ishares.com HYG=ishares.com IBIT=ishares.com EFA=ishares.com AGG=ishares.com
 VOO=vanguard.com VTI=vanguard.com VEA=vanguard.com VWO=vanguard.com VNQ=vanguard.com BND=vanguard.com GLD=spdrgoldshares.com ARKK=ark-invest.com ARKB=ark-invest.com BITO=proshares.com FBTC=fidelity.com`;
+const BY_TICKER_2 = `SPCX=spacex.com CRCL=circle.com CRWV=coreweave.com FIG=figma.com CART=instacart.com RDDT=redditinc.com NU=nubank.com.br DDOG=datadoghq.com NET=cloudflare.com
+CRWD=crowdstrike.com ZS=zscaler.com PANW=paloaltonetworks.com MDB=mongodb.com TEAM=atlassian.com LYFT=lyft.com DASH=doordash.com LCID=lucidmotors.com XPEV=xpeng.com
+LI=lixiang.com PDD=pddholdings.com SOFI=sofi.com U=unity.com AFRM=affirm.com UPST=upstart.com DKNG=draftkings.com RKLB=rocketlabusa.com ASTS=ast-science.com
+IONQ=ionq.com RGTI=rigetti.com QUBT=quantumcomputinginc.com VRT=vertiv.com APP=applovin.com DUOL=duolingo.com TTD=thetradedesk.com CELH=celsius.com ELF=elfbeauty.com
+ONON=on.com CAVA=cava.com TOST=toasttab.com HIMS=forhims.com JOBY=jobyaviation.com ACHR=archer.com OKLO=oklo.com SMR=nuscalepower.com VST=vistracorp.com
+CEG=constellationenergy.com CCJ=cameco.com UEC=uraniumenergy.com LEU=centrusenergy.com BE=bloomenergy.com WBD=wbd.com ROKU=roku.com ETSY=etsy.com EBAY=ebay.com
+W=wayfair.com CHWY=chewy.com GME=gamestop.com AMC=amctheatres.com NOK=nokia.com STLA=stellantis.com RACE=ferrari.com XYZ=block.xyz PSKY=paramount.com
+SNPS=synopsys.com CDNS=cadence.com NOW=servicenow.com INTU=intuit.com WDAY=workday.com ADSK=autodesk.com FTNT=fortinet.com OKTA=okta.com TWLO=twilio.com
+DOCU=docusign.com ZI=zoominfo.com PATH=uipath.com S=sentinelone.com GTLB=gitlab.com HUBS=hubspot.com BILL=bill.com SE=sea.com GRAB=grab.com
+CPNG=coupang.com TCOM=trip.com MRNA=modernatx.com BNTX=biontech.de REGN=regeneron.com VRTX=vrtx.com GILD=gilead.com AMGN=amgen.com BMY=bms.com
+NVAX=novavax.com LUV=southwest.com DAL=delta.com UAL=united.com AAL=aa.com CCL=carnival.com RCL=royalcaribbean.com MAR=marriott.com HLT=hilton.com
+BKNG=booking.com EXPE=expedia.com LULU=lululemon.com ANF=anf.com DECK=deckers.com CROX=crocs.com YETI=yeti.com PTON=onepeloton.com SIRI=siriusxm.com
+LYV=livenation.com TKO=tkocorp.com WYNN=wynnresorts.com LVS=sands.com MGM=mgmresorts.com CZR=caesars.com`;
 // Símbolos con bolsa (el mismo ticker puede ser otra empresa en otra plaza): solo se aceptan completos.
 const BY_SYMBOL = `SAP.DE=sap.com ASML.AS=asml.com 7203.T=toyota.co.jp 6758.T=sony.com 9984.T=softbank.jp NESN.SW=nestle.com NOVN.SW=novartis.com ROG.SW=roche.com SIE.DE=siemens.com
 ALV.DE=allianz.com MC.PA=lvmh.com OR.PA=loreal.com AIR.PA=airbus.com TTE.PA=totalenergies.com SAN.MC=bancosantander.es ITX.MC=inditex.com BBVA.MC=bbva.com VOW3.DE=volkswagen.de`;
 const parse = (s: string) => new Map(s.split(/\s+/).filter(Boolean).map((p) => p.split('=') as [string, string]));
-export const TICKER_DOMAINS = parse(BY_TICKER);
+export const TICKER_DOMAINS = parse(`${BY_TICKER} ${BY_TICKER_2}`);
 export const SYMBOL_DOMAINS = parse(BY_SYMBOL);
 
 /** "https://www.apple.com/es/" → "apple.com". null si no parece un sitio válido. */

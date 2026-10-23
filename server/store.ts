@@ -57,6 +57,10 @@ export class SqlStore implements UsageStore {
     const rows = await this.sql.all<{ plan: string; n: number }>('SELECT plan, COUNT(*) AS n FROM users WHERE code = ? GROUP BY plan', 'device');
     return Object.fromEntries(rows.map((r) => [r.plan, r.n]));
   }
+  /** Una cuenta de invitado pasa a ser de una cuenta de Google SIN perder su plan ni su uso del día. */
+  async convertUser(id: string, code: string, deviceId: string): Promise<void> {
+    await this.sql.run('UPDATE users SET code = ?, device_id = ? WHERE id = ?', code, deviceId, id);
+  }
   async getUser(id: string): Promise<UserRow | null> {
     return (await this.sql.all<UserRow>('SELECT * FROM users WHERE id = ?', id))[0] ?? null;
   }
@@ -101,6 +105,13 @@ export class SqlStore implements UsageStore {
   }
   async costSince(ts: number): Promise<number> {
     return (await this.sql.all<{ c: number }>('SELECT COALESCE(SUM(cost_usd), 0) AS c FROM calls WHERE ts >= ?', ts))[0]?.c ?? 0;
+  }
+  /** Costo REAL por respuesta de cada modelo (costo de los pedidos / respuestas), solo con una muestra mínima para no tomar ruido. */
+  async measuredCostPerAnswer(since: number, minAnswers = 5): Promise<Record<string, number>> {
+    const cost = await this.sql.all<{ model: string; c: number }>('SELECT model, SUM(cost_usd) AS c FROM calls WHERE ts >= ? GROUP BY model', since);
+    const ans = await this.sql.all<{ model: string; n: number }>('SELECT model, COUNT(*) AS n FROM turns WHERE created_at >= ? AND refunded = 0 GROUP BY model', since);
+    const n = new Map(ans.map((a) => [a.model, a.n]));
+    return Object.fromEntries(cost.filter((c) => (n.get(c.model) ?? 0) >= minAnswers && c.c > 0).map((c) => [c.model, c.c / n.get(c.model)!]));
   }
   async usageReport(since: number) {
     const byDay = await this.sql.all<{ day: string; model: string; calls: number; input: number; output: number; thoughts: number; cached: number; cost: number }>(

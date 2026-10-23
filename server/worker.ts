@@ -21,6 +21,6 @@ export default {
   async fetch(req: Request, env: WorkerEnv): Promise<Response> {
     currentKey = env.GEMINI_API_KEY;
     currentBase = env.GEMINI_BASE ?? 'https://generativelanguage.googleapis.com/v1beta';
-    return createApp({ store: new SqlStore(new D1Sql(env.DB)), env, router, version: '0.4.1' })(req);
+    return createApp({ store: new SqlStore(new D1Sql(env.DB)), env, router, version: '0.6.0' })(req);
   },
 };

@@ -2,6 +2,7 @@
 // Pensado para no perder datos: si se llena el espacio, primero se quitan las tarjetas gráficas de los chats más
 // viejos y recién después se borran chats completos (nunca el que se está guardando).
 import type { Turn, ToolCallRecord } from './agent';
+import { locale } from './i18n';
 
 export interface ChatMeta {
   id: string;
@@ -227,7 +228,7 @@ export function groupByDate(list: ChatMeta[], now = Date.now()): Array<{ label: 
     else if (age <= DAY) put('Ayer', m);
     else if (age <= 7 * DAY) put('Últimos 7 días', m);
     else if (age <= 30 * DAY) put('Últimos 30 días', m);
-    else put(cap(new Date(m.updatedAt).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })), m);
+    else put(cap(new Date(m.updatedAt).toLocaleDateString(locale(), { month: 'long', year: 'numeric' })), m);
   }
   return groups;
 }

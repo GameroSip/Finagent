@@ -48,11 +48,15 @@ import pencil from 'lucide-static/icons/pencil.svg?raw';
 import rotateCcw from 'lucide-static/icons/rotate-ccw.svg?raw';
 import square from 'lucide-static/icons/square.svg?raw';
 import squarePen from 'lucide-static/icons/square-pen.svg?raw';
+import sliders from 'lucide-static/icons/sliders-horizontal.svg?raw';
+import crown from 'lucide-static/icons/crown.svg?raw';
+import gem from 'lucide-static/icons/gem.svg?raw';
+import badgeCheck from 'lucide-static/icons/badge-check.svg?raw';
 
 const ICONS = { activity, arrowDown, arrowUp, arrowUpRight, bitcoin, candles, lineChart, check, checkCircle, chevronLeft, clock, dollar,
   externalLink, flame, gauge, globe, house, info, keyRound, landmark, layers, lock, monitor, moon, newspaper, plus, refresh, scale,
   search, send, settings, shield, sparkles, star, sun, trash, trendDown, trendUp, warn, x, zap,
-  copy, ellipsis, menu, messageSquare, pencil, rotateCcw, square, squarePen } as const;
+  copy, ellipsis, menu, messageSquare, pencil, rotateCcw, square, squarePen, sliders, crown, gem, badgeCheck } as const;
 export type IconName = keyof typeof ICONS;
 
 /** Devuelve el HTML de un icono (hereda el color del texto). `fill` rellena la forma (ej. estrella activa). */

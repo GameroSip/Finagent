@@ -1,10 +1,12 @@
 // Tarjetas ricas del chat: los datos de las herramientas se muestran como gráficos y tablas, no solo texto.
 import type { Ctx } from '../ctx';
+import { assetIcon } from '../ui/assetIcon';
 import { mountCompareChart, mountPriceChart, PALETTE, type ChartHandle } from '../ui/chart';
 import { esc, h, openUrl } from '../ui/dom';
-import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, initials, symbolColor, timeAgo } from '../ui/format';
+import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon, type IconName } from '../ui/icons';
 import { sparkSvg } from '../ui/spark';
+import { t } from '../i18n';
 
 export interface Rich { el: HTMLElement; mount?: () => void; destroy?: () => void }
 
@@ -26,7 +28,7 @@ const pillHtml = (pct: number | null | undefined) => {
 const PERIOD: Record<string, string> = { '6mo': '6 meses', '1y': '1 año', '2y': '2 años', '5y': '5 años' };
 
 function chartCard(ui: any, ctx: Ctx): Rich {
-  const { el, body } = shell(ui.symbol, `Gráfico técnico · ${PERIOD[ui.period] ?? ui.period}`, 'candles', () => ctx.openAsset(ui.symbol));
+  const { el, body } = shell(ui.symbol, `${t('Gráfico técnico')} · ${t(PERIOD[ui.period] ?? ui.period)}`, 'candles', () => ctx.openAsset(ui.symbol));
   const box = h('div', { style: 'margin:0 -6px' });
   body.append(box);
   const legend = h('div', { class: 'chips-wrap', style: 'margin-top:8px' });
@@ -74,7 +76,7 @@ function quotesCard(ui: any, ctx: Ctx): Rich {
   } else {
     items.slice(0, 8).forEach((i, idx) => {
       const r = h('button', { class: 'qrow', style: idx ? 'border-top:1px solid var(--line)' : '' });
-      r.innerHTML = `<div class="avatar" style="width:34px;height:34px;border-radius:11px;font-size:11px;background:${symbolColor(i.symbol)}">${esc(initials(i.symbol))}</div>
+      r.innerHTML = `${assetIcon(i.symbol, { style: 'width:34px;height:34px;border-radius:11px;font-size:11px' })}
         <div style="flex:1;min-width:0;text-align:left"><div style="font-weight:700">${esc(i.symbol)}</div><div class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div></div>
         <div style="text-align:right"><div class="num" style="font-weight:650;margin-bottom:2px">${fmtPrice(i.price, i.currency ?? 'USD')}</div>${pillHtml(i.changePct)}</div>`;
       r.onclick = () => ctx.openAsset(i.symbol, i.name);
@@ -114,31 +116,31 @@ function headlinesCard(ui: any): Rich {
 }
 
 function metricsCard(ui: any, ctx: Ctx): Rich {
-  const { el, body } = shell(ui.title ?? `${ui.symbol} · fundamentales`, ui.name !== ui.symbol ? ui.name : '', 'scale', () => ctx.openAsset(ui.symbol, ui.name));
+  const { el, body } = shell(ui.title ?? `${ui.symbol} · ${t('fundamentales')}`, ui.name !== ui.symbol ? ui.name : '', 'scale', () => ctx.openAsset(ui.symbol, ui.name));
   const fmt = (it: any) => {
     if (it.key === 'market_cap') return fmtCompact(it.value);
     if (it.unit === '%') return fmtPct(it.value, !!it.signed);
     if (it.unit === 'x') return `${fmtNum(it.value, 2)}x`;
     return fmtNum(it.value, 2);
   };
-  body.insertAdjacentHTML('beforeend', `<div class="mgrid">${(ui.items ?? []).map((it: any) => `<div class="mcell"><div class="eyebrow" style="font-weight:600;font-size:12px">${esc(it.label)}</div><div class="num" style="font-weight:700;font-size:16px;margin-top:2px">${fmt(it)}</div></div>`).join('')}</div>`);
+  body.insertAdjacentHTML('beforeend', `<div class="mgrid">${(ui.items ?? []).map((it: any) => `<div class="mcell"><div class="eyebrow" style="font-weight:600;font-size:12px">${esc(t(it.label))}</div><div class="num" style="font-weight:700;font-size:16px;margin-top:2px">${fmt(it)}</div></div>`).join('')}</div>`);
   return { el };
 }
 
 function screenCard(ui: any, ctx: Ctx): Rich {
   const passed: any[] = ui.passed ?? [], excluded: any[] = ui.excluded ?? [];
-  const { el, body } = shell('Resultado del screener', `Pasan ${passed.length} de ${ui.evaluated} · ${ui.universe}`, 'search');
+  const { el, body } = shell('Resultado del screener', t('Pasan {n} de {m} · {u}', { n: passed.length, m: ui.evaluated, u: ui.universe }), 'search');
   if (!passed.length) body.insertAdjacentHTML('beforeend', '<div class="muted" style="font-size:13px;padding:4px 0">Ningún activo cumplió todos los filtros.</div>');
   passed.forEach((p, idx) => {
     const r = h('button', { class: 'qrow', style: idx ? 'border-top:1px solid var(--line)' : '' });
-    r.innerHTML = `<div class="avatar" style="width:34px;height:34px;border-radius:11px;font-size:11px;background:${symbolColor(p.ticker)}">${esc(initials(p.ticker))}</div>
+    r.innerHTML = `${assetIcon(p.ticker, { style: 'width:34px;height:34px;border-radius:11px;font-size:11px' })}
       <div style="flex:1;min-width:0;text-align:left"><div style="font-weight:700">${esc(p.ticker)}</div><div class="muted num" style="font-size:12px">P/E ${fmtNum(p.pe_ttm, 1)} · Div ${p.dividend_yield_pct !== undefined ? fmtPct(p.dividend_yield_pct, false) : '—'} · ROE ${p.roe_pct !== undefined ? fmtPct(p.roe_pct, false) : '—'}</div></div>
       <div class="num" style="font-weight:650">${fmtNum(p.price, 2)}</div>`;
     r.onclick = () => ctx.openAsset(p.ticker);
     body.append(r);
   });
   if (excluded.length) {
-    body.insertAdjacentHTML('beforeend', `<details class="excl"><summary>Ver ${excluded.length} excluidos y por qué</summary>${excluded.map((e) => `<div class="excl-row"><b>${esc(e.ticker)}</b><span class="muted">${esc((e.reasons ?? []).join(' · '))}</span></div>`).join('')}</details>`);
+    body.insertAdjacentHTML('beforeend', `<details class="excl"><summary>${esc(t('Ver {n} excluidos y por qué', { n: excluded.length }))}</summary>${excluded.map((e) => `<div class="excl-row"><b>${esc(e.ticker)}</b><span class="muted">${esc((e.reasons ?? []).join(' · '))}</span></div>`).join('')}</details>`);
   }
   return { el };
 }

@@ -70,7 +70,7 @@ describe('cuenta automática: se abre la app y funciona, sin registro ni código
   });
   it('/health informa el nivel de Gemini y /v1/plans lista los planes: el gratis disponible y los de pago "próximamente"', async () => {
     const s = await makeServer();
-    expect((await s.call('GET', '/health')).json).toEqual({ ok: true, version: 'test', tier: 'free' });
+    expect((await s.call('GET', '/health')).json).toEqual({ ok: true, version: 'test', tier: 'free', google: false });
     expect((await (await makeServer({ env: { GEMINI_TIER: 'paid' } })).call('GET', '/health')).json.tier).toBe('paid');
     const p = (await s.call('GET', '/v1/plans')).json;
     expect(p.tier).toBe('free');
@@ -466,5 +466,129 @@ describe('el límite por minuto no se gasta con pedidos que no llegan a Gemini',
     for (let i = 0; i < 15; i++) expect((await s.ask(token)).json.error).toBe('limit');   // 15 rechazos por límite del plan: sin la devolución agotarían los 8 pedidos del minuto
     const pro = await s.session('pro', 'telefono-pro-abcdef');
     expect((await s.ask(pro.token)).status).toBe(200);                    // y el servidor sigue atendiendo a los demás
+  });
+});
+
+describe('calculadora de precios del panel', () => {
+  it('solo el administrador la usa y valida los parámetros (los acota a rangos razonables)', async () => {
+    const s = await makeServer();
+    expect((await s.call('GET', '/v1/admin/pricing')).status).toBe(401);
+    const r = await s.call('GET', '/v1/admin/pricing?utilization=9&playFee=-3&margin=abc', { token: ADMIN });
+    expect(r.status).toBe(200);
+    expect(r.json.params).toMatchObject({ utilization: 1, playFee: 0, targetMargin: 0.6 });   // 9 → tope 1; -3 → 0; "abc" → valor por defecto
+  });
+  it('devuelve Plus y Pro con costo, precio de equilibrio y recomendado; sin muestra real, el costo es estimado', async () => {
+    const s = await makeServer();
+    const r = (await s.call('GET', '/v1/admin/pricing', { token: ADMIN })).json;
+    expect(r.plans.map((p: any) => p.plan)).toEqual(['plus', 'pro']);
+    expect(r.plans[0]).toMatchObject({ model: 'gemini-3.8-flash', source: 'estimated' });
+    expect(r.plans[0].recommended).toBeGreaterThan(r.plans[0].breakEven);
+    expect(r.plans[1].costMax).toBeGreaterThan(r.plans[0].costMax);
+    expect(r.measuredModels).toEqual([]);
+  });
+  it('con respuestas reales usa el costo MEDIDO del modelo en lugar del estimado', async () => {
+    const s = await makeServer();
+    const { token } = await s.session('plus');
+    for (let i = 0; i < 6; i++) await s.ask(token);                       // 6 respuestas de Plus (3.8 Flash) quedan registradas
+    const r = (await s.call('GET', '/v1/admin/pricing', { token: ADMIN })).json;
+    expect(r.measuredModels).toContain('gemini-3.8-flash');
+    expect(r.plans[0].source).toBe('measured');
+    expect(r.plans[0].costPerAnswer).toBeGreaterThan(0);
+    expect(r.plans[1].source).toBe('measured');                           // Pro usa el mismo modelo base
+  });
+  it('el catálogo público de planes avisa cuáles tienen respaldo automático', async () => {
+    const s = await makeServer();
+    const p = (await s.call('GET', '/v1/plans')).json.plans;
+    expect(p.map((x: any) => [x.id, x.hasFallback])).toEqual([['free', false], ['plus', true], ['pro', true]]);
+  });
+});
+
+// ---------------------------------------------------------------- inicio de sesión con Google
+const CID = 'cid-123.apps.googleusercontent.com';
+const NOW_SEC = Date.parse('2026-10-19T15:00:00Z') / 1000;
+const b64u = (b: ArrayBuffer | Uint8Array | string) => Buffer.from(typeof b === 'string' ? b : new Uint8Array(b)).toString('base64url');
+async function googleKit(kid = 'kid-1') {
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const jwk = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const keys = [{ kid, n: jwk.n!, e: jwk.e!, kty: 'RSA', alg: 'RS256' }];
+  const sign = async (pay: Record<string, unknown> = {}, head: Record<string, unknown> = {}) => {
+    const h = b64u(JSON.stringify({ alg: 'RS256', kid, typ: 'JWT', ...head })), p = b64u(JSON.stringify({ iss: 'https://accounts.google.com', aud: CID, sub: '110022', exp: NOW_SEC + 3600, iat: NOW_SEC, email: 'alguien@gmail.com', name: 'Alguien', ...pay }));
+    return `${h}.${p}.${b64u(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(`${h}.${p}`)))}`;
+  };
+  return { keys, sign, jwks: async () => keys };
+}
+
+describe('inicio de sesión con Google', () => {
+  it('está apagado si el servidor no tiene el client ID de Google, y /health lo informa', async () => {
+    const s = await makeServer();
+    const r = await s.call('POST', '/v1/auth/google', { body: { idToken: 'x.y.z' } });
+    expect(r.status).toBe(501); expect(r.json.error).toBe('google_disabled');
+    const on = await makeServer({ env: { GOOGLE_CLIENT_ID: CID } });
+    expect((await on.call('GET', '/health')).json.google).toBe(true);
+  });
+  it('con un token válido crea la cuenta (plan gratis) y la sesión funciona; la misma cuenta de Google es siempre la misma persona', async () => {
+    const k = await googleKit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: CID }, jwks: k.jwks });
+    const a = await s.call('POST', '/v1/auth/google', { body: { idToken: await k.sign() } });
+    expect(a.status).toBe(200);
+    expect(a.json).toMatchObject({ plan: { id: 'free' }, linked: false, tier: 'free' });
+    expect((await s.call('GET', '/v1/me', { token: a.json.token })).status).toBe(200);
+    const b = await s.call('POST', '/v1/auth/google', { body: { idToken: await k.sign() } });
+    expect((await s.store.usersByPlan())).toEqual({});
+    const ids = new Set([a.json.token, b.json.token].map((t: string) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).sub));
+    expect(ids.size).toBe(1);
+  });
+  it('SOLO guarda el identificador de la cuenta de Google: ni el correo ni el nombre quedan en ninguna tabla', async () => {
+    const k = await googleKit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: CID }, jwks: k.jwks });
+    await s.call('POST', '/v1/auth/google', { body: { idToken: await k.sign() } });
+    const sql = (s.store as any).sql as NodeSql;
+    for (const t of ['users', 'invites', 'counters', 'turns', 'calls']) expect(JSON.stringify(await sql.all(`SELECT * FROM ${t}`))).not.toMatch(/alguien|gmail/i);
+  });
+  it('un invitado que inicia sesión CONSERVA su plan y su uso del día (la cuenta de invitado pasa a ser la de Google)', async () => {
+    const k = await googleKit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: CID }, jwks: k.jwks });
+    const guest = await s.session('plus');
+    await s.ask(guest.token);
+    const r = await s.call('POST', '/v1/auth/google', { token: guest.token, body: { idToken: await k.sign() } });
+    expect(r.json).toMatchObject({ linked: true, plan: { id: 'plus' } });
+    const me = await s.call('GET', '/v1/me', { token: r.json.token });
+    expect(me.json.plan.id).toBe('plus'); expect(me.json.remaining.day).toBe(9);
+    expect(await s.store.usersByPlan()).toEqual({});
+  });
+  it('si esa cuenta de Google ya existía (otro teléfono), se entra a ELLA: mismo plan y mismo cupo compartido', async () => {
+    const k = await googleKit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: CID }, jwks: k.jwks });
+    const phoneA = await s.session('free', 'telefono-aaaa');
+    const ra = await s.call('POST', '/v1/auth/google', { token: phoneA.token, body: { idToken: await k.sign() } });
+    await s.ask(ra.json.token);
+    const phoneB = await s.session('free', 'telefono-bbbb');
+    const rb = await s.call('POST', '/v1/auth/google', { token: phoneB.token, body: { idToken: await k.sign() } });
+    expect(rb.json.linked).toBe(false);
+    expect((await s.call('GET', '/v1/me', { token: rb.json.token })).json.remaining.day).toBe(2);
+  });
+  it('rechaza todo token que no sea auténtico, para esta app y vigente (y no crea ninguna cuenta)', async () => {
+    const k = await googleKit(), other = await googleKit(), s = await makeServer({ env: { GOOGLE_CLIENT_ID: CID }, jwks: k.jwks });
+    const bad: Record<string, string> = {
+      'firmado con otra clave': await other.sign(),
+      'para otra aplicación': await k.sign({ aud: 'otra-app.apps.googleusercontent.com' }),
+      'vencido': await k.sign({ exp: NOW_SEC - 10 }),
+      'de otro emisor': await k.sign({ iss: 'https://evil.example.com' }),
+      'sin identificador': await k.sign({ sub: '' }),
+      'con kid desconocido': await k.sign({}, { kid: 'otro-kid' }),
+      'con algoritmo "none"': `${b64u(JSON.stringify({ alg: 'none', kid: 'kid-1' }))}.${b64u(JSON.stringify({ iss: 'https://accounts.google.com', aud: CID, sub: '1', exp: NOW_SEC + 99 }))}.`,
+      'adulterado': await (async () => { const [h, pl, sg] = (await k.sign()).split('.'); return `${h}.${pl}.${sg.slice(0, 100)}${sg[100] === 'A' ? 'B' : 'A'}${sg.slice(101)}`; })(),
+      'payload cambiado con la firma original': await (async () => { const [h, , sg] = (await k.sign()).split('.'); return `${h}.${b64u(JSON.stringify({ iss: 'https://accounts.google.com', aud: CID, sub: 'otra-persona', exp: NOW_SEC + 3600, iat: NOW_SEC }))}.${sg}`; })(),
+      'basura': 'esto.no.es-un-token',
+    };
+    for (const [why, token] of Object.entries(bad)) expect((await s.call('POST', '/v1/auth/google', { body: { idToken: token } })).status, why).toBe(401);
+    expect(await (s.store as any).sql.all('SELECT * FROM users')).toEqual([]);
+  });
+  it('acepta varios client IDs (Android y web), pide de nuevo las claves si Google las rotó, y bloquea a un usuario desactivado', async () => {
+    const k = await googleKit('kid-nuevo');
+    let calls = 0;
+    const jwks = async () => { calls++; return calls === 1 ? [{ kid: 'kid-viejo', n: 'AQAB', e: 'AQAB', kty: 'RSA' }] : k.keys; };
+    const s = await makeServer({ env: { GOOGLE_CLIENT_ID: `otro-id, ${CID}` }, jwks });
+    const r = await s.call('POST', '/v1/auth/google', { body: { idToken: await k.sign() } });
+    expect(r.status).toBe(200); expect(calls).toBe(2);
+    const uid = JSON.parse(Buffer.from(r.json.token.split('.')[1], 'base64url').toString()).sub;
+    await s.call('POST', '/v1/admin/users', { token: ADMIN, body: { userId: uid, disabled: true } });
+    expect((await s.call('POST', '/v1/auth/google', { body: { idToken: await k.sign() } })).status).toBe(403);
   });
 });

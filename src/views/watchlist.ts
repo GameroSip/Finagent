@@ -3,11 +3,13 @@ import type { Ctx, View } from '../ctx';
 import { fetchQuoteCard, type QuoteCard } from '../data/market';
 import { getWatchlist, subscribe, toggleWatch } from '../store';
 import { pool } from '../data/net';
+import { assetIcon } from '../ui/assetIcon';
 import { $, esc, h } from '../ui/dom';
-import { dirClass, fmtPct, fmtPrice, initials, symbolColor } from '../ui/format';
+import { dirClass, fmtPct, fmtPrice } from '../ui/format';
 import { icon } from '../ui/icons';
 import { confirmSheet } from '../ui/sheet';
 import { sparkSvg } from '../ui/spark';
+import { t } from '../i18n';
 
 const STARTERS = ['AAPL', 'MSFT', 'NVDA', 'MELI', 'GGAL', 'YPFD.BA', 'BTC-USD', 'AAPL.BA'];
 
@@ -48,7 +50,7 @@ export function createWatchView(ctx: Ctx): View {
       const qd = quotes.get(s);
       const row = h('div', { class: 'wrow', style: i ? 'border-top:1px solid var(--line)' : '' });
       const cls = dirClass(qd?.changePct);
-      row.innerHTML = `<div class="avatar" style="background:${symbolColor(s)}">${esc(initials(s))}</div>
+      row.innerHTML = `${assetIcon(s)}
         <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(s)}</div><div class="muted" style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(qd?.name && qd.name !== s ? qd.name : qd?.error ? 'Sin datos' : '…')}</div></div>
         <div class="spk">${qd?.spark.length ? sparkSvg(qd.spark, { w: 74, h: 30 }) : ''}</div>
         <div class="px">${qd?.price !== undefined && qd.price !== null
@@ -62,7 +64,7 @@ export function createWatchView(ctx: Ctx): View {
         longPress = false;
         timer = window.setTimeout(async () => {
           longPress = true;
-          if (await confirmSheet({ title: `¿Quitar ${s} de favoritos?`, confirm: 'Quitar', danger: true })) toggleWatch(s);
+          if (await confirmSheet({ title: t('¿Quitar {s} de favoritos?', { s }), confirm: t('Quitar'), danger: true })) toggleWatch(s);
         }, 650);
       }, { passive: true });
       ['touchend', 'touchmove', 'touchcancel'].forEach((ev) => row.addEventListener(ev, () => clearTimeout(timer), { passive: true }));

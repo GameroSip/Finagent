@@ -1,3 +1,4 @@
+import zlib from 'node:zlib';
 // Simuladores de red: Gemini (guionado, usa los números reales que devuelven las herramientas) y las fuentes de datos.
 const hash = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 const PRICE = { AAPL: 343.46, NVDA: 187.69, MSFT: 512.3, MELI: 2210.5, GGAL: 61.4, YPF: 38.9, 'BTC-USD': 104500, '^GSPC': 6890.2, '^IXIC': 23410.5, '^DJI': 46780.1,
@@ -17,9 +18,12 @@ function series(sym, n, stepSec, endTs) {
 }
 const BARS = { '1d|5m': [78, 300], '5d|30m': [65, 1800], '1mo|1d': [22, 86400], '3mo|1d': [64, 86400], '6mo|1d': [126, 86400], '1y|1d': [252, 86400], '2y|1d': [504, 86400], '5y|1d': [1260, 86400], '5y|1wk': [260, 604800], '5d|1d': [5, 86400] };
 
+// Para pruebas que dependen de la hora (sesiones de mercado): se puede fijar "ahora".
+let mockNow = null;
+export const setMockNow = (t) => { mockNow = t; };
 export function yahooChart(sym, range, interval) {
   const [n, step] = BARS[`${range}|${interval}`] ?? [126, 86400];
-  const now = Math.floor(Date.now() / 1000), s = series(sym, n, step, now - 600);
+  const now = mockNow ?? Math.floor(Date.now() / 1000), s = series(sym, n, step, now - 600);
   const last = s.close.at(-1), prev = s.close.at(-2) ?? last;
   const yr = series(sym, 252, 86400, now - 600).close;
   return { chart: { error: null, result: [{ meta: { currency: sym.startsWith('^') ? 'USD' : sym.endsWith('.BA') ? 'ARS' : 'USD', symbol: sym, shortName: NAME[sym] ?? sym, longName: NAME[sym] ?? sym,
@@ -92,9 +96,9 @@ export const FA_CODE = 'FA-TEST-2222';
 const FREE = { id: 'free', label: 'Gratis', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 3, monthlyLimit: 90, available: true };
 const PLUS = { id: 'plus', label: 'Plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10, monthlyLimit: 200, available: false };
 const PLAN_LIST = [
-  { ...FREE, blurb: 'Respuestas rápidas con un modelo liviano.', deepModelLabel: null, deepMonthlyLimit: 0 },
-  { ...PLUS, blurb: 'Un modelo más potente y más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0 },
-  { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30 },
+  { ...FREE, blurb: 'Respuestas rápidas con un modelo liviano.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: false },
+  { ...PLUS, blurb: 'Un modelo más potente y más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: true },
+  { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30, hasFallback: true },
 ];
 export const apiState = { used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [] };
 export const resetApi = () => Object.assign(apiState, { used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [] });
@@ -130,4 +134,23 @@ export function finagentApi(method, path, headers, body) {
     return j({ data, model: 'gemini-3.5-flash-lite', turn, remaining: remaining(), plan: planNow(), tier: 'free' });
   }
   return j({ error: 'not_found' }, 404);
+}
+
+// ------------------------------------------------------------------ imágenes simuladas (logos)
+const crcTable = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (buf) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); };
+/** PNG de un solo color, válido (para probar la carga de logos sin red). */
+export function png(size = 64, rgb = [30, 120, 220]) {
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array(size).fill(rgb).flat())]);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(Buffer.concat(Array(size).fill(row)))), chunk('IEND', Buffer.alloc(0))]);
+}
+/** Qué responde cada servicio de logos: btc y eth existen; apple.com tiene logo bueno; microsoft.com solo una miniatura de 16 px; el resto, 404. */
+export function iconResponse(u) {
+  const ok = (size, rgb) => ({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: png(size, rgb) });
+  const nf = { status: 404, headers: { 'access-control-allow-origin': '*' }, body: 'no' };
+  if (u.host === 'cdn.jsdelivr.net') return /\/(btc|eth)\.png$/.test(u.pathname) ? ok(128, [247, 147, 26]) : nf;
+  if (u.host === 'www.google.com') { const d = u.searchParams.get('domain'); return d === 'apple.com' ? ok(128, [60, 60, 60]) : d === 'microsoft.com' ? ok(16, [0, 120, 215]) : nf; }
+  return nf;
 }

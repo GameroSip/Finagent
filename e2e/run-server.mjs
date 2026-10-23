@@ -25,8 +25,19 @@ check('ofrece los planes de pago como próximamente (más potentes, más convers
 check('avisa con honestidad que el nivel gratuito de Gemini puede usar las consultas', /nivel gratuito de Gemini/.test(banner) && /datos personales/.test(banner));
 check('el contador del chat muestra el plan y las conversaciones que quedan', /^Plan Gratis · te quedan 3 conversaciones hoy$/.test(await chip(p)), await chip(p));
 await shot(p, 'S2-chat-vacio');
-await p.click('#c-plan [data-go="settings"]'); await sleep(500);
-check('"Ver planes" lleva a Ajustes', (await activeTab(p)) === 'settings', String(await activeTab(p)));
+await p.click('#c-plan [data-plans]'); await p.waitForSelector('.plans-sheet .plan-card', { timeout: 6000 }); await sleep(500);
+const cards = await p.$$eval('.plan-card', (c) => c.map((x) => ({ n: x.querySelector('.plan-name').textContent, m: x.querySelector('.plan-mult b').textContent, t: x.textContent })));
+const sheetTxt = await text(p, '.plans-sheet');
+check('"Ver planes" abre la pantalla de planes (Plus y Pro)', /Llevá FinAgent al siguiente nivel/.test(sheetTxt) && cards.map((c) => c.n).join() === 'Plus,Pro', JSON.stringify(cards.map((c) => c.n)));
+check('el multiplicador sale de los límites reales: Plus 3x (10 contra 3) y Pro 10x (30 contra 3)', cards[0].m === '3x' && cards[1].m === '10x', JSON.stringify(cards.map((c) => c.m)));
+check('Pro ofrece análisis profundo con Gemini 3.1 Pro y Plus no (solo ventajas reales)', /Análisis profundo con Gemini 3\.1 Pro/.test(cards[1].t) && !/profundo/.test(cards[0].t));
+check('explica por qué pagar: modelo más potente, respaldo automático y sin recordatorios', /Un modelo más potente: Gemini 3\.8 Flash/.test(cards[0].t) && /Respaldo automático/.test(cards[0].t) && /Sin recordatorios de planes/.test(cards[0].t));
+check('destaca lo que sigue gratis y compara los planes', /Gratis para siempre/.test(sheetTxt) && /Fibonacci/.test(sheetTxt) && (await p.$('.plans-cmp')) !== null);
+check('aclara con honestidad que todavía no se puede contratar ni tiene precio', /Todavía no se puede contratar ni tiene precio definido/.test(sheetTxt) && /Avisame cuando esté disponible/.test(sheetTxt));
+await shot(p, 'S2b-planes');
+await p.click('[data-plan="plus"]'); await sleep(700);
+check('"Avisame" anota el interés en Plus y el botón queda en "Anotado ✓"', M.apiState.interest.includes('plus') && (await p.$eval('[data-plan="plus"]', (b) => b.textContent)) === 'Anotado ✓', JSON.stringify(M.apiState.interest));
+await p.evaluate(() => document.querySelector('.sheet-back').click()); await sleep(450);
 await tab(p, 'chat'); await sleep(400);
 
 // 3) una conversación: verificada, y descuenta una
@@ -55,12 +66,19 @@ M.apiState.capacity = null;
 // 5) se agota el límite del plan gratis
 await say(p, 'Dame el análisis técnico de AAPL'); await waitAnswer(p, 2); await sleep(700);
 check('queda 1 conversación (singular)', /te queda 1 conversación hoy/.test(await chip(p)), await chip(p));
+await p.waitForSelector('.upsell-card', { timeout: 6000 });
+const up = await text(p, '.upsell-card');
+check('con 1 conversación restante aparece UNA sugerencia de planes, con el multiplicador real (10x)', /Te queda 1 conversación hoy/.test(up) && /10x más usos/.test(up) && (await p.$$('.upsell-card')).length === 1, up.slice(0, 160));
+check('la sugerencia aclara que los gráficos, los mercados y las herramientas siguen gratis', /siguen gratis/.test(up));
+await shot(p, 'S5a-sugerencia-planes');
+await p.click('.upsell-card [data-u="later"]'); await sleep(300);
+check('"Ahora no" la quita y la silencia por 7 días', (await p.$('.upsell-card')) === null && (await p.evaluate(() => JSON.parse(localStorage.getItem('finagent.upsell.v1')).dismissedUntil > Date.now() + 6 * 864e5)));
 await say(p, 'Dame el análisis técnico de AAPL'); await waitAnswer(p, 3); await sleep(700);
 check('llegó a 0', /te quedan 0 conversaciones hoy/.test(await chip(p)), await chip(p));
 await say(p, 'Dame el análisis técnico de AAPL'); await waitErr(p, 3);
 e = await lastErr(p);
 check('al pasarse del límite: dice cuál es, cuándo vuelve y ofrece los planes de pago', /Usaste las 3 conversaciones de hoy de tu plan Gratis/.test(e) && /Se reinician/.test(e) && /planes de pago \(próximamente\)/.test(e), e.slice(0, 220));
-check('ofrece "Ver mercados" y "Ver planes"', (await p.$('.err-bubble [data-go="market"]')) !== null && (await p.$('.err-bubble [data-go="settings"]')) !== null);
+check('ofrece "Ver mercados" y "Ver planes"', (await p.$('.err-bubble [data-go="market"]')) !== null && (await p.$('.err-bubble [data-plans]')) !== null);
 await shot(p, 'S5-limite');
 await p.click('.err-bubble [data-go="market"]'); await sleep(500);
 check('"Ver mercados" lleva a Mercados', (await activeTab(p)) === 'market', String(await activeTab(p)));
@@ -70,12 +88,12 @@ await tab(p, 'settings'); await sleep(1200);
 let st = await p.evaluate(() => document.body.innerText);
 check('Ajustes muestra el plan, el modelo fijo y las conversaciones', /Plan Gratis/.test(st) && /0 de 3 conversaciones hoy/.test(st) && /Gemini 3\.5 Flash-Lite/.test(st), st.match(/Tu plan[^]{0,200}/)?.[0]);
 check('muestra el aviso del nivel gratuito de Gemini', /Por ahora FinAgent usa el nivel gratuito de Gemini/.test(st));
-check('lista Plus y Pro como "Próximamente" con su modelo y conversaciones', /Plus\s*Próximamente/.test(st) && /Gemini 3\.8 Flash · 10 conversaciones por día/.test(st) && /Pro\s*Próximamente/.test(st) && /análisis profundo con Gemini 3\.1 Pro/.test(st), st.match(/Planes de pago[^]{0,400}/)?.[0]);
-check('aclara que todavía no se pueden contratar ni tienen precio', /Todavía no se pueden contratar ni tienen precio definido/.test(st));
+check('Ajustes invita a ver los planes (Plus y Pro, próximamente)', /Plus y Pro\s*Próximamente/.test(st) && (await p.$('#s-plans-open')) !== null, st.match(/Planes de pago[^]{0,200}/)?.[0]);
 check('NO hay ninguna clave de Gemini en Ajustes', (await p.$('#s-key')) === null && !/Clave de Gemini/.test(st));
 await shot(p, 'S6-ajustes-plan');
-await p.evaluate(() => [...document.querySelectorAll('.plan-row button')][0].click()); await sleep(700);
-check('"Avisame" anota el interés (Plus) y el botón queda en "Anotado ✓"', M.apiState.interest.includes('plus') && (await p.$$eval('.plan-row button', (b) => b[0].textContent)) === 'Anotado ✓', JSON.stringify(M.apiState.interest));
+await p.click('#s-plans-open'); await p.waitForSelector('.plans-sheet .plan-card', { timeout: 6000 }); await sleep(500);
+check('desde Ajustes también se abre la pantalla de planes, y recuerda que ya te anotaste en Plus', (await p.$eval('[data-plan="plus"]', (b) => b.textContent)) === 'Anotado ✓');
+await p.evaluate(() => document.querySelector('.sheet-back').click()); await sleep(450);
 
 // 7) un código de plan (para testers) desbloquea un plan más potente
 await p.type('#s-code', 'fatest2222'); await p.click('#s-redeem'); await sleep(1500);
@@ -104,6 +122,20 @@ await say(p, 'hola'); await waitErr(p, errs + 1);
 e = await lastErr(p);
 check('si desactivan el acceso, lo dice claramente', /Tu acceso a FinAgent fue desactivado/.test(e), e.slice(0, 120));
 await p.close();
+
+// 12) recordatorio semanal en Mercados: solo plan gratis, solo si ya usó la app, y una sola vez
+const seed = { 'finagent.upsell.v1': JSON.stringify({ answers: 6, lastShown: Date.now() - 9 * 864e5, dismissedUntil: 0, shownAt: [] }) };
+M.resetApi();
+let w = await newPage({ key: '', extra: seed }); await w.waitForSelector('.tabbar', { timeout: 12000 }); await sleep(3500);
+check('en Mercados aparece el recordatorio semanal (plan gratis, ya usó la app, pasó una semana)', (await w.$('#m-upsell .upsell-card')) !== null && /Más usos, un modelo más potente/.test(await text(w, '#m-upsell')), await text(w, '#m-upsell'));
+await shot(w, 'S8-recordatorio-semanal');
+await w.reload({ waitUntil: 'load' }); await w.waitForSelector('.tabbar', { timeout: 12000 }); await sleep(3000);
+check('al volver no se repite (como máximo uno cada 24 horas)', (await w.$('#m-upsell .upsell-card')) === null);
+await w.close();
+M.resetApi(); M.apiState.plan = 'plus';
+w = await newPage({ key: '', extra: seed }); await w.waitForSelector('.tabbar', { timeout: 12000 }); await sleep(3500);
+check('quien ya tiene un plan de pago NO recibe recordatorios', (await w.$('.upsell-card')) === null);
+await w.close();
 
 // 11) lo más importante: en TODA la sesión la app nunca habló con Google ni usó una clave
 check('la app jamás llamó a Gemini directamente (todo pasó por el servidor de FinAgent)', !log.requests.some((r) => r.includes('generativelanguage.googleapis.com')), log.requests.filter((r) => r.includes('googleapis')).join(' | '));

@@ -2,10 +2,12 @@
 import type { Ctx } from '../ctx';
 import { getRecent, isWatched, toggleWatch } from '../store';
 import { searchSymbols } from '../yahoo';
+import { assetIcon } from '../ui/assetIcon';
 import { $, esc, h } from '../ui/dom';
-import { initials, symbolColor } from '../ui/format';
+
 import { icon } from '../ui/icons';
 import type { Overlay } from './asset';
+import { t } from '../i18n';
 
 const SUGGEST: Array<[string, string]> = [['AAPL', 'Apple'], ['MSFT', 'Microsoft'], ['NVDA', 'NVIDIA'], ['MELI', 'Mercado Libre'], ['GGAL', 'Grupo Galicia (ADR)'], ['YPFD.BA', 'YPF (BYMA)'], ['AAPL.BA', 'Apple CEDEAR'], ['BTC-USD', 'Bitcoin'], ['^MERV', 'Merval']];
 
@@ -26,7 +28,7 @@ export function openSearchOverlay(ctx: Ctx, onClose?: () => void): Overlay {
 
   function row(sym: string, nm: string, meta: string) {
     const r = h('div', { class: 'srow' });
-    r.innerHTML = `<div class="avatar" style="background:${symbolColor(sym)}">${esc(initials(sym))}</div>
+    r.innerHTML = `${assetIcon(sym)}
       <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(sym)}</div><div class="muted" style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(nm)}${meta ? ' · ' + esc(meta) : ''}</div></div>
       <button class="icon-btn star-btn" aria-label="Favorito" style="width:38px;height:38px">${icon('star', 18, isWatched(sym))}</button>`;
     r.onclick = (e) => {
@@ -56,7 +58,7 @@ export function openSearchOverlay(ctx: Ctx, onClose?: () => void): Overlay {
       if (my !== seq || closed) return;
       body.innerHTML = '';
       const list = quotes.filter((x: any) => x?.symbol);
-      if (!list.length) { body.innerHTML = `<div class="empty-note">${icon('search', 26)}<div>No encontré resultados para "${esc(qs)}".</div><div class="muted" style="font-size:12.5px">Probá con el ticker (por ej. AAPL, GGAL.BA, BTC-USD).</div></div>`; return; }
+      if (!list.length) { body.innerHTML = `<div class="empty-note">${icon('search', 26)}<div>${esc(t('No encontré resultados para "{q}".', { q: qs }))}</div><div class="muted" style="font-size:12.5px">Probá con el ticker (por ej. AAPL, GGAL.BA, BTC-USD).</div></div>`; return; }
       list.forEach((x: any) => body.append(row(x.symbol, x.longname ?? x.shortname ?? '', [x.exchDisp ?? x.exchange, x.quoteType].filter(Boolean).join(' · '))));
     } catch (e: any) {
       if (my !== seq || closed) return;

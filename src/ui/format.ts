@@ -60,7 +60,7 @@ export function symbolColor(sym: string): string {
   let hsh = 0;
   for (const ch of sym) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
   const hue = hsh % 360;
-  return `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 40) % 360} 70% 42%))`;
+  return `hsl(${hue} 12% 26%)`;                                       // gris con un leve tono propio: se distinguen entre sí sin colores estridentes
 }
 export const initials = (sym: string) => sym.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '?';
 

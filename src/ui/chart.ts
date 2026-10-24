@@ -25,7 +25,7 @@ export interface PriceChartOpts {
 export interface ChartHandle { chart: IChartApi; notices: string[]; destroy(): void }
 
 const PANE_H = 92; // alto de cada panel inferior (RSI, MACD)
-export const TOOL_COLORS = { ema20: '#22D3EE', ema50: '#FFB547', ema200: '#FF6BB5', bb: '#8B93FF', vwap: '#FF8A4C', fib: '#FFB547', pivot: '#9AA4B2', profile: '#7C6CFF', asia: '#FF6BB5', london: '#22D3EE', newyork: '#FFB547' } as const;
+export const TOOL_COLORS = { ema20: '#6FA8DC', ema50: '#D6B26A', ema200: '#C77D7D', bb: '#8C93A6', vwap: '#E08A4F', fib: '#D6B26A', pivot: '#9AA4B2', profile: '#7F8AA8', asia: '#C77D7D', london: '#6FA8DC', newyork: '#D6B26A' } as const;
 
 const dedupe = (pts: Pt[]) => {
   const out: Pt[] = [];
@@ -105,7 +105,7 @@ export function mountPriceChart(el: HTMLElement, o: PriceChartOpts): ChartHandle
   if (tools.fib) {
     const f = hasOhlc ? fibonacci(pts as never) : null;
     if (!f) notices.push(t('No hay un movimiento claro para trazar Fibonacci en este rango.'));
-    else for (const l of f.levels) main.createPriceLine({ price: l.price, color: l.ratio === 0.618 ? '#FFB547' : l.ratio === 0.382 || l.ratio === 0.5 ? '#FFD28A' : rgba('#FFB547', 0.6), lineWidth: 1, lineStyle: l.ratio === 0 || l.ratio === 1 ? LineStyle.Solid : LineStyle.Dashed, axisLabelVisible: [0, 0.382, 0.5, 0.618, 1].includes(l.ratio), title: `${+(l.ratio * 100).toFixed(1)}%` });
+    else for (const l of f.levels) main.createPriceLine({ price: l.price, color: l.ratio === 0.618 ? '#D6B26A' : l.ratio === 0.382 || l.ratio === 0.5 ? '#E6CE98' : rgba('#D6B26A', 0.6), lineWidth: 1, lineStyle: l.ratio === 0 || l.ratio === 1 ? LineStyle.Solid : LineStyle.Dashed, axisLabelVisible: [0, 0.382, 0.5, 0.618, 1].includes(l.ratio), title: `${+(l.ratio * 100).toFixed(1)}%` });
   }
   if (tools.pivots) {
     const prev = hasOhlc ? previousPeriod(pts as never, !!o.intraday) : null;
@@ -131,7 +131,7 @@ export function mountPriceChart(el: HTMLElement, o: PriceChartOpts): ChartHandle
   if (tools.rsi) {
     if (closes.length < 16) notices.push(t('El RSI necesita al menos 16 velas.'));
     else {
-      const s = line(rsiFn(closes), { color: '#8B93FF', lastValueVisible: true }, pane);
+      const s = line(rsiFn(closes), { color: '#8C93A6', lastValueVisible: true }, pane);
       for (const [v, c] of [[70, css('--down')], [50, css('--line-2')], [30, css('--up')]] as const) s?.createPriceLine({ price: v, color: c, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: v !== 50, title: '' });
       pane++;
     }
@@ -142,7 +142,7 @@ export function mountPriceChart(el: HTMLElement, o: PriceChartOpts): ChartHandle
       const m = macdFn(closes);
       const hs = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane);
       hs.setData(m.hist.map((v, i) => ({ time: T(pts[i].t), value: v, color: rgba(v >= 0 ? css('--up') : css('--down'), 0.6) })));
-      line(m.line, { color: '#22D3EE', lineWidth: 1 }, pane); line(m.signal, { color: '#FFB547', lineWidth: 1 }, pane);
+      line(m.line, { color: '#6FA8DC', lineWidth: 1 }, pane); line(m.signal, { color: '#D6B26A', lineWidth: 1 }, pane);
       pane++;
     }
   }
@@ -154,7 +154,7 @@ export function mountPriceChart(el: HTMLElement, o: PriceChartOpts): ChartHandle
   if (tools.profile && !vp) notices.push(t(hasVol ? 'No hay datos suficientes para el perfil de volumen.' : 'Este activo no informa volumen: no hay perfil de volumen.'));
   if (vp) {
     const pl = (price: number, title: string, col: string) => main.createPriceLine({ price, color: col, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: title === 'POC', title });
-    pl((vp.poc.lo + vp.poc.hi) / 2, 'POC', '#FFB547'); pl(vp.vah, 'VAH', TOOL_COLORS.profile); pl(vp.val, 'VAL', TOOL_COLORS.profile);
+    pl((vp.poc.lo + vp.poc.hi) / 2, 'POC', '#D6B26A'); pl(vp.vah, 'VAH', TOOL_COLORS.profile); pl(vp.val, 'VAL', TOOL_COLORS.profile);
   }
   const bands = tools.sessions ? (o.intraday ? sessionBands(pts.map((p) => p.t)) : []) : [];
   if (tools.sessions && !o.intraday) notices.push(t('Las sesiones de mercado solo se muestran en los gráficos de 1D y 1S.'));
@@ -188,7 +188,7 @@ export function mountPriceChart(el: HTMLElement, o: PriceChartOpts): ChartHandle
         const ya = main.priceToCoordinate(bin.hi), yb = main.priceToCoordinate(bin.lo);
         if (ya === null || yb === null) return;
         const inVA = bin.lo >= vp.val - 1e-9 && bin.hi <= vp.vah + 1e-9, isPoc = bin === vp.poc, bwid = (bin.vol / maxVol) * maxW;
-        ctx.fillStyle = isPoc ? rgba('#FFB547', 0.75) : inVA ? rgba(TOOL_COLORS.profile, 0.42) : rgba(TOOL_COLORS.profile, 0.2);
+        ctx.fillStyle = isPoc ? rgba('#D6B26A', 0.75) : inVA ? rgba(TOOL_COLORS.profile, 0.42) : rgba(TOOL_COLORS.profile, 0.2);
         ctx.fillRect(plotRight - bwid, ya, bwid, Math.max(1, yb - ya - 1));
       });
     }
@@ -220,7 +220,7 @@ const dedupeLine = (d: Array<{ time: UTCTimestamp; value: number }>) => {
   return out;
 };
 
-export const PALETTE = ['#7C6CFF', '#22D3EE', '#1FD18B', '#FFB547', '#FF6BB5', '#FF8A4C'];
+export const PALETTE = ['#7F8AA8', '#6FA8DC', '#3DB488', '#D6B26A', '#C77D7D', '#E08A4F'];
 
 /** Rendimiento comparado (% desde el inicio) de varios activos. */
 export function mountCompareChart(el: HTMLElement, lines: Array<{ symbol: string; points: Array<[number, number]> }>, height = 220): ChartHandle {

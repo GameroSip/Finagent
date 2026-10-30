@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildReport, verdict } from '../evals/radar/report';
-import { synthetic } from '../evals/radar/data';
+import { binanceSymbol, cachePath, fetchDaily, loadCached, parseKlines, parseStooq, retryDelay, stooqSymbol, synthetic } from '../evals/radar/data';
 import { levelOf, radarSeries, RADAR_PARAMS, type DayBar } from '../src/radar';
 import { backtest, baseRates, forwardMax, forwardMin, forwardRet, median, quantile, wilson, type AssetSeries, type Block, type Cell } from '../src/radarBacktest';
 
@@ -115,5 +116,48 @@ describe('veredicto (regla fija)', () => {
     const poco = blk({ rojo: cell({ n: 10 }) });
     expect(verdict(poco, poco, poco)).toBe('sin datos suficientes');
     expect(verdict(undefined, undefined, undefined)).toBe('sin datos suficientes');
+  });
+});
+
+describe('descarga de datos (sin internet: todo simulado)', () => {
+  afterEach(() => { vi.unstubAllGlobals(); retryDelay.ms = 1200; });
+  it('Stooq: lee el CSV, ordena por fecha, descarta filas rotas y rechaza respuestas que no son precios (por ejemplo, un pedido de clave)', () => {
+    const csv = 'Date,Open,High,Low,Close,Volume\n2020-01-03,10,11,9,10.5,1000\n2020-01-02,9,10,8,9.5,900\n2020-01-06,0,0,0,0,0\n2020-01-07,x,1,1,1,1\n';
+    const b = parseStooq(csv);
+    expect(b.map((x) => x.c)).toEqual([9.5, 10.5]); expect(b[0].t).toBeLessThan(b[1].t); expect(b[1].v).toBe(1000);
+    expect(parseStooq('Get your apikey: https://stooq.com/q/d/?s=aapl.us&get_apikey')).toEqual([]);
+    expect(parseStooq('')).toEqual([]);
+  });
+  it('mapeo de símbolos: acciones y ETF a Stooq (.us), índices a su código, cripto solo a Binance', () => {
+    expect(stooqSymbol('AAPL')).toBe('aapl.us'); expect(stooqSymbol('^GSPC')).toBe('^spx'); expect(stooqSymbol('^MERV')).toBeNull(); expect(stooqSymbol('BTC-USD')).toBeNull();
+    expect(binanceSymbol('BTC-USD')).toBe('BTCUSDT'); expect(binanceSymbol('AAPL')).toBeNull();
+  });
+  it('Binance: convierte velas con precios en texto', () => {
+    const b = parseKlines([[1_500_000_000_000, '10', '12', '9', '11', '500'], [1_500_086_400_000, '0', '0', '0', '0', '0']]);
+    expect(b).toHaveLength(1); expect(b[0]).toEqual({ t: 1_500_000_000, o: 10, h: 12, l: 9, c: 11, v: 500 });
+  });
+  it('lo descargado por yfinance (archivo local) tiene prioridad y no se pide nada por red', async () => {
+    const f = cachePath('ZZTEST'); mkdirSync('evals/radar/data', { recursive: true });
+    writeFileSync(f, JSON.stringify({ bars: [[1, 10, 11, 9, 10, 100], [2, 10, 12, 9, 11, 120], [3, 0, 0, 0, 0, 0]] }));
+    const spy = vi.fn(); vi.stubGlobal('fetch', spy);
+    try { expect(loadCached('ZZTEST')).toHaveLength(2); const r = await fetchDaily('ZZTEST'); expect(r.note).toBe('yfinance'); expect(spy).not.toHaveBeenCalled(); } finally { rmSync(f); }
+    expect(loadCached('ZZTEST')).toBeNull();
+  });
+  it('si Yahoo bloquea (429) varias veces seguidas, deja de insistir y usa los respaldos; si todo falla, lo dice sin colgarse', async () => {
+    retryDelay.ms = 0;
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(String(url));
+      if (String(url).includes('yahoo')) return new Response('{}', { status: 429 });
+      if (String(url).includes('stooq')) return new Response('Date,Open,High,Low,Close,Volume\n2020-01-02,9,10,8,9.5,900\n');
+      return new Response('[]');
+    });
+    const state = { blocked: 0 };
+    for (const s of ['A1', 'A2', 'A3', 'A4', 'A5', 'A6']) expect((await fetchDaily(s, state)).note).toBe('Stooq');
+    expect(state.blocked).toBe(4);
+    const yahooCalls = calls.filter((c) => c.includes('yahoo')).length;
+    expect(yahooCalls).toBeLessThanOrEqual(4 * 4);                                         // los 4 primeros activos intentan; del 5.º en adelante ya no se le pide nada a Yahoo
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 429 }));
+    await expect(fetchDaily('B1', { blocked: 4 })).rejects.toThrow(/bloqueado|sin datos|Stooq|Binance/);
   });
 });

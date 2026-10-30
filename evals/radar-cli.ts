@@ -11,18 +11,20 @@ const only = args.find((a) => a.startsWith('--symbols='))?.slice(10).split(',').
 const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const state = { blocked: 0 };
 const series: AssetSeries[] = [], excluded: Array<{ symbol: string; why: string }> = [];
 const list = UNIVERSE.filter(([s]) => !only || only.includes(s));
+if (args.includes('--list')) { console.log(list.map(([s]) => s).join(' ')); process.exit(0); }
 let k = 0;
 for (const [symbol, group] of list) {
   try {
-    const bars = isSynthetic ? synthetic(1000 + k++ * 7919, 6000, group === 'cripto' ? 0.035 : group === 'acciones' ? 0.018 : 0.011) : (await fetchDaily(symbol)).bars;
+    const bars = isSynthetic ? synthetic(1000 + k++ * 7919, 6000, group === 'cripto' ? 0.035 : group === 'acciones' ? 0.018 : 0.011) : (await fetchDaily(symbol, state)).bars;
     if (bars.length < 500) { excluded.push({ symbol, why: `poca historia (${bars.length} ruedas)` }); continue; }
     if (bars.filter((b) => b.v > 0).length < bars.length * 0.6) { excluded.push({ symbol, why: 'no informa volumen (la condición de volumen no se puede medir)' }); continue; }
     series.push({ symbol, group, bars });
     console.log(`✔ ${symbol.padEnd(9)} ${String(bars.length).padStart(5)} ruedas  ${day(bars[0].t)} → ${day(bars[bars.length - 1].t)}`);
   } catch (e: any) { excluded.push({ symbol, why: `no se pudo descargar (${String(e?.message ?? e).slice(0, 90)})` }); console.log(`✘ ${symbol}: ${e?.message ?? e}`); }
-  if (!isSynthetic) await sleep(350);
+  if (!isSynthetic && state.blocked < 4) await sleep(300);
 }
 if (series.length < 5) { console.error(`Datos insuficientes: solo ${series.length} activos utilizables.`); process.exitCode = 1; }
 const blocks = backtest(series);

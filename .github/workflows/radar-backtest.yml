@@ -20,7 +20,7 @@ permissions:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +30,16 @@ jobs:
       - run: npm ci
       - name: Tests del radar
         run: npx vitest run tests/radar.test.ts
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Descargar historia con yfinance
+        if: ${{ inputs.modo != 'prueba con datos sintéticos' }}
+        continue-on-error: true
+        run: |
+          pip install --quiet yfinance
+          python evals/radar/fetch_yf.py $(npx tsx evals/radar-cli.ts --list)
 
       - name: Backtest
         env:

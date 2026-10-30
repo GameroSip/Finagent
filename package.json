@@ -13,6 +13,8 @@
     "eval": "tsx evals/cli.ts",
     "eval:smoke": "tsx evals/cli.ts --smoke",
     "eval:fake": "tsx evals/cli.ts --fake=bueno",
+    "radar:backtest": "tsx evals/radar-cli.ts",
+    "radar:selftest": "tsx evals/radar-cli.ts --synthetic",
     "duel": "tsx evals/duel/cli.ts",
     "duel:fake": "tsx evals/duel/cli.ts --fake --lang=es",
     "server:dev": "tsx server/node.ts",

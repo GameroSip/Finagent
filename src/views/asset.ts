@@ -11,6 +11,8 @@ import { $, esc, h, openUrl, safeUrl, toast } from '../ui/dom';
 import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 import { locale, t } from '../i18n';
+import { stressNow } from '../stress';
+import { bindStress, stressHtml } from '../ui/stressCard';
 
 export interface Overlay { el: HTMLElement; close(): void }
 
@@ -52,6 +54,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
       </div>
       <div class="chips-row" id="a-toolbar"><button class="chip chip-tools" id="a-tools">${icon('sliders', 15)} Herramientas<span class="chip-n" id="a-tools-n"></span></button></div>
       <div id="a-signals"></div>
+      <div id="a-stress"></div>
       <div class="section" style="margin-top:22px"><div class="section-head"><h2>Estadísticas</h2></div><div id="a-stats" class="stat-grid">${Array.from({ length: 4 }, () => '<div class="skeleton" style="height:64px;border-radius:16px"></div>').join('')}</div></div>
       <div class="section"><div class="section-head"><h2>${icon('newspaper', 19)} Noticias</h2></div><div id="a-news" data-notrans style="display:flex;flex-direction:column;gap:10px"></div></div>
       <p class="muted" style="font-size:11.5px;text-align:center;margin:22px 0 100px;line-height:1.5">Datos de Yahoo Finance con posible demora. Información educativa, no es asesoramiento financiero.</p>
@@ -173,6 +176,9 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
           <div class="chips-wrap compact">${snap.signals.slice(0, 4).map((s) => `<span class="chip" style="white-space:normal">${esc(t(s))}</span>`).join('')}</div>
           <div class="stat-grid" style="margin-top:12px">${stat('RSI (14)', fmtNum(snap.rsi14, 1))}${stat('vs EMA 200', snap.pct_vs_ema200 === null ? '—' : fmtPct(snap.pct_vs_ema200), snap.pct_vs_ema200 === null ? 'datos insuficientes' : '')}</div></div>`;
       }
+      // termómetro de tensión: con ruedas completas (se descarta la rueda en curso) y solo para tipos de activo que el backtest respaldó
+      const drawStress = () => { try { q('#a-stress').innerHTML = stressHtml(stressNow(yd.bars, sym, yd.meta)); bindStress(q('#a-stress'), drawStress); } catch { q('#a-stress').innerHTML = ''; } };
+      drawStress();
     } catch { /* se muestran solo los fundamentales */ }
     q('#a-stats').innerHTML = tiles.join('') || '';
     try {

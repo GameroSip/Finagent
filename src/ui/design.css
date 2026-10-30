@@ -110,8 +110,8 @@ h1, h2, h3 { letter-spacing: -.01em; }
 .stat { background: var(--surface); border: 1px solid var(--line); }
 .error-box { border-radius: 10px; }
 .skeleton { border-radius: 8px; }
-.range-bar { border-radius: 2px; }
-.range-bar i { border-radius: 2px; background: var(--brand); box-shadow: none; }
+.range-bar { height: 4px; border-radius: 2px; background: var(--line-2); opacity: 1; }          /* sin degradé rojo-verde: un rango no es bueno ni malo */
+.range-bar i { width: 10px; height: 10px; border: 2px solid var(--bg); border-radius: 50%; background: var(--brand); box-shadow: none; }
 
 /* ---- onboarding con clave (modo desarrollo) */
 .onb { background: var(--bg); }
@@ -144,3 +144,28 @@ h1, h2, h3 { letter-spacing: -.01em; }
 .upsell-ic { background: none; color: var(--brand); border: 1px solid var(--line-2); border-radius: 8px; width: 34px; height: 34px; }
 .empty-orb { box-shadow: none; background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; color: var(--brand); animation: none; }
 .chip.on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+
+/* ---- termómetro de tensión (sin verde ni rojo: no indica si algo es bueno o malo, solo cuánta tensión hay) */
+.stress { padding-top: 14px; }
+.stress-top { display: flex; align-items: center; gap: 14px; }
+.stress-meter { display: flex; gap: 4px; width: 78px; flex: none; } .stress-meter i { flex: 1; height: 9px; border-radius: 2px; background: var(--surface-3); } .stress-meter i.on { background: var(--brand); }
+.stress-level { font-size: 22px; font-weight: 600; letter-spacing: -.015em; }
+.stress-sum { margin-top: 10px; font-size: 14.5px; line-height: 1.5; color: var(--text-2); }
+.stress-sub { margin: 18px 0 6px; font-size: 11.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.stress-cond { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.stress-cond li { display: flex; gap: 11px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; line-height: 1.4; color: var(--muted); }
+.stress-cond li.on { color: var(--text); } .stress-cond .dot { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; border: 1.5px solid var(--line-2); } .stress-cond li.on .dot { background: var(--brand); border-color: var(--brand); }
+.stress-hist { border-top: 1px solid var(--line); }
+.sh-row { display: grid; grid-template-columns: minmax(0, 1fr) 104px 64px; gap: 8px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.sh-row.head { font-size: 11.5px; color: var(--muted); } .sh-row > :nth-child(n+2) { text-align: right; } .sh-row b { font-weight: 600; font-size: 15px; } .sh-row > span:last-child { color: var(--muted); }
+.stress-src, .stress-note, .stress-hint { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.stress-note { margin-top: 14px; }
+.stress-off { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.stress-plan { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: var(--r-sm); }
+.stress-plan.hot { border-color: var(--brand); }
+.sp-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 13px; } .sp-top b { font-weight: 600; }
+.stress-plan p { font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.plan-h { font-size: 20px; font-weight: 600; margin: 4px 0 8px; letter-spacing: -.01em; }
+.plan-ta { width: 100%; min-height: 140px; padding: 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 15px; line-height: 1.5; resize: vertical; }
+.plan-ta:focus { outline: none; border-color: var(--brand); }
+.plan-count { margin-top: 6px; font-size: 11.5px; text-align: right; }

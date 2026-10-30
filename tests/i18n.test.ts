@@ -5,6 +5,7 @@ import { ABOUT } from '../src/about';
 import { TOUR } from '../src/content/tour';
 import { COMING_LANGS, detectLang, getLang, LANGS, locale, lookup, setLang, t, translateText, type UiLang } from '../src/i18n';
 import { FREE_FOREVER } from '../src/planPitch';
+import { stressTexts } from '../src/stress';
 import { FLOW, VS } from '../src/views/about';
 
 afterEach(() => setLang('es'));
@@ -13,7 +14,7 @@ const SRC = walk('src');
 const vars = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 const LANG2: UiLang[] = ['en', 'pt'];
 // Siglas y nombres que se escriben igual en todos los idiomas.
-const SAME = /^(EMA \d+|VWAP|MACD|RSI \(14\)|Fibonacci)$/;
+const SAME = /^(EMA \d+|VWAP|MACD|RSI \(14\)|Fibonacci|ETF)$/;
 
 /** Todos los textos que el código manda por t('…') (se leen del código fuente: si alguien agrega uno nuevo sin traducirlo, esta prueba falla). */
 function tKeys(): Array<[string, string]> {
@@ -27,7 +28,7 @@ function tKeys(): Array<[string, string]> {
 }
 /** Textos de los módulos de contenido (se muestran con t() a partir de listas). */
 function contentKeys(): string[] {
-  const k: string[] = [...Object.values(ABOUT).flat(), ...FREE_FOREVER, ...FLOW.flatMap((f) => [f.title, f.text]), ...VS.flat()];
+  const k: string[] = [...Object.values(ABOUT).flat(), ...stressTexts(), ...FREE_FOREVER, ...FLOW.flatMap((f) => [f.title, f.text]), ...VS.flat()];
   for (const s of TOUR) k.push(s.title, s.text, ...(s.bullets ?? []));
   const tools = readFileSync('src/views/chartTools.ts', 'utf8');
   for (const m of tools.matchAll(/(?:label|desc):\s*'((?:[^'\\]|\\.)*)'/g)) k.push(m[1].replace(/\\'/g, "'"));

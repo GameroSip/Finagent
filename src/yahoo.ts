@@ -107,6 +107,7 @@ export interface ChartMeta {
   longName?: string; shortName?: string; regularMarketTime?: number; regularMarketPrice?: number;
   chartPreviousClose?: number; previousClose?: number; fiftyTwoWeekHigh?: number; fiftyTwoWeekLow?: number;
   regularMarketDayHigh?: number; regularMarketDayLow?: number; regularMarketVolume?: number;
+  gmtoffset?: number; currentTradingPeriod?: { regular?: { start: number; end: number } };
 }
 export interface ChartData {
   meta: ChartMeta;

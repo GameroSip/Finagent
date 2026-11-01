@@ -58,24 +58,6 @@ jobs:
           node run-i18n.mjs ../dist-server ../e2e-shots 2>&1 | tee ../e2e-log/idiomas.txt; c=${PIPESTATUS[0]}
           exit $((a + b + c))
 
-      - name: Publicar el texto de las pruebas en la rama e2e-reports
-        if: always()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          if ! ls e2e-log/*.txt > /dev/null 2>&1; then echo "No hay textos de pruebas para publicar."; exit 0; fi
-          git config --global user.name "FinAgent e2e"
-          git config --global user.email "e2e@users.noreply.github.com"
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
-          if git ls-remote --exit-code --heads "$URL" e2e-reports > /dev/null 2>&1; then git clone -q --depth 1 --branch e2e-reports "$URL" .; else git init -q . && git checkout -q -b e2e-reports && git remote add origin "$URL"; fi
-          D="logs/${BRANCH//\//-}"; mkdir -p "$D" && cp "$GITHUB_WORKSPACE"/e2e-log/*.txt "$D"/ && echo "ejecución ${RUN_ID}" > "$D/ejecucion.txt"
-          git add logs && git commit -q -m "Pruebas de navegador de ${BRANCH} (ejecución ${RUN_ID})" && git push -q origin e2e-reports
-
       - name: Publicar capturas de la app
         if: always()
         uses: actions/upload-artifact@v4
@@ -94,6 +76,24 @@ jobs:
           node run-icons.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/iconos.txt; b=${PIPESTATUS[0]}
           node run-stress.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/termometro.txt; c=${PIPESTATUS[0]}
           exit $((a + b + c))
+
+      - name: Publicar el texto de las pruebas en la rama e2e-reports
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if ! ls e2e-log/*.txt > /dev/null 2>&1; then echo "No hay textos de pruebas para publicar."; exit 0; fi
+          git config --global user.name "FinAgent e2e"
+          git config --global user.email "e2e@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" e2e-reports > /dev/null 2>&1; then git clone -q --depth 1 --branch e2e-reports "$URL" .; else git init -q . && git checkout -q -b e2e-reports && git remote add origin "$URL"; fi
+          D="logs/${BRANCH//\//-}"; mkdir -p "$D" && cp "$GITHUB_WORKSPACE"/e2e-log/*.txt "$D"/ && echo "ejecución ${RUN_ID}" > "$D/ejecucion.txt"
+          git add logs && git commit -q -m "Pruebas de navegador de ${BRANCH} (ejecución ${RUN_ID})" && git push -q origin e2e-reports
 
       # El APK: si el repositorio tiene la variable API_BASE (Settings → Secrets and variables → Actions → Variables), es el APK de la BETA
       # (entra con código de invitación, sin clave de Gemini). Si no la tiene, es el APK de desarrollo (pide la clave de Gemini).

@@ -13,6 +13,7 @@ const activeTitle = (p) => p.$eval('.slide.active h2', (e) => e.textContent).cat
 
 // ---- 1) pantalla de carga: logo 3D y despegue (reloj del escenario controlado para detenerlo en cada instante)
 let p = await newPage({ key: '', intro: true, lang: '', motion: true });
+await p.waitForFunction(() => localStorage.getItem('finagent.session.v1') !== null, { timeout: 20000 });   // la primera carga termina de crear la cuenta ANTES de recargar (si no, en equipos rápidos se registraría dos veces)
 await p.evaluateOnNewDocument(() => { window.__t = 0; window.__stageClock = () => window.__t; window.__ac = 0; const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__ac++; } }; });
 await p.reload({ waitUntil: 'load' });
 await p.waitForSelector('.stage-canvas', { timeout: 20000 });

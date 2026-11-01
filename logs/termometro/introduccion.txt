@@ -3,7 +3,7 @@
   ✔ el logo 3D se dibuja de verdad: hay metal dorado en el centro y no está quemado a blanco 
   ✔ usa el idioma del dispositivo (inglés) sin preguntar 
   ✔ al terminar la carga suena UN efecto de sonido (una sola vez) 
-  ✘ la cuenta se creó de verdad durante la carga 2
+  ✔ la cuenta se creó de verdad durante la carga 
   ✔ sin desborde horizontal en T2-despegue 
   ✔ el logo despega: primero "going", luego "revealing" (la pantalla siguiente aparece mientras sube) y por último desaparece 
   ✔ sin desborde horizontal en T3-cuenta 
@@ -24,7 +24,7 @@
   ✔ "Qué hay detrás" dice la verdad: IA de Google (independiente de Google) y fuentes públicas sin acuerdos comerciales 
   ✔ al terminar entra a la app, ya en portugués 
   ✔ sin desborde horizontal en T5-app-pt 
-  ✘ al volver a abrir NO repite la introducción y conserva el idioma 2
+  ✔ al volver a abrir NO repite la introducción y conserva el idioma 
   ✔ en Ajustes está el selector de idioma con el actual 
   ✔ "Acerca de" muestra cómo funciona (5 pasos), qué hay detrás, la comparación con una IA común, cobertura, privacidad y límites 
   ✔ "Acerca de" no promete licencias, respaldo de Google ni tiempo real 
@@ -34,5 +34,5 @@
   ✔ con el sonido apagado en Ajustes no suena nada al abrir la app 
   ✔ en toda la prueba la app nunca llamó a Gemini directamente 
 
-RESULTADO (introducción e idiomas): 33/35 verificaciones OK
+RESULTADO (introducción e idiomas): 35/35 verificaciones OK
 ERRORES DE PÁGINA: []

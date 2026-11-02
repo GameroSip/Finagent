@@ -25,7 +25,7 @@ export function parseStooq(text: string): DayBar[] {
   }
   return bars.sort((x, y) => x.t - y.t);
 }
-const STOOQ_INDEX: Record<string, string> = { '^GSPC': '^spx', '^IXIC': '^ndq', '^DJI': '^dji', '^FTSE': '^ukx', '^GDAXI': '^dax', '^N225': '^nkx', '^BVSP': '^bvp', '^HSI': '^hsi' };
+const STOOQ_INDEX: Record<string, string> = { '^GSPC': '^spx', '^IXIC': '^ndq', '^DJI': '^dji', '^FTSE': '^ukx', '^GDAXI': '^dax', '^N225': '^nkx', '^BVSP': '^bvp', '^HSI': '^hsi', '^VIX': '^vix' };
 export const stooqSymbol = (symbol: string): string | null => (symbol.startsWith('^') ? STOOQ_INDEX[symbol] ?? null : /-USD$/.test(symbol) ? null : `${symbol.toLowerCase()}.us`);
 
 /** Velas diarias de Binance (datos públicos de mercado). Cada vela: [apertura, open, high, low, close, volume, ...] con precios como texto. */

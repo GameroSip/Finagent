@@ -17,7 +17,7 @@ export function har3Map(assets: Array<{ symbol: string; bars: DayBar[] }>): Map<
 }
 
 export interface Q12 { period: Period; assets: number; vsHar3: number; commonAssets: number; shareBeatsAyer: number; vsEwma: number; dmBetterThanAyer: number }
-export function q12(rows: PRec[], har3: Map<string, Map<number, number>>, period: Period): Q12 | null {
+export function q12(rows: PRec[], har3: Map<string, Map<number, number>>, period: Period, skipQ1: Set<string> = new Set()): Q12 | null {
   const A = byAsset(rows, period);
   if (!A.length) return null;
   const r3: number[] = [], rE: number[] = []; let beats = 0, dm = 0;
@@ -25,7 +25,7 @@ export function q12(rows: PRec[], har3: Map<string, Map<number, number>>, period
     const Lg = rs.map((x) => qlike(x.y, x.f.grupo)), La = rs.map((x) => qlike(x.y, x.f.ayer)), Le = rs.map((x) => qlike(x.y, x.f.EWMA));
     if (mean(Lg) < mean(La)) beats++; rE.push(mean(Lg) / mean(Le)); if (dmStat(La, Lg) > 1.96) dm++;
     const h = har3.get(sym), common = h ? rs.filter((x) => h.has(x.t)) : [];
-    if (common.length >= 250) r3.push(mean(common.map((x) => qlike(x.y, x.f.grupo))) / mean(common.map((x) => qlike(x.y, h!.get(x.t)!))));
+    if (!skipQ1.has(sym) && common.length >= 250) r3.push(mean(common.map((x) => qlike(x.y, x.f.grupo))) / mean(common.map((x) => qlike(x.y, h!.get(x.t)!))));
   }
   return { period, assets: A.length, vsHar3: median(r3), commonAssets: r3.length, shareBeatsAyer: beats / A.length, vsEwma: median(rE), dmBetterThanAyer: dm };
 }
@@ -69,8 +69,8 @@ export function vixCompare(rows: PRec[], vix: DayBar[] | null, period: Period): 
 }
 
 // ------------------------------------------------------------------ veredictos
-export function verdicts(rows: PRec[], har3: Map<string, Map<number, number>>, vix: DayBar[] | null) {
-  const c = PERIODS.map((p) => q12(rows, har3, p)), both = c.every((x) => x !== null), cc = c as Q12[];
+export function verdicts(rows: PRec[], har3: Map<string, Map<number, number>>, vix: DayBar[] | null, opts: { skipQ1?: Set<string> } = {}) {
+  const c = PERIODS.map((p) => q12(rows, har3, p, opts.skipQ1)), both = c.every((x) => x !== null), cc = c as Q12[];
   const Q1 = both && cc.every((x) => Number.isFinite(x.vsHar3) && x.vsHar3 <= 1.03), Q2 = both && cc.every((x) => x.shareBeatsAyer >= 0.8 && x.vsEwma <= 1.0);
   const Q3: Record<string, boolean> = {};
   for (const g of POOLED_GROUPS) { const cs = PERIODS.map((p) => calib(rows, p, g)).filter((x): x is Cal => x !== null); Q3[g] = cs.length > 0 && cs.every(calOk); }
@@ -84,17 +84,18 @@ export function verdicts(rows: PRec[], har3: Map<string, Map<number, number>>, v
 
 // ------------------------------------------------------------------ reporte
 const pc = (x: number, d = 1) => (Number.isFinite(x) ? `${(x * 100).toFixed(d)} %` : '—'), f3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3) : '—'), yn = (b: boolean) => (b ? '**PASA**' : '**NO PASA**');
-export function report(rows: PRec[], har3: Map<string, Map<number, number>>, vix: DayBar[] | null, models: Partial<Record<PooledGroup, PModel>>, meta: { when: string; synthetic: boolean; excluded: Array<{ symbol: string; why: string }>; prereg: string; assets: Array<{ symbol: string; group: string }> }): string {
-  const v = verdicts(rows, har3, vix), L: string[] = ['# Backtest 3: movimiento esperado con coeficientes por grupo', ''];
+export function report(rows: PRec[], har3: Map<string, Map<number, number>>, vix: DayBar[] | null, models: Partial<Record<PooledGroup, PModel>>, meta: { when: string; synthetic: boolean; excluded: Array<{ symbol: string; why: string }>; prereg: string; assets: Array<{ symbol: string; group: string }>; quality?: boolean; skipQ1?: Set<string> }): string {
+  const v = verdicts(rows, har3, vix, { skipQ1: meta.skipQ1 }), L: string[] = ['# Backtest 3: movimiento esperado con coeficientes por grupo', ''];
   if (meta.synthetic) L.push('> **DATOS SINTÉTICOS.** Solo prueban el circuito; no dicen nada de los mercados reales.', '');
   L.push(`Ejecutado: ${meta.when} · ${meta.assets.length} activos · criterios fijados en el registro previo (commit ${meta.prereg}), publicado antes de calcular nada.`, '');
+  if (meta.quality) L.push('> **Segundo intento** (registro previo PREREGISTRO-VOL4.md, no independiente del intento 1): filtro de calidad de datos aplicado al entrenamiento, a los cuantiles y a la evaluación. Criterios de éxito idénticos. ' + (meta.skipQ1?.size ? `Q1 excluye por calidad de datos: ${[...meta.skipQ1].join(', ')}.` : ''), '');
   L.push('## Veredictos (criterios del registro previo)', '', '| Criterio | Resultado |', '|---|---|',
     `| Q1 no peor que el modelo por activo (mediana ≤ 1,03) | ${yn(v.Q1)} |`, `| Q2 mejor que "ayer" (≥ 80 % de activos) y que EWMA (mediana ≤ 1,00) | ${yn(v.Q2)} |`,
     `| Q3 calibración del intervalo — todos | ${yn(v.Q3all)} |`, ...POOLED_GROUPS.map((g) => `| Q3 calibración — ${g} | ${yn(v.Q3[g])} |`),
     `| Q4 calibración condicional (tramos < 0,5× y ≥ 2×) | ${yn(v.Q4)} |`, `| Q5 "X veces lo habitual" crece con X (≥ 1,3 arriba, ≤ 0,9 abajo) | ${yn(v.Q5)} |`, `| Q6 el VIX mejora al modelo por grupo en el S&P 500 | ${yn(v.Q6)} |`, '',
     '**Decisión según el registro previo:** ' + (v.noData ? 'sin datos suficientes.' : `bloque "movimiento esperado": **${v.build ? 'SE CONSTRUYE' : 'NO se construye'}** · intervalo solo para: ${v.intervalGroups.length ? v.intervalGroups.join(', ') : '(ningún grupo)'} · VIX: ${v.useVix ? 'se incorpora' : 'no se incorpora'}.`), '');
   L.push('## Q1 y Q2: magnitud', '', '| Período | Activos | Activos con HAR por activo | Grupo/HAR por activo (mediana QLIKE) | Grupo mejor que ayer | Grupo/EWMA (mediana QLIKE) | Dif. significativa vs ayer |', '|---|---|---|---|---|---|---|');
-  for (const p of PERIODS) { const c = q12(rows, har3, p); if (c) L.push(`| ${p} | ${c.assets} | ${c.commonAssets} | ${f3(c.vsHar3)} | ${pc(c.shareBeatsAyer, 0)} | ${f3(c.vsEwma)} | ${c.dmBetterThanAyer} |`); }
+  for (const p of PERIODS) { const c = q12(rows, har3, p, meta.skipQ1); if (c) L.push(`| ${p} | ${c.assets} | ${c.commonAssets} | ${f3(c.vsHar3)} | ${pc(c.shareBeatsAyer, 0)} | ${f3(c.vsEwma)} | ${c.dmBetterThanAyer} |`); }
   L.push('', '## Q3: calibración del intervalo 5 %–95 % del retorno de 5 ruedas (cuantiles por grupo)', '', '| Grupo | Período | Casos | Cobertura | Cola izquierda | Cola derecha | ¿Pasa? |', '|---|---|---|---|---|---|---|');
   for (const g of GROUPS) for (const p of PERIODS) { const c = calib(rows, p, g); if (c) L.push(`| ${g} | ${p} | ${c.n} | ${pc(c.coverage)} | ${pc(c.left)} | ${pc(c.right)} | ${calOk(c) ? 'sí' : 'no'} |`); }
   L.push('', '## Q4: cobertura por tramo de pronóstico (todos)', '', '| Período | ' + BINS4.map(([b]) => `${b} (casos)`).join(' | ') + ' |', '|---|' + BINS4.map(() => '---').join('|') + '|');

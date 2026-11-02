@@ -1,0 +1,60 @@
+name: Backtest 4 - movimiento esperado con filtro de calidad de datos
+
+# Mide con datos reales (Yahoo, historia completa) los pronósticos de volatilidad y la cola izquierda. Criterios fijados ANTES en evals/radar/PREREGISTRO-VOL4.md.
+# Sin Gemini y sin secretos. El reporte queda en la rama "radar-reports" (reports/vol4-backtest.md) y en el resumen de la ejecución.
+on:
+  workflow_dispatch:
+  push:
+    branches: [vol-pooled4]
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tests
+        run: npx vitest run tests/vol.test.ts tests/vol2.test.ts tests/vol4.test.ts tests/radar.test.ts
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Descargar historia con yfinance
+        continue-on-error: true
+        run: |
+          pip install --quiet yfinance
+          python evals/radar/fetch_yf.py $(npx tsx evals/vol2-cli.ts --list)
+
+      - name: Backtest
+        env:
+          PREREG_COMMIT: 8d64535
+        run: npx tsx evals/vol2-cli.ts --quality 2>&1 | tee vol4-backtest.log
+
+      - name: Mostrar el reporte en la página de la ejecución
+        if: always()
+        run: |
+          [ -f evals/reports/vol4-backtest.md ] && cat evals/reports/vol4-backtest.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Publicar el reporte en la rama radar-reports
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ ! -f evals/reports/vol4-backtest.md ]; then echo "No hay reporte para publicar."; exit 0; fi
+          git config --global user.name "FinAgent radar"
+          git config --global user.email "radar@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" radar-reports > /dev/null 2>&1; then git clone -q --depth 1 --branch radar-reports "$URL" .; else git init -q . && git checkout -q -b radar-reports && git remote add origin "$URL"; fi
+          mkdir -p reports && cp "$GITHUB_WORKSPACE"/evals/reports/vol4-backtest* reports/ && cp "$GITHUB_WORKSPACE/vol4-backtest.log" reports/vol4-backtest.log 2>/dev/null || true
+          git add reports && git commit -q -m "Backtest 4 (ejecución ${RUN_ID})" && git push -q origin radar-reports

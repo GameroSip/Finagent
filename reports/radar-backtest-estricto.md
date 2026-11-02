@@ -1,6 +1,6 @@
 # Radar de tensión — backtest
 
-Ejecutado: 2026-11-02 22:47 UTC · 49 activos · períodos: 1927-12-30 a 2026-11-02
+Ejecutado: 2026-11-02 23:20 UTC · 49 activos · períodos: 1927-12-30 a 2026-11-02
 
 ## Cómo leer esto
 
@@ -118,7 +118,7 @@ Parámetros del radar (fijos): {"rsiPeriod":14,"rsiHigh":70,"overboughtLookback"
 | ^DJI | índices | 8771 | 1992-01-02 | 2026-11-02 |
 | ^RUT | índices | 9861 | 1987-09-10 | 2026-11-02 |
 | ^FTSE | índices | 10821 | 1984-01-03 | 2026-11-02 |
-| ^GDAXI | índices | 9823 | 1987-12-29 | 2026-11-01 |
+| ^GDAXI | índices | 9822 | 1987-12-29 | 2026-10-29 |
 | ^HSI | índices | 9830 | 1986-12-30 | 2026-10-29 |
 | SPY | ETF | 8498 | 1993-01-29 | 2026-11-02 |
 | QQQ | ETF | 6956 | 1999-03-10 | 2026-11-02 |

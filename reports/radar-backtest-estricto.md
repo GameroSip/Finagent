@@ -1,6 +1,6 @@
 # Radar de tensión — backtest
 
-Ejecutado: 2026-11-02 23:20 UTC · 49 activos · períodos: 1927-12-30 a 2026-11-02
+Ejecutado: 2026-11-02 23:24 UTC · 49 activos · períodos: 1927-12-30 a 2026-11-02
 
 ## Cómo leer esto
 

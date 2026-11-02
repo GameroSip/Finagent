@@ -1,0 +1,32 @@
+{
+ "índices": {
+  "desde": 1962,
+  "hasta": 2026,
+  "dias": 64335,
+  "activos": 7
+ },
+ "ETF": {
+  "desde": 1994,
+  "hasta": 2026,
+  "dias": 51641,
+  "activos": 8
+ },
+ "acciones": {
+  "desde": 1962,
+  "hasta": 2026,
+  "dias": 294714,
+  "activos": 29
+ },
+ "cripto": {
+  "desde": 2015,
+  "hasta": 2026,
+  "dias": 17433,
+  "activos": 5
+ },
+ "todos": {
+  "desde": 1962,
+  "hasta": 2026,
+  "dias": 428123,
+  "activos": 49
+ }
+}

@@ -1,8 +1,7 @@
 // Tarjeta del termómetro de tensión (pantalla del activo) y "Mi plan": un texto que escribe la persona y la app solo se lo recuerda.
 // El plan NO se envía a ningún servidor ni se le muestra a la IA: queda en este teléfono.
 import { locale, t } from '../i18n';
-import { RADAR_STATS } from '../data/radarStats';
-import { historyOf, STRESS_TEXTS as T, type StressLevel, type StressResult } from '../stress';
+import { historyOf, STRESS_TEXTS as T, type MoveResult, type StressLevel, type StressResult } from '../stress';
 import { esc, h, toast } from './dom';
 import { fmtNum } from './format';
 import { icon } from './icons';
@@ -16,6 +15,22 @@ export function setPlan(text: string): void {
 
 const pct = (x: number) => `${(x * 100).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;   // siempre un decimal: en una tabla, 4,0 y 14,6 se comparan mejor que 4 y 14,6
 const FILLED: Record<StressLevel, number> = { baja: 1, media: 2, alta: 3 };
+
+const signed = (x: number) => `${(x * 100).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero' })} %`;
+
+/** Bloque "Movimiento esperado de la semana" (vacío si el tipo de activo no está respaldado). */
+export function moveHtml(r: MoveResult): string {
+  if (r.kind === 'unsupported' && r.reason === 'tipo') return '';
+  const head = (extra = '') => `<div class="section" style="margin-top:22px"><div class="section-head"><h2>${esc(t(T.move.title))}</h2>${extra}</div>`;
+  if (r.kind === 'unsupported') return `${head()}<p class="stress-off" id="a-move-off">${esc(t(T.move.unsupported[r.reason]))}</p></div>`;
+  const date = new Date(r.asOf * 1000).toLocaleDateString(locale(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const x = r.ratio.toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `${head(`<span class="muted" style="font-size:12px">${esc(t('al cierre del {d}', { d: date }))}</span>`)}
+    <div class="move"><div class="move-range num" id="a-move-range">${esc(t(T.move.range, { lo: signed(r.low), hi: signed(r.high) }))}</div>
+      <p class="move-cover">${esc(t(T.move.cover))}</p>
+      <div class="move-ratio" id="a-move-ratio">${esc(t(T.move.ratio, { x }))}</div>
+      <p class="stress-src">${esc(t(T.move.outside))}</p><p class="stress-src">${esc(t(T.move.source, { a: r.assets, g: t(T.groups[r.group]) }))}</p></div></div>`;
+}
 
 /** HTML de la sección (vacío si el tipo de activo no está respaldado por el backtest). */
 export function stressHtml(r: StressResult): string {
@@ -37,7 +52,7 @@ export function stressHtml(r: StressResult): string {
       <div class="stress-sub">${esc(t(T.after))}</div>
       <div class="stress-hist"><div class="sh-row head"><span></span><span>${esc(t(T.levelShort[r.level]))}</span><span>${esc(t(T.usual))}</span></div>
         ${row(T.drop, hist.stats.t5.drop, hist.stats.t5.expDrop)}${row(T.up, hist.stats.t5.up, hist.stats.t5.expUp)}</div>
-      <p class="stress-src">${esc(t('{n} días en este nivel · {a} activos ({g}) · {y}–2026', { n: fmtNum(hist.stats.n, 0), a: hist.assets, g: t(T.groups[r.group]), y: RADAR_STATS.desde }))}. ${esc(t(T.usualNote))}</p>
+      <p class="stress-src">${esc(t('{n} días en este nivel · {a} activos ({g}) · {y}–2026', { n: fmtNum(hist.stats.n, 0), a: hist.assets, g: t(T.groups[r.group]), y: hist.desde }))}. ${esc(t(T.usualNote))}</p>
       ${planBlock}
       <p class="stress-note">${esc(t(T.note))}</p>
     </div></div>`;

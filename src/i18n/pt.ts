@@ -588,4 +588,12 @@ export const PT: Record<string, string> = {
   "Plan guardado": "Plano salvo",
   "Plan borrado": "Plano apagado",
   "{n} días en este nivel · {a} activos ({g}) · {y}–2026": "{n} dias neste nível · {a} ativos ({g}) · {y}–2026",
+  "Movimiento esperado de la semana": "Movimento esperado da semana",
+  "{lo} a {hi}": "{lo} a {hi}",
+  "Rango dentro del cual terminaron alrededor de 9 de cada 10 semanas con un pronóstico como este (próximas 5 ruedas).": "Faixa dentro da qual terminaram cerca de 9 de cada 10 semanas com uma previsão como esta (próximos 5 pregões).",
+  "Hoy: {x} veces lo habitual de este activo (promedio del último año).": "Hoje: {x} vezes o habitual deste ativo (média do último ano).",
+  "Fuera del rango quedó cerca de 1 de cada 10 semanas, más o menos la mitad por debajo y la mitad por encima. Es un rango de volatilidad: no es un tope ni una predicción de dirección.": "Cerca de 1 em cada 10 semanas ficou fora da faixa, mais ou menos metade abaixo e metade acima. É uma faixa de volatilidade: não é um teto nem uma previsão de direção.",
+  "{a} activos del mismo tipo ({g}) · coeficientes comunes, validados con un backtest propio. Solo incluye activos que hoy existen, así que la realidad pudo ser algo peor.": "{a} ativos do mesmo tipo ({g}) · coeficientes comuns, validados com um backtest próprio. Inclui apenas ativos que existem hoje, então a realidade pode ter sido um pouco pior.",
+  "No disponible: los datos diarios de este activo no traen el rango (máximo y mínimo) completo.": "Indisponível: os dados diários deste ativo não trazem a faixa (máxima e mínima) completa.",
+  "No disponible: se necesita aproximadamente 1 año de datos diarios.": "Indisponível: é necessário cerca de 1 ano de dados diários.",
 };

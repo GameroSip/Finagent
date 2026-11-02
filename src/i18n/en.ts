@@ -588,4 +588,12 @@ export const EN: Record<string, string> = {
   "Plan guardado": "Plan saved",
   "Plan borrado": "Plan deleted",
   "{n} días en este nivel · {a} activos ({g}) · {y}–2026": "{n} days at this level · {a} assets ({g}) · {y}–2026",
+  "Movimiento esperado de la semana": "Expected move this week",
+  "{lo} a {hi}": "{lo} to {hi}",
+  "Rango dentro del cual terminaron alrededor de 9 de cada 10 semanas con un pronóstico como este (próximas 5 ruedas).": "Range within which about 9 out of 10 weeks ended, given a forecast like this one (next 5 sessions).",
+  "Hoy: {x} veces lo habitual de este activo (promedio del último año).": "Today: {x} times this asset's usual level (last-year average).",
+  "Fuera del rango quedó cerca de 1 de cada 10 semanas, más o menos la mitad por debajo y la mitad por encima. Es un rango de volatilidad: no es un tope ni una predicción de dirección.": "About 1 in 10 weeks ended outside the range, roughly half below and half above. It is a volatility range: it is not a cap and it does not predict direction.",
+  "{a} activos del mismo tipo ({g}) · coeficientes comunes, validados con un backtest propio. Solo incluye activos que hoy existen, así que la realidad pudo ser algo peor.": "{a} assets of the same type ({g}) · shared coefficients, validated with our own backtest. It only includes assets that exist today, so reality may have been somewhat worse.",
+  "No disponible: los datos diarios de este activo no traen el rango (máximo y mínimo) completo.": "Not available: this asset's daily data does not include the full range (high and low).",
+  "No disponible: se necesita aproximadamente 1 año de datos diarios.": "Not available: about 1 year of daily data is needed.",
 };

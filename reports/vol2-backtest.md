@@ -1,6 +1,6 @@
 # Backtest 3: movimiento esperado con coeficientes por grupo
 
-Ejecutado: 2026-11-02 22:37 UTC · 49 activos · criterios fijados en el registro previo (commit 3cbd797), publicado antes de calcular nada.
+Ejecutado: 2026-11-02 22:43 UTC · 49 activos · criterios fijados en el registro previo (commit 3cbd797), publicado antes de calcular nada.
 
 ## Veredictos (criterios del registro previo)
 

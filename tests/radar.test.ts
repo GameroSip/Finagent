@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildReport, verdict } from '../evals/radar/report';
 import { binanceSymbol, cachePath, fetchDaily, loadCached, parseKlines, parseStooq, retryDelay, stooqSymbol, synthetic } from '../evals/radar/data';
 import { levelOf, radarSeries, RADAR_PARAMS, type DayBar } from '../src/radar';
-import { backtest, baseRates, forwardMax, forwardMin, forwardRet, median, quantile, wilson, type AssetSeries, type Block, type Cell } from '../src/radarBacktest';
+import { backtest, baseRates, rowsFor, forwardMax, forwardMin, forwardRet, median, quantile, wilson, type AssetSeries, type Block, type Cell } from '../src/radarBacktest';
 
 /** Barras planas (precio 100, rango 99,5–100,5, volumen 1 M) para armar escenarios a mano. */
 const flat = (n: number, o: Partial<DayBar> = {}): DayBar[] => Array.from({ length: n }, (_, i) => ({ t: 1_000_000 + i * 86400, o: 100, h: 100.5, l: 99.5, c: 100, v: 1_000_000, ...o }));
@@ -159,5 +159,16 @@ describe('descarga de datos (sin internet: todo simulado)', () => {
     expect(yahooCalls).toBeLessThanOrEqual(4 * 4);                                         // los 4 primeros activos intentan; del 5.º en adelante ya no se le pide nada a Yahoo
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 429 }));
     await expect(fetchDaily('B1', { blocked: 4 })).rejects.toThrow(/bloqueado|sin datos|Stooq|Binance/);
+  });
+});
+
+describe('modo estricto del backtest', () => {
+  it('descarta los días con datos de rango degenerado y los que no tienen las 4 condiciones medibles', () => {
+    const good = synthetic(5, 3000), flatHead: AssetSeries = { symbol: 'F', group: 'índices', bars: synthetic(6, 3000).map((b, i) => (i < 1200 ? { ...b, o: b.c, h: b.c, l: b.c, v: 0 } : b)) };
+    const loose = rowsFor(flatHead, 5), strict = rowsFor(flatHead, 5, { strict: true });
+    expect(strict.length).toBeLessThan(loose.length);
+    expect(Math.min(...strict.map((r) => r.t))).toBeGreaterThan(flatHead.bars[1200].t);                       // ningún día de la parte sin rango
+    const clean: AssetSeries = { symbol: 'C', group: 'índices', bars: good };
+    expect(rowsFor(clean, 5, { strict: true }).length).toBeGreaterThan(rowsFor(clean, 5).length * 0.9);        // en datos sanos casi no cambia nada
   });
 });

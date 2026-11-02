@@ -5,13 +5,13 @@ import { t } from '../i18n';
 import { googleAvailable, isServerMode, quotaInfo } from '../server';
 import { esc, h } from '../ui/dom';
 import { icon, type IconName } from '../ui/icons';
-import { logo3dHtml } from '../ui/logo3d';
+import { markSvg } from '../ui/logo';
 import { openSheet } from '../ui/sheet';
 
 export const FLOW: Array<{ ic: IconName; title: string; text: string }> = [
   { ic: 'globe', title: 'Fuentes de datos', text: 'Precios, noticias y datos macro de fuentes públicas.' },
   { ic: 'gauge', title: 'Herramientas de FinAgent', text: 'Obtienen y calculan los datos: porcentajes, indicadores y comparaciones.' },
-  { ic: 'sparkles', title: 'IA (Gemini)', text: 'Interpreta tu pregunta y redacta la respuesta. No calcula.' },
+  { ic: 'layers', title: 'IA (Gemini)', text: 'Interpreta tu pregunta y redacta la respuesta. No calcula.' },
   { ic: 'shield', title: 'Verificador de cifras', text: 'Compara cada cifra con los datos. Si no se puede respaldar, se corrige o se quita.' },
   { ic: 'badgeCheck', title: 'Tu respuesta', text: 'Con la fuente y la fecha de cada dato.' },
 ];
@@ -25,7 +25,7 @@ export const VS: Array<[string, string, string]> = [
 export function openAbout(o: { version: string; onReplayIntro?: () => void }): void {
   const server = isServerMode(), q = quotaInfo();
   const el = h('div', { class: 'about-sheet' });
-  el.innerHTML = `<div class="about-hero">${logo3dHtml(104)}<h2>FinAgent</h2><div class="about-ver" data-notrans>${esc(t('Versión'))} ${esc(o.version)}</div><p>${esc(ABOUT.what)}</p></div>
+  el.innerHTML = `<div class="about-hero">${markSvg(40)}<h2>FinAgent</h2><div class="about-ver" data-notrans>${esc(t('Versión'))} ${esc(o.version)}</div><p>${esc(ABOUT.what)}</p></div>
     <section class="about-sec"><h3>${icon('activity', 18)} ${esc(t('Cómo funciona'))}</h3>
       <div class="flow">${FLOW.map((f, i) => `<div class="flow-node" style="--d:${i * 0.12}s"><span class="flow-ic">${icon(f.ic, 20)}</span><div><b>${esc(t(f.title))}</b><span>${esc(t(f.text))}</span></div></div>${i < FLOW.length - 1 ? '<i class="flow-line"></i>' : ''}`).join('')}</div></section>
     <section class="about-sec"><h3>${icon('layers', 18)} ${esc(t('Qué hay detrás'))}</h3>

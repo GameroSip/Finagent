@@ -14,6 +14,7 @@ import { modelLabel } from '../models';
 import { getSettings, subscribe } from '../store';
 import { aiTitle, fallbackTitle } from '../titles';
 import { $, esc, h, openUrl, toast } from '../ui/dom';
+import { markSvg } from '../ui/logo';
 import { icon, type IconName } from '../ui/icons';
 import { promptSheet } from '../ui/sheet';
 import { renderRich, type Rich } from './cards';
@@ -31,7 +32,7 @@ const SUGGESTIONS: Array<{ ic: IconName; title: string; sub: string; prompt: str
   { ic: 'landmark', title: 'Dólar y riesgo país', sub: 'Argentina: brecha, MEP, CCL e inflación', prompt: '¿Cómo están el dólar, la brecha y el riesgo país hoy? ¿Qué te dice eso del momento de Argentina?' },
 ];
 
-const who = (bad = false) => `<div class="ai-who"><span class="ai-av ${bad ? 'bad' : ''}">${icon(bad ? 'warn' : 'sparkles', 14)}</span><b>FinAgent</b></div>`;
+const who = (bad = false) => `<div class="ai-who"><span class="ai-av ${bad ? 'bad' : ''}">${bad ? icon('warn', 14) : markSvg(10, 'currentColor')}</span><b>FinAgent</b></div>`;
 
 const LABELS: Record<string, (a: any) => string> = {
   search_ticker: (a) => t('Buscando "{q}"', { q: a.query ?? '' }), get_quote: (a) => t('Cotización de {s}', { s: a.ticker }), get_fundamentals: (a) => t('Fundamentales de {s}', { s: a.ticker }),
@@ -76,7 +77,7 @@ export function createChatView(ctx: Ctx): ChatView {
     <div class="chat-head">
       <button class="icon-btn" id="c-hist" aria-label="Historial de chats">${icon('menu', 20)}</button>
       <button class="chat-title" id="c-title" aria-label="Renombrar chat"><span class="t" id="c-title-t" data-notrans>Nuevo chat</span>
-        <span class="model-chip" id="c-model">${icon('sparkles', 12)}<span class="t">Gemini · automático</span></span></button>
+        <span class="model-chip" id="c-model"><span class="t">Gemini · automático</span></span></button>
       <button class="icon-btn" id="c-new" aria-label="Nuevo chat">${icon('squarePen', 20)}</button>
     </div>
     <div class="chat-scroll" id="c-scroll"></div>
@@ -151,11 +152,11 @@ export function createChatView(ctx: Ctx): ChatView {
     destroyRiches();
     scroll.innerHTML = '';
     const e = h('div', { class: 'chat-empty' });
-    e.innerHTML = `<div class="orb"><div class="orb-core">${icon('sparkles', 34)}</div></div>
-      <h2 style="font-size:24px;font-weight:760;letter-spacing:-.03em;margin-top:18px">¿Qué querés saber<br>del mercado?</h2>
-      <p class="muted" style="margin-top:8px;max-width:290px">Pregunto a los datos reales, verifico cada cifra y te muestro de dónde salió.</p>
+    e.innerHTML = `<div class="ce-eyebrow">FinAgent</div>
+      <h2>¿Qué querés saber<br>del mercado?</h2>
+      <p class="ce-sub">Pregunto a los datos reales, verifico cada cifra y te muestro de dónde salió.</p>
       ${isServerMode() ? planBannerHtml() : ''}
-      <div class="sugg">${SUGGESTIONS.map((s, i) => `<button class="sug" data-i="${i}"><span class="sug-ic">${icon(s.ic, 18)}</span><span style="flex:1;text-align:left"><b>${esc(s.title)}</b><span class="muted">${esc(s.sub)}</span></span>${icon('arrowUpRight', 15)}</button>`).join('')}</div>`;
+      <div class="sugg">${SUGGESTIONS.map((s, i) => `<button class="sug" data-i="${i}"><span style="flex:1;text-align:left"><b>${esc(s.title)}</b><span class="muted">${esc(s.sub)}</span></span>${icon('arrowUpRight', 15)}</button>`).join('')}</div>`;
     scroll.append(e);
   }
 

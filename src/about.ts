@@ -21,7 +21,7 @@ export const ABOUT = {
   freeTier: 'Por ahora FinAgent usa el nivel gratuito de Gemini: Google puede usar lo que escribas para mejorar sus productos. No incluyas datos personales ni información financiera sensible en tus consultas.',
   // Solo si la persona inicia sesión con Google: el servidor guarda únicamente el identificador de la cuenta (lo verifica tests/server.test.ts).
   privacyGoogle: 'Si iniciás sesión con Google, FinAgent guarda solo un identificador de tu cuenta de Google: no guarda tu correo ni tu nombre.',
-  credits: 'Gráficos: TradingView Lightweight Charts™ (tradingview.com). Iconos: Lucide. Tipografía: Inter. Datos: Yahoo Finance, DolarAPI, ArgentinaDatos, Google News, alternative.me. IA: Google Gemini.',
+  credits: 'Gráficos: TradingView Lightweight Charts™ (tradingview.com). Iconos: Lucide. Tipografía: IBM Plex. Datos: Yahoo Finance, DolarAPI, ArgentinaDatos, Google News, alternative.me. Logos de monedas: CoinGecko. IA: Google Gemini.',
 };
 
 /** Todo el texto visible de la presentación, en una lista (para controlarlo). */

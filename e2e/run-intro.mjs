@@ -1,6 +1,7 @@
 // Introducción (carga 3D → cuenta → idioma → recorrido), idiomas y "Acerca de" en un navegador real, con la app compilada con servidor.
 //   VITE_API_BASE=https://api.finagent.test npx vite build --outDir dist-server --emptyOutDir
 //   cd e2e && node run-intro.mjs ../dist-server ../e2e-shots
+import sharp from 'sharp';
 import * as M from './mocks.mjs';
 import { browser, check, checks, log, newPage, shot, server, sleep, tab } from './run.mjs';
 
@@ -10,26 +11,37 @@ const click = (p, sel) => p.evaluate((s) => document.querySelector(s).click(), s
 const has = (p, sel) => p.$(sel).then((x) => x !== null);
 const activeTitle = (p) => p.$eval('.slide.active h2', (e) => e.textContent).catch(() => '');
 
-// ---- 1) primera apertura: el navegador de prueba está en inglés, así que la introducción arranca en inglés (idioma del dispositivo)
-let p = await newPage({ key: '', intro: true, lang: '' });
-await p.waitForSelector('.intro .l3d', { timeout: 8000 }); await sleep(1000);
-const okMid = await p.$$eval('.intro-checks li.ok', (l) => l.length);
-check('arranca con la pantalla de carga: logo de FinAgent en 3D, con animación', await p.evaluate(() => { const c = document.querySelector('.l3d-coin'); const cs = getComputedStyle(c); return cs.animationName === 'l3dSwing' && getComputedStyle(document.querySelector('.l3d-stage')).transformStyle === 'preserve-3d' && document.querySelectorAll('.l3d-layer').length >= 10; }));
-check('el logo 3D tiene espesor (capas apiladas), anillos orbitales y velas flotantes', (await p.$$('.l3d-layer')).length === 10 && (await p.$$('.l3d-ring')).length === 2 && (await p.$$('.l3d-bar')).length === 4);
-check('usa el idioma del dispositivo (inglés) sin preguntar', /Your AI financial analyst/.test(await text(p, '.intro')) && (await p.evaluate(() => document.documentElement.lang)) === 'en', await text(p, '.intro'));
-await shot(p, 'T1-carga');
-await p.waitForSelector('#a-guest', { timeout: 10000 });
-check('hace un mini proceso de configuración con 3 pasos que se van tildando (y la cuenta se crea de verdad)', okMid >= 1 && M.apiState.deviceAuths === 1, `tildes a mitad: ${okMid}, cuentas: ${M.apiState.deviceAuths}`);
-
-// ---- 2) cuenta
-await sleep(300);
+// ---- 1) pantalla de carga: logo 3D y despegue (reloj del escenario controlado para detenerlo en cada instante)
+let p = await newPage({ key: '', intro: true, lang: '', motion: true });
+await p.evaluateOnNewDocument(() => { window.__t = 0; window.__stageClock = () => window.__t; window.__ac = 0; const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__ac++; } }; });
+await p.reload({ waitUntil: 'load' });
+await p.waitForSelector('.stage-canvas', { timeout: 20000 });
+const frame = () => p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+const step = async (ms) => { await p.evaluate((m) => { window.__t += m; }, ms); await frame(); };
+const phase = () => p.evaluate(() => document.querySelector('.launch')?.className ?? 'ninguna');
+await sleep(500); await shot(p, 'T1-carga');
+check('muestra la pantalla de carga con el logo 3D (WebGL), la palabra FINAGENT y una línea de progreso', await p.evaluate(() => { const c = document.querySelector('.stage-canvas'); return !!c && c.clientWidth > 200 && c.clientHeight > 300 && /FINAGENT/.test(document.querySelector('.launch-word')?.textContent ?? '') && !!document.querySelector('.launch-line i'); }));
+{ // se mira una captura real: en el centro tiene que haber un objeto dorado (no un lienzo vacío) y no puede estar quemado a blanco
+  const box = await p.evaluate(() => { const r = document.querySelector('.stage-canvas').getBoundingClientRect(); return { x: r.width * 0.25, y: r.height * 0.3, width: r.width * 0.5, height: r.height * 0.3 }; });
+  const png = await p.screenshot({ clip: box }); const { data } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let gold = 0, white = 0, total = data.length / 3; for (let i = 0; i < data.length; i += 3) { const [r, g, b] = [data[i], data[i + 1], data[i + 2]]; if (r > 90 && r > b * 1.35 && g > b) gold++; if (r > 235 && g > 235 && b > 225) white++; }
+  check('el logo 3D se dibuja de verdad: hay metal dorado en el centro y no está quemado a blanco', gold / total > 0.04 && white / total < 0.02, `dorado ${(100 * gold / total).toFixed(1)} %, blanco ${(100 * white / total).toFixed(1)} %`); }
+check('usa el idioma del dispositivo (inglés) sin preguntar', (await p.evaluate(() => document.documentElement.lang)) === 'en');
+await p.waitForFunction(() => document.querySelector('.launch.going'), { timeout: 20000, polling: 40 });
+check('al terminar la carga suena UN efecto de sonido (una sola vez)', (await p.evaluate(() => window.__ac)) === 1, String(await p.evaluate(() => window.__ac)));
+check('la cuenta se creó de verdad durante la carga', M.apiState.deviceAuths === 1, String(M.apiState.deviceAuths));
+const seen = new Set(); let steps = 0;
+while ((await p.$('.launch')) && steps++ < 160) { seen.add(await phase()); if (steps === 30) await shot(p, 'T2-despegue'); await step(33); }
+check('el logo despega: primero "going", luego "revealing" (la pantalla siguiente aparece mientras sube) y por último desaparece', [...seen].some((c) => /going/.test(c) && !/revealing/.test(c)) && [...seen].some((c) => /revealing/.test(c)) && !(await p.$('.launch')), JSON.stringify([...seen]));
+await p.waitForSelector('#a-guest', { timeout: 8000 }); await sleep(900);
+await shot(p, 'T3-cuenta');
 const acc = await text(p, '.intro');
 check('luego pide iniciar sesión, en inglés: Google y correo como "Coming soon" y entrar como invitado', /Sign in to FinAgent/.test(acc) && /Continue with Google/.test(acc) && /Continue with email/.test(acc) && (acc.match(/Coming soon/g) ?? []).length === 2 && /Continue as guest/.test(acc), acc.slice(0, 200));
 check('los botones que todavía no existen están desactivados (no se promete lo que no anda)', await p.$$eval('.auth-btn', (b) => b.every((x) => x.disabled)));
-await shot(p, 'T2-cuenta');
+check('la pantalla de cuenta es sobria: sin degradés ni destellos de colores', await p.evaluate(() => ![...document.querySelectorAll('.intro *')].some((e) => /gradient/.test(getComputedStyle(e).backgroundImage) && !e.closest('.a-rule'))));
 
 // ---- 3) idioma: se cambia al instante
-await click(p, '#a-guest'); await p.waitForSelector('.lang-grid', { timeout: 4000 }); await sleep(300);
+await click(p, '#a-guest'); await p.waitForSelector('.lang-grid', { timeout: 6000 }); await sleep(900);
 check('pide elegir el idioma, con el del dispositivo ya marcado', /Choose your language/.test(await text(p, '.intro')) && await p.$eval('.lang-card.on', (e) => e.dataset.l) === 'en');
 await click(p, '.lang-card[data-l="es"]'); await sleep(250);
 check('al elegir Español toda la pantalla pasa a español al instante', /Elegí tu idioma/.test(await text(p, '.intro')) && /Continuar/.test(await text(p, '#l-next')));
@@ -60,7 +72,8 @@ check('al terminar entra a la app, ya en portugués', (await p.evaluate(() => do
 await shot(p, 'T5-app-pt');
 
 // ---- 5) las siguientes aperturas: splash corto y directo a la app (sin repetir la introducción), en el idioma elegido
-await p.reload({ waitUntil: 'load' });
+await p.close();
+p = await newPage({ key: '', lang: '' });                  // reabrir la app (con movimiento reducido: el reloj del escenario de arriba ya no aplica)
 await p.waitForSelector('.tabbar', { timeout: 20000 }); await sleep(600);
 check('al volver a abrir NO repite la introducción y conserva el idioma', !(await has(p, '.intro')) && (await p.evaluate(() => document.documentElement.lang)) === 'pt' && M.apiState.deviceAuths === 1, String(M.apiState.deviceAuths));
 
@@ -69,7 +82,7 @@ await tab(p, 'settings'); await sleep(900);
 check('en Ajustes está el selector de idioma con el actual', /Idioma/.test(await text(p, '#s-lang')) && /Português/.test(await text(p, '#s-lang')), await text(p, '#s-lang'));
 await click(p, '#s-about'); await p.waitForSelector('.about-sheet .flow', { timeout: 4000 }); await sleep(1400);
 const ab = await text(p, '.about-sheet');
-check('"Acerca de" muestra cómo funciona (5 pasos), qué hay detrás, la comparación con una IA común, cobertura, privacidad y límites', (await p.$$('.flow-node')).length === 5 && /Como funciona/.test(ab) && /O que há por trás/.test(ab) && /IA comum/.test(ab) && /Cobertura/.test(ab) && /Sua privacidade/.test(ab) && /Limites e aviso legal/.test(ab), ab.slice(0, 160));
+check('"Acerca de" muestra cómo funciona (5 pasos), qué hay detrás, la comparación con una IA común, cobertura, privacidad y límites', (await p.$$('.flow-node')).length === 5 && /como funciona/i.test(ab) && /o que há por trás/i.test(ab) && /ia comum/i.test(ab) && /cobertura/i.test(ab) && /sua privacidade/i.test(ab) && /limites e aviso legal/i.test(ab), ab.slice(0, 160));
 check('"Acerca de" no promete licencias, respaldo de Google ni tiempo real', !/licen[çc]|respaldad|avalizad|tempo real|todos os mercados/i.test(ab) && /independente do Google/.test(ab));
 await shot(p, 'T6-acerca-de');
 await p.evaluate(() => document.querySelector('.sheet-back').click()); await sleep(450);
@@ -81,10 +94,12 @@ await p.close();
 
 // ---- 7) "Omitir" lleva directo a la app
 p = await newPage({ key: '', intro: true, lang: 'es' });
-await p.evaluate(() => localStorage.clear()); await p.reload({ waitUntil: 'load' });   // el almacenamiento se comparte entre pestañas: se empieza de cero
-await p.waitForSelector('#a-guest', { timeout: 30000 }); await click(p, '#a-guest'); await click(p, '#l-next'); await p.waitForSelector('#t-skip', { timeout: 4000 });
+await p.evaluateOnNewDocument(() => { window.__ac = 0; const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__ac++; } }; });
+await p.evaluate(() => { localStorage.clear(); localStorage.setItem('finagent.sound.v1', '0'); }); await p.reload({ waitUntil: 'load' });   // el almacenamiento se comparte entre pestañas: se empieza de cero (y con el sonido apagado)
+await p.waitForSelector('#a-guest', { timeout: 30000 }); await click(p, '#a-guest'); await p.waitForSelector('#l-next', { timeout: 5000 }); await sleep(300); await click(p, '#l-next'); await p.waitForSelector('#t-skip', { timeout: 5000 });
 await click(p, '#t-skip'); await p.waitForSelector('.tabbar', { timeout: 8000 });
 check('"Omitir" salta el recorrido y entra a la app', (await has(p, '.tabbar')) && !(await has(p, '.intro')));
+check('con el sonido apagado en Ajustes no suena nada al abrir la app', (await p.evaluate(() => window.__ac)) === 0, String(await p.evaluate(() => window.__ac)));
 await p.close();
 
 check('en toda la prueba la app nunca llamó a Gemini directamente', !log.requests.some((r) => r.includes('generativelanguage.googleapis.com')));

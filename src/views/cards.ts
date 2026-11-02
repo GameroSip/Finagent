@@ -22,7 +22,7 @@ function shell(title: string, sub: string, ic: IconName, onHead?: () => void): {
 
 const pillHtml = (pct: number | null | undefined) => {
   const c = dirClass(pct ?? null);
-  return `<span class="pill ${c}">${c === 'up' ? icon('arrowUp', 11) : c === 'down' ? icon('arrowDown', 11) : ''}${fmtPct(pct ?? null, false)}</span>`;
+  return `<span class="pill ${c}">${c === 'up' ? icon('arrowUp', 11) : c === 'down' ? icon('arrowDown', 11) : ''}${fmtPct(pct ?? null)}</span>`;
 };
 
 const PERIOD: Record<string, string> = { '6mo': '6 meses', '1y': '1 año', '2y': '2 años', '5y': '5 años' };

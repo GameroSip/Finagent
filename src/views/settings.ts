@@ -1,6 +1,7 @@
 // Ajustes: lo mínimo. El modelo y los límites son automáticos; acá solo hay cuenta, tema, diagnóstico y datos.
 import { ABOUT } from '../about';
 import { getLang, LANGS, setLang } from '../i18n';
+import { setSound, soundOn } from '../ui/sfx';
 import { openAbout } from './about';
 import { openPlans } from './plans';
 import { fetchMe, isCodeShape, isServerMode, normalizeCode, PlanCodeError, planCodeMessage, quotaInfo, redeemPlanCode, googleAvailable, GoogleError, googleMessage, signInWithGoogle } from '../server';
@@ -18,7 +19,7 @@ import { logoSvg } from '../ui/logo';
 import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
 import { t } from '../i18n';
 
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 
 interface Probe { name: string; run: () => Promise<unknown> }
 
@@ -28,7 +29,7 @@ export function createSettingsView(ctx: Ctx): View {
   const quotaText = () => { const q = quotaInfo(); return q.remaining && q.plan ? t('{d} de {l} conversaciones hoy · {m} este mes', { d: q.remaining.day, l: q.plan.dailyLimit, m: q.remaining.month }) : t('Cargando…'); };
   const serverAccountHtml = () => { const q = quotaInfo(), p = q.plan;
     return `<div class="set-group"><div class="set-title">Tu plan</div><div class="card set-card">
-        <div class="set-row"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1"><div class="set-main">${esc(t('Plan {name}', { name: t(p?.label ?? '') }))}</div><div class="set-sub" id="s-quota">${esc(quotaText())}</div></div></div>
+        <div class="set-row"><span class="set-ic">${icon('layers', 18)}</span><div style="flex:1"><div class="set-main">${esc(t('Plan {name}', { name: t(p?.label ?? '') }))}</div><div class="set-sub" id="s-quota">${esc(quotaText())}</div></div></div>
         <div class="set-row"><span class="set-ic">${icon('zap', 18)}</span><div style="flex:1"><div class="set-main">Modelo de IA</div><div class="set-sub">Tu plan usa un modelo fijo</div></div><span class="val" id="s-model">${esc(p?.modelLabel ?? '')}</span></div>
         ${googleAvailable() ? `<button class="set-row" id="s-google"><span class="set-ic">G</span><div style="flex:1;text-align:left"><div class="set-main">Iniciar sesión con Google</div><div class="set-sub">Guardá tu plan aunque cambies de teléfono</div></div></button>` : ''}
         <div class="set-note" id="s-tiernote" ${q.tier === 'free' ? '' : 'hidden'}>${esc(ABOUT.freeTier)}</div>
@@ -62,7 +63,7 @@ export function createSettingsView(ctx: Ctx): View {
         <div><div style="font-weight:750;font-size:18px">FinAgent</div><div class="muted" style="font-size:13px">${t('Versión')} ${VERSION} · ${t(isServerMode() ? 'beta cerrada' : 'todo en tu teléfono')}</div></div></div>
 
       ${isServerMode() ? serverAccountHtml() : `<div class="set-group"><div class="set-title">Inteligencia artificial</div><div class="card set-card">
-        <div class="set-row"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1"><div class="set-main">Modelo</div><div class="set-sub">Automático: usa el mejor disponible y se actualiza solo</div></div><span class="val">${esc(id ? modelLabel(id) : 'Gemini')}</span></div>
+        <div class="set-row"><span class="set-ic">${icon('layers', 18)}</span><div style="flex:1"><div class="set-main">Modelo</div><div class="set-sub">Automático: usa el mejor disponible y se actualiza solo</div></div><span class="val">${esc(id ? modelLabel(id) : 'Gemini')}</span></div>
         <button class="set-row" id="s-refresh"><span class="set-ic">${icon('refresh', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Buscar modelos nuevos</div></div></button>
       </div></div>
 
@@ -72,6 +73,7 @@ export function createSettingsView(ctx: Ctx): View {
 
       <div class="set-group"><div class="set-title">Apariencia</div><div class="card set-card">
         <button class="set-row" id="s-lang"><span class="set-ic">${icon('globe', 18)}</span><div class="set-main" style="flex:1;text-align:left">Idioma</div><span class="val" data-notrans>${esc(LANGS.find((l) => l.id === getLang())!.native)}</span></button>
+        <label class="set-row" id="s-sound"><span class="set-ic">${icon('volume2', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Sonidos</div><div class="set-sub">Efecto de sonido al abrir la app</div></div><input type="checkbox" class="tgl" id="s-sound-t" ${soundOn() ? 'checked' : ''}></label>
         <div class="set-row"><span class="set-ic">${icon('moon', 18)}</span><div class="set-main" style="flex:1">Tema</div>
           <div class="seg" id="s-theme">${(['auto', 'dark', 'light'] as Theme[]).map((t) => `<button data-t="${t}" class="${s.theme === t ? 'on' : ''}">${{ auto: 'Auto', dark: 'Oscuro', light: 'Claro' }[t]}</button>`).join('')}</div></div>
       </div></div>
@@ -88,7 +90,7 @@ export function createSettingsView(ctx: Ctx): View {
 
       <div class="set-group"><div class="set-title">Acerca de</div><div class="card set-card">
         <button class="set-row" id="s-about"><span class="set-ic">${icon('info', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Acerca de FinAgent</div><div class="set-sub">Cómo funciona, qué hay detrás, privacidad y límites</div></div></button>
-        <button class="set-row" id="s-intro"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Ver la introducción otra vez</div><div class="set-sub">El recorrido por las funciones de la app</div></div></button>
+        <button class="set-row" id="s-intro"><span class="set-ic">${icon('arrowUpRight', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Ver la introducción otra vez</div><div class="set-sub">El recorrido por las funciones de la app</div></div></button>
       </div></div>`;
     bind();
     if (isServerMode()) {
@@ -144,6 +146,7 @@ export function createSettingsView(ctx: Ctx): View {
     const keyBtn = el.querySelector<HTMLElement>('#s-key');
     if (keyBtn) keyBtn.onclick = changeKey;
     el.querySelector<HTMLElement>('#s-lang')!.onclick = () => actionSheet(t('Idioma'), LANGS.map((l) => ({ label: l.native, run: () => { if (l.id !== getLang()) { setLang(l.id); location.reload(); } } })));
+    el.querySelector<HTMLInputElement>('#s-sound-t')!.onchange = (e) => setSound((e.target as HTMLInputElement).checked);
     el.querySelector<HTMLElement>('#s-about')!.onclick = () => openAbout({ version: VERSION, onReplayIntro: replayIntro });
     el.querySelector<HTMLElement>('#s-intro')!.onclick = replayIntro;
     const googleBtn = el.querySelector<HTMLElement>('#s-google');

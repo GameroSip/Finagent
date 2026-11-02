@@ -15,7 +15,7 @@ import { createSettingsView } from './views/settings';
 import { createWatchView } from './views/watchlist';
 
 const TABS: Array<{ id: TabId; label: string; ic: IconName }> = [
-  { id: 'market', label: 'Mercados', ic: 'activity' }, { id: 'chat', label: 'Asistente', ic: 'sparkles' },
+  { id: 'market', label: 'Mercados', ic: 'activity' }, { id: 'chat', label: 'Asistente', ic: 'messageSquare' },
   { id: 'watch', label: 'Favoritos', ic: 'star' }, { id: 'settings', label: 'Ajustes', ic: 'settings' },
 ];
 
@@ -49,8 +49,8 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
   (Object.keys(views) as TabId[]).forEach((id) => { views[id].el.classList.add('hide'); viewsEl.append(views[id].el); });
 
   for (const t of TABS) {
-    const b = h('button', { class: `tab ${t.id === 'chat' ? 'ai' : ''}`, attrs: { 'data-tab': t.id, 'aria-label': t.label } });
-    b.innerHTML = t.id === 'chat' ? `<span class="ic-wrap">${icon(t.ic, 19)}</span><span>${t.label}</span>` : `${icon(t.ic, 21)}<span>${t.label}</span>`;
+    const b = h('button', { class: 'tab', attrs: { 'data-tab': t.id, 'aria-label': t.label } });
+    b.innerHTML = `${icon(t.ic, 21)}<span>${t.label}</span>`;
     b.onclick = () => { closeAll(); setTab(t.id); };
     tabbar.append(b);
   }

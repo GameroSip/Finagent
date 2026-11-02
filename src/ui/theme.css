@@ -1,52 +1,51 @@
 /* ============ Sistema de diseño FinAgent ============ */
 :root {
   color-scheme: dark;
-  --bg: #05070C; --bg-2: #0A0E16;
-  --surface: #0F141E; --surface-2: #151B28; --surface-3: #1D2535;
-  --line: rgba(255,255,255,.07); --line-2: rgba(255,255,255,.13);
-  --text: #F5F7FB; --text-2: #BAC2D2; --muted: #7D879C;
-  --brand: #7C6CFF; --brand-2: #22D3EE; --brand-3: #4F8CFF;
-  --grad: linear-gradient(135deg, #7C6CFF 0%, #4F8CFF 52%, #22D3EE 100%);
-  --grad-soft: linear-gradient(135deg, rgba(124,108,255,.22), rgba(34,211,238,.12));
-  --up: #1FD18B; --up-bg: rgba(31,209,139,.14);
-  --down: #FF5C70; --down-bg: rgba(255,92,112,.14);
-  --warn: #FFB547; --warn-bg: rgba(255,181,71,.14);
-  --glass: rgba(12,17,26,.9);
-  --shadow: 0 14px 40px rgba(0,0,0,.5);
-  --glow: 0 0 0 1px rgba(124,108,255,.35), 0 10px 40px rgba(124,108,255,.28);
-  --r: 22px; --r-sm: 14px; --r-xs: 10px;
+  --bg: #0E0F11; --bg-2: #121316;
+  --surface: #16181B; --surface-2: #1B1E22; --surface-3: #23272C;
+  --line: rgba(255,255,255,.075); --line-2: rgba(255,255,255,.14);
+  --text: #EDEEF0; --text-2: #B7BBC2; --muted: #858A93;
+  /* un único acento (latón); el verde y el rojo quedan reservados para subas y bajas */
+  --brand: #D6B26A; --brand-2: #D6B26A; --brand-3: #D6B26A; --on-brand: #16120A;
+  --grad: #D6B26A;                      /* (nombre heredado) hoy es un color liso, sin degradé */
+  --grad-soft: rgba(214,178,106,.09);
+  --up: #3DB488; --up-bg: rgba(61,180,136,.13);
+  --down: #E2655A; --down-bg: rgba(226,101,90,.13);
+  --warn: #D6B26A; --warn-bg: rgba(214,178,106,.13);
+  --glass: rgba(18,19,22,.97);
+  --shadow: 0 10px 30px rgba(0,0,0,.45);
+  --glow: 0 0 0 1px var(--line-2);
+  --r: 14px; --r-sm: 10px; --r-xs: 6px;
   --st: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --sb: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  --tabbar-h: 66px;
-  --aurora-a: rgba(124,108,255,.30); --aurora-b: rgba(34,211,238,.16);
+  --tabbar-h: 58px;
+  --aurora-a: transparent; --aurora-b: transparent;
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #F3F5FA; --bg-2: #EAEEF6;
-  --surface: #FFFFFF; --surface-2: #F6F8FC; --surface-3: #E9EDF5;
-  --line: rgba(15,23,42,.08); --line-2: rgba(15,23,42,.14);
-  --text: #0C1220; --text-2: #3C475C; --muted: #6B778C;
-  --brand: #5B4BEF; --brand-2: #0AA9C9; --brand-3: #2F6FEB;
-  --grad: linear-gradient(135deg, #6A5BFF 0%, #3F7BF5 52%, #12BFDD 100%);
-  --grad-soft: linear-gradient(135deg, rgba(106,91,255,.14), rgba(18,191,221,.1));
-  --up: #0E9F6E; --up-bg: rgba(14,159,110,.12);
-  --down: #E5384F; --down-bg: rgba(229,56,79,.1);
-  --warn: #B7791F; --warn-bg: rgba(255,181,71,.2);
-  --glass: rgba(255,255,255,.92);
-  --shadow: 0 12px 34px rgba(30,41,80,.14);
-  --glow: 0 0 0 1px rgba(91,75,239,.3), 0 10px 30px rgba(91,75,239,.18);
-  --aurora-a: rgba(106,91,255,.22); --aurora-b: rgba(18,191,221,.18);
+  --bg: #F5F4F0; --bg-2: #EFEDE8;
+  --surface: #FFFFFF; --surface-2: #FAF9F6; --surface-3: #EEEBE4;
+  --line: rgba(20,18,12,.09); --line-2: rgba(20,18,12,.17);
+  --text: #17181B; --text-2: #43464D; --muted: #6F737B;
+  --brand: #8A6516; --brand-2: #8A6516; --brand-3: #8A6516; --on-brand: #FFFFFF;
+  --grad: #8A6516; --grad-soft: rgba(138,101,22,.08);
+  --up: #1C8A63; --up-bg: rgba(28,138,99,.11);
+  --down: #C9423A; --down-bg: rgba(201,66,58,.1);
+  --warn: #8A6516; --warn-bg: rgba(138,101,22,.12);
+  --glass: rgba(255,255,255,.97);
+  --shadow: 0 10px 28px rgba(30,25,10,.13);
+  --glow: 0 0 0 1px var(--line-2);
 }
 
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overscroll-behavior: none; }
 body {
-  font-family: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss03';
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; 
   user-select: none; -webkit-user-select: none;
 }
 input, textarea { user-select: text; -webkit-user-select: text; }
-.num, .tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum', 'cv11'; }
+.num, .tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, h4, p { margin: 0; }

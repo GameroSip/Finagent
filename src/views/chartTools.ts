@@ -19,8 +19,8 @@ export const TOOL_DEFS: ToolDef[] = [
   { id: 'profile', label: 'Perfil de volumen', group: 'over', needs: 'volume', color: TOOL_COLORS.profile, desc: 'Barras horizontales: a qué precios se operó más. POC es el precio con más negocio; el área de valor (VAH–VAL) concentra el 70%.' },
   { id: 'sessions', label: 'Sesiones de mercado', group: 'over', needs: 'intraday', color: TOOL_COLORS.london, desc: 'Sombrea las horas de Asia, Londres y Nueva York. El movimiento suele aumentar cuando abre cada plaza y más aún cuando se superponen.' },
   { id: 'volume', label: 'Volumen', group: 'panel', needs: 'volume', color: '#6B7A90', desc: 'Cuántas unidades se operaron en cada vela. Un movimiento con mucho volumen es más confiable que uno con poco.' },
-  { id: 'rsi', label: 'RSI (14)', group: 'panel', color: '#8B93FF', desc: 'Mide la fuerza del movimiento de 0 a 100. Arriba de 70 se considera sobrecompra; abajo de 30, sobreventa.' },
-  { id: 'macd', label: 'MACD', group: 'panel', color: '#22D3EE', desc: 'Compara dos medias para detectar cambios de tendencia: cuando la línea cruza a su señal suele cambiar el impulso.' },
+  { id: 'rsi', label: 'RSI (14)', group: 'panel', color: '#8C93A6', desc: 'Mide la fuerza del movimiento de 0 a 100. Arriba de 70 se considera sobrecompra; abajo de 30, sobreventa.' },
+  { id: 'macd', label: 'MACD', group: 'panel', color: '#6FA8DC', desc: 'Compara dos medias para detectar cambios de tendencia: cuando la línea cruza a su señal suele cambiar el impulso.' },
 ];
 
 const KEY = 'finagent.charttools.v1';

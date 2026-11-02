@@ -11,3 +11,5 @@ e2e-shots-server
 *.db
 .wrangler
 .dev.vars
+evals/radar/data/
+e2e-log/

@@ -19,7 +19,7 @@ import { logoSvg } from '../ui/logo';
 import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
 import { t } from '../i18n';
 
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 
 interface Probe { name: string; run: () => Promise<unknown> }
 

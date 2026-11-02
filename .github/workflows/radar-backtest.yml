@@ -1,0 +1,83 @@
+name: Radar de tensión - backtest
+
+# Mide con datos reales (Yahoo, historia completa) qué pasó DESPUÉS de cada nivel del radar. Sin Gemini y sin secretos.
+# Se ejecuta a mano (Actions → "Radar de tensión - backtest" → Run workflow) y también al subir cambios a la rama radar-backtest.
+# El reporte queda en la rama "radar-reports" (se puede leer ahí sin descargar nada) y en el resumen de la ejecución.
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "Con qué datos correr"
+        type: choice
+        options: ["datos reales (Yahoo)", "prueba con datos sintéticos"]
+        default: "datos reales (Yahoo)"
+  push:
+    branches: [radar-backtest]
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tests del radar
+        run: npx vitest run tests/radar.test.ts
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Descargar historia con yfinance
+        if: ${{ inputs.modo != 'prueba con datos sintéticos' }}
+        continue-on-error: true
+        run: |
+          pip install --quiet yfinance
+          python evals/radar/fetch_yf.py $(npx tsx evals/radar-cli.ts --list)
+
+      - name: Backtest
+        env:
+          MODO: ${{ inputs.modo }}
+        run: |
+          ARGS=""
+          if [ "$MODO" = "prueba con datos sintéticos" ]; then ARGS="--synthetic"; fi
+          npx tsx evals/radar-cli.ts $ARGS
+
+      - name: Mostrar el reporte en la página de la ejecución
+        if: always()
+        run: |
+          for f in evals/reports/radar-backtest*.md; do [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"; done || true
+
+      - name: Publicar el reporte en la rama radar-reports
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if ! ls evals/reports/radar-backtest*.md > /dev/null 2>&1; then echo "No hay reportes para publicar."; exit 0; fi
+          git config --global user.name "FinAgent radar"
+          git config --global user.email "radar@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" radar-reports > /dev/null 2>&1; then
+            git clone -q --depth 1 --branch radar-reports "$URL" .
+          else
+            git init -q . && git checkout -q -b radar-reports && git remote add origin "$URL"
+          fi
+          mkdir -p reports && cp "$GITHUB_WORKSPACE"/evals/reports/radar-backtest* reports/
+          git add reports && git commit -q -m "Backtest del radar (ejecución ${RUN_ID})" && git push -q origin radar-reports
+
+      - name: Guardar el reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-radar
+          path: evals/reports/radar-backtest*
+          if-no-files-found: ignore

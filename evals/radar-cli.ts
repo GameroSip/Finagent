@@ -37,7 +37,8 @@ if (strict) {                                                  // desde cuándo 
   for (const g of ['índices', 'ETF', 'acciones', 'cripto', 'todos']) {
     const rs = series.filter((a2) => g === 'todos' || a2.group === g).map((a2) => ({ a: a2.symbol, rows: rowsFor(a2, 5, { strict: true }) })).filter((x) => x.rows.length);
     const ts = rs.flatMap((x) => x.rows.map((r) => r.t));
-    if (ts.length) meta[g] = { desde: new Date(Math.min(...ts) * 1000).getUTCFullYear(), hasta: new Date(Math.max(...ts) * 1000).getUTCFullYear(), dias: ts.length, activos: rs.length };
+    if (ts.length) { let lo = Infinity, hi = -Infinity; for (const t of ts) { if (t < lo) lo = t; if (t > hi) hi = t; }      // (sin Math.min(...ts): con cientos de miles de fechas desborda la pila)
+      meta[g] = { desde: new Date(lo * 1000).getUTCFullYear(), hasta: new Date(hi * 1000).getUTCFullYear(), dias: ts.length, activos: rs.length }; }
   }
   writeFileSync(`evals/reports/${name}-meta.json`, JSON.stringify(meta, null, 1));
 } writeFileSync(`evals/reports/${name}.json`, JSON.stringify(blocks));

@@ -5,7 +5,7 @@ import type { DayBar } from '../src/radar';
 import { evaluatePooled, finalModels, type PooledGroup } from '../src/volPooled';
 import { fetchDaily, synthetic } from './radar/data';
 import { UNIVERSE } from './radar/universe';
-import { har3Map, report, verdicts } from './radar/vol2';
+import { diagnostic, har3Map, report, verdicts } from './radar/vol2';
 
 const args = process.argv.slice(2), isSynthetic = args.includes('--synthetic');
 if (args.includes('--list')) { console.log([...UNIVERSE.map(([s]) => s), '^VIX'].join(' ')); process.exit(0); }
@@ -31,4 +31,5 @@ mkdirSync('evals/reports', { recursive: true });
 const name = isSynthetic ? 'vol2-backtest-sintetico' : 'vol2-backtest';
 writeFileSync(`evals/reports/${name}.md`, md);
 writeFileSync(`evals/reports/${name}-modelo.json`, JSON.stringify({ calibrado: new Date().toISOString().slice(0, 10), prereg: PREREG, assets: assets.length, groups: models, veredicto: verdicts(rows, har3, vix) }, null, 1));
+writeFileSync(`evals/reports/${name}-diagnostico.md`, diagnostic(assets, rows, har3, vix));
 console.log(`\nReporte: evals/reports/${name}.md (${assets.length} activos, ${rows.length} casos)`);

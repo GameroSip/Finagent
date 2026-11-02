@@ -108,3 +108,32 @@ export function report(rows: PRec[], har3: Map<string, Map<number, number>>, vix
   if (meta.excluded.length) { L.push('', '**Excluidos:**', ''); for (const e of meta.excluded) L.push(`- ${e.symbol}: ${e.why}`); }
   return L.join('\n') + '\n';
 }
+
+// ------------------------------------------------------------------ diagnóstico EXPLORATORIO (no cambia ningún veredicto)
+/** ¿Hay ruedas sin rango (apertura, máximo y mínimo iguales)? Un rango de cero no es volatilidad cero: es un dato que falta. */
+export function diagnostic(assets: Array<{ symbol: string; group: string; bars: DayBar[] }>, rows: PRec[], har3: Map<string, Map<number, number>>, vix: DayBar[] | null): string {
+  const L: string[] = ['# Diagnóstico del backtest 3 (exploratorio: NO cambia ningún veredicto)', '', 'Pregunta: ¿los datos de algunos activos traen ruedas sin rango (máximo = mínimo), que el modelo toma como "volatilidad cero"?', ''];
+  const share = new Map<string, Map<number, number>>();
+  L.push('## Activos con ruedas sin rango', '', '| Activo | Grupo | Ruedas | % sin rango (total) | % sin rango antes de 1990 | Última rueda sin rango |', '|---|---|---|---|---|---|');
+  for (const a of assets) {
+    const flat = a.bars.map((b) => (b.h === b.l ? 1 : 0)), P = [0]; for (const f of flat) P.push(P[P.length - 1] + f);
+    const m = new Map<number, number>(); a.bars.forEach((b, i) => { if (i >= 249) m.set(b.t, (P[i + 1] - P[i - 249]) / 250); }); share.set(a.symbol, m);
+    const tot = P[P.length - 1] / a.bars.length, old = a.bars.filter((b) => b.t < Date.UTC(1990, 0, 1) / 1000), oldS = old.length ? old.filter((b) => b.h === b.l).length / old.length : NaN;
+    let lastI = -1; flat.forEach((f, i) => { if (f) lastI = i; });
+    if (tot > 0.01) L.push(`| ${a.symbol} | ${a.group} | ${a.bars.length} | ${pc(tot)} | ${pc(oldS)} | ${lastI >= 0 ? new Date(a.bars[lastI].t * 1000).toISOString().slice(0, 10) : '—'} |`);
+  }
+  const z = (r: PRec) => Math.abs(r.r5 / Math.sqrt(H * r.f.grupo)), ext = (rs: PRec[]) => rs.filter((r) => z(r) > 8).length;
+  const clean = rows.filter((r) => (share.get(r.asset)?.get(r.t) ?? 1) <= 0.05), dirty = rows.length - clean.length;
+  L.push('', `Casos totales: ${rows.length} · con ≥ 5 % de ruedas sin rango en las 250 previas: ${dirty} (${pc(dirty / rows.length)}).`, `Retornos "imposibles" (|z| > 8): todos ${ext(rows)} · limpios ${ext(clean)}.`, '',
+    '## Sensibilidad (exploratoria): los mismos criterios sin los casos con datos de rango degenerado', '');
+  const a = verdicts(rows, har3, vix), b = verdicts(clean, har3, vix);
+  L.push('| Criterio | Todos los casos (veredicto oficial) | Sin rango degenerado |', '|---|---|---|');
+  const yes = (v: boolean) => (v ? 'pasa' : 'no pasa');
+  for (const k of ['Q1', 'Q2', 'Q3all', 'Q4', 'Q5', 'Q6'] as const) L.push(`| ${k} | ${yes(a[k] as boolean)} | ${yes(b[k] as boolean)} |`);
+  for (const g of POOLED_GROUPS) L.push(`| Q3 ${g} | ${yes(a.Q3[g])} | ${yes(b.Q3[g])} |`);
+  L.push(`| Se construiría | ${a.build ? 'sí' : 'no'} | ${b.build ? 'sí' : 'no'} |`, '', '### Q5 sin rango degenerado', '', '| Período | ' + RBINS.map(([x]) => x).join(' | ') + ' |', '|---|' + RBINS.map(() => '---').join('|') + '|');
+  for (const p of PERIODS) L.push(`| ${p} | ` + ratioBins(clean, p).map((x) => `${f3(x.realized)} (${x.n})`).join(' | ') + ' |');
+  L.push('', '### Q3 sin rango degenerado', '', '| Grupo | Período | Cobertura | Izq. | Der. |', '|---|---|---|---|---|');
+  for (const g of GROUPS) for (const p of PERIODS) { const c = calib(clean, p, g); if (c) L.push(`| ${g} | ${p} | ${pc(c.coverage)} | ${pc(c.left)} | ${pc(c.right)} |`); }
+  return L.join('\n') + '\n';
+}

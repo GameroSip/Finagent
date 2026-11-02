@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { synthetic } from '../evals/radar/data';
-import { report, verdicts } from '../evals/radar/vol2';
+import { diagnostic, report, verdicts } from '../evals/radar/vol2';
 import { SPLIT_DATE } from '../src/radarBacktest';
 import { evaluatePooled, features, finalModels, fitPooled, habitual, interval, Q_WIN, xAt, type PooledGroup, type PRec } from '../src/volPooled';
 
@@ -99,5 +99,15 @@ describe('el registro previo coincide con el código', () => {
   it('contiene los criterios y las reglas de decisión', () => {
     const doc = readFileSync('evals/radar/PREREGISTRO-VOL2.md', 'utf8');
     for (const s of ['≤ 1,03', '≥ 80 %', '≤ 1,00', '87 % y 93 %', '85 % y 95 %', '1,3', '0,9', '1.500', '250 ruedas', 'solo si pasan Q1, Q2, Q4 y Q5'.replace('solo si', '**solo si'), 'no se cambian después de ver los datos']) expect(doc).toContain(s.replace('**solo si pasan Q1, Q2, Q4 y Q5', '**solo si pasan Q1, Q2, Q4 y Q5'));
+  });
+});
+
+describe('diagnóstico de ruedas sin rango', () => {
+  it('detecta un activo cuyas primeras ruedas traen solo el cierre (apertura = máximo = mínimo) y cuenta los casos afectados', () => {
+    const good = mk(6500, 91), flatHead = mk(6500, 92).map((b, i) => (i < 3000 ? { ...b, o: b.c, h: b.c, l: b.c } : b));
+    const a = [{ symbol: 'LIMPIO', group: 'índices' as PooledGroup, bars: good }, { symbol: 'SOLO-CIERRE', group: 'índices' as PooledGroup, bars: flatHead }, { symbol: 'X1', group: 'índices' as PooledGroup, bars: mk(6500, 93) }];
+    const md = diagnostic(a, evaluatePooled(a), new Map(), null);
+    expect(md).toContain('SOLO-CIERRE'); expect(md).not.toMatch(/\| LIMPIO \|/); expect(md).toMatch(/con ≥ 5 % de ruedas sin rango en las 250 previas: [1-9]\d*/);
+    expect(md).toContain('NO cambia ningún veredicto'); expect(md).not.toMatch(/NaN|undefined/);
   });
 });

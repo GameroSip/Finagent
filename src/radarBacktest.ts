@@ -52,14 +52,18 @@ export type Slice = 'todo' | 'antes de 2015' | 'desde 2015';
 export interface Row { level: Level; drop: number; up: number; ret: number; episode: boolean; priorFall3: number | null; t: number; asset: string }
 
 /** Filas evaluables (con datos hacia adelante) de una serie: una por día, con el nivel del radar ese día. */
-export function rowsFor(a: AssetSeries, h: number): Row[] {
+export interface BacktestOpts { /** Solo días con las 4 condiciones medibles Y con datos de rango reales (≤ 5 % de ruedas sin rango en las 250 previas). */ strict?: boolean }
+export function rowsFor(a: AssetSeries, h: number, opts: BacktestOpts = {}): Row[] {
   const pts = radarSeries(a.bars), rows: Row[] = [];
+  const P = [0]; for (const b of a.bars) P.push(P[P.length - 1] + (b.h === b.l ? 1 : 0));
+  const flatShare = (i: number) => (i >= 249 ? (P[i + 1] - P[i - 249]) / 250 : 1);
   let sinceRed = 99;                                    // ruedas desde el último rojo (para agrupar rojos seguidos en un solo "episodio")
   for (const pt of pts) {
     const isRed = pt.ready && pt.level === 'rojo';
     const episode = isRed && sinceRed >= 5;
     sinceRed = isRed ? 0 : sinceRed + 1;
     if (!pt.ready) continue;
+    if (opts.strict && (pt.available < 4 || flatShare(pt.i) > 0.05)) continue;
     const drop = forwardMin(a.bars, pt.i, h), up = forwardMax(a.bars, pt.i, h), ret = forwardRet(a.bars, pt.i, h);
     if (drop === null || up === null || ret === null) continue;
     rows.push({ level: pt.level, drop, up, ret, episode, priorFall3: pt.i >= 3 ? a.bars[pt.i].c / a.bars[pt.i - 3].c - 1 : null, t: a.bars[pt.i].t, asset: a.symbol });
@@ -78,13 +82,13 @@ export interface Block {
   precision: number; recall: number;
 }
 
-export function backtest(assets: AssetSeries[]) {
+export function backtest(assets: AssetSeries[], opts: BacktestOpts = {}) {
   const groups: Array<[string, AssetSeries[]]> = [['todos', assets], ...(['índices', 'ETF', 'acciones', 'cripto'] as Group[]).map((g) => [g, assets.filter((a) => a.group === g)] as [string, AssetSeries[]])];
   const blocks: Block[] = [];
   for (const [name, list] of groups) {
     if (!list.length) continue;
     for (const h of HORIZONS) {
-      const all = list.flatMap((a) => rowsFor(a, h));
+      const all = list.flatMap((a) => rowsFor(a, h, opts));
       for (const slice of ['todo', 'antes de 2015', 'desde 2015'] as Slice[]) {
         const rows = all.filter((r) => slice === 'todo' || (slice === 'antes de 2015' ? r.t < SPLIT_DATE : r.t >= SPLIT_DATE));
         if (!rows.length) continue;

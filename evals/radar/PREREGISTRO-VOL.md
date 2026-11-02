@@ -35,3 +35,10 @@ Variación diaria promedio de las 5 ruedas siguientes, estimada con el rango ape
 
 ## Límites conocidos (se declaran antes de medir)
 Sesgo de supervivencia (activos que hoy existen); los intervalos de confianza son optimistas (días solapados y activos correlacionados); datos diarios de Yahoo (pueden tener errores); el rango diario es una medida ruidosa; sin costos de operar porque no se evalúa ninguna estrategia, solo pronósticos.
+
+---
+
+## Enmienda 1 — antes de correr con datos reales
+Hecha después del control con datos sintéticos y **antes de cualquier corrida con datos reales**. No cambia ninguna pregunta ni ningún umbral de éxito.
+1. **EWMA usa el mismo estimador que el blanco.** La definición original (retornos al cuadrado) mide en otra escala que el rango apertura-máximo-mínimo-cierre (no incluye los saltos nocturnos), lo que sesgaría la comparación contra EWMA. Desde esta enmienda, el modelo **EWMA** se aplica a la variación diaria de Garman-Klass, con λ = 0,94. La versión original queda como modelo adicional **EWMA-r²**, solo informativo (no entra en los veredictos).
+2. **Calibración condicional (exploratoria).** La cobertura total del intervalo es casi automática (los cuantiles salen del propio entrenamiento), así que no distingue modelos. Se agrega la cobertura por tramo de volatilidad pronosticada (pronóstico ÷ su promedio del activo en el período: < 0,5; 0,5–1; 1–2; ≥ 2). Es **exploratorio y no entra en los veredictos**; P2 se mantiene tal cual, con esa limitación declarada.

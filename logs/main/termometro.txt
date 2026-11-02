@@ -1,0 +1,26 @@
+  ✔ sin desborde horizontal en TS1-termometro 
+  ✔ aparece el termómetro de tensión con su nivel (baja, media o alta) 
+  ✔ muestra las 4 condiciones y el medidor de 3 tramos 
+  ✔ el medidor llena tantos tramos como el nivel (baja 1, media 2, alta 3) 
+  ✔ muestra qué pasó después en la semana siguiente: caída y suba de 5 % con su valor habitual 
+  ✔ dice de dónde salen los números (casos, activos, años) y qué es "habitual" 
+  ✔ advierte que no predice dirección ni momento y que no es señal de compra ni de venta 
+  ✔ no usa lenguaje de recomendación, garantía ni de "seguro" 
+  ✔ el termómetro no usa verde ni rojo (no dice si algo es bueno o malo): solo el acento de la marca 
+  ✔ sin desborde horizontal 
+  ✔ sin plan, ofrece escribirlo y aclara que queda solo en el teléfono 
+  ✔ sin desborde horizontal en TS2-plan 
+  ✔ se abre la hoja "Mi plan" con aclaración de que la app no dice qué hacer, y sin texto de ejemplo que parezca un consejo 
+  ✔ cuenta los caracteres mientras escribe 
+  ✔ al guardar, la tarjeta muestra el plan escrito por la persona 
+  ✔ el plan queda en este teléfono: no sale ningún pedido de red que lo contenga 
+  ✔ al volver a abrir la app, el plan sigue ahí 
+  ✔ al editar aparece el plan guardado y se puede borrar 
+  ✔ al borrar, se quita de la tarjeta y del teléfono 
+  ✔ en una divisa el termómetro no aparece (el backtest no la cubre) 
+  ✔ sin desborde horizontal en TS3-ingles 
+  ✔ en inglés se traduce completo: título, nivel, condiciones, historial y advertencias 
+  ✔ en inglés no queda ningún texto en español en la tarjeta 
+
+RESULTADO (termómetro): 23/23 verificaciones OK
+ERRORES DE PÁGINA: []

@@ -1,0 +1,38 @@
+  ✔ sin desborde horizontal en T1-carga 
+  ✔ muestra la pantalla de carga con el logo 3D (WebGL), la palabra FINAGENT y una línea de progreso 
+  ✔ el logo 3D se dibuja de verdad: hay metal dorado en el centro y no está quemado a blanco 
+  ✔ usa el idioma del dispositivo (inglés) sin preguntar 
+  ✔ al terminar la carga suena UN efecto de sonido (una sola vez) 
+  ✔ la cuenta se creó de verdad durante la carga 
+  ✔ sin desborde horizontal en T2-despegue 
+  ✔ el logo despega: primero "going", luego "revealing" (la pantalla siguiente aparece mientras sube) y por último desaparece 
+  ✔ sin desborde horizontal en T3-cuenta 
+  ✔ luego pide iniciar sesión, en inglés: Google y correo como "Coming soon" y entrar como invitado 
+  ✔ los botones que todavía no existen están desactivados (no se promete lo que no anda) 
+  ✔ la pantalla de cuenta es sobria: sin degradés ni destellos de colores 
+  ✔ pide elegir el idioma, con el del dispositivo ya marcado 
+  ✔ al elegir Español toda la pantalla pasa a español al instante 
+  ✔ al elegir Português pasa a portugués 
+  ✔ muestra los idiomas que vienen como "próximamente" (sin prometer fechas) 
+  ✔ sin desborde horizontal en T3-idioma 
+  ✔ sin desborde horizontal en T4-tour-3 
+  ✔ sin desborde horizontal en T4-tour-5 
+  ✔ el recorrido tiene 7 diapositivas, todas en portugués 
+  ✔ explica los planes y lo que sigue gratis, sin inventar precios 
+  ✔ en la última diapositiva el botón dice "Começar" 
+  ✔ se puede volver atrás 
+  ✔ "Qué hay detrás" dice la verdad: IA de Google (independiente de Google) y fuentes públicas sin acuerdos comerciales 
+  ✔ al terminar entra a la app, ya en portugués 
+  ✔ sin desborde horizontal en T5-app-pt 
+  ✔ al volver a abrir NO repite la introducción y conserva el idioma 
+  ✔ en Ajustes está el selector de idioma con el actual 
+  ✔ "Acerca de" muestra cómo funciona (5 pasos), qué hay detrás, la comparación con una IA común, cobertura, privacidad y límites 
+  ✔ "Acerca de" no promete licencias, respaldo de Google ni tiempo real 
+  ✔ sin desborde horizontal en T6-acerca-de 
+  ✔ cambiar el idioma desde Ajustes reinicia la app en el idioma elegido (inglés) 
+  ✔ "Omitir" salta el recorrido y entra a la app 
+  ✔ con el sonido apagado en Ajustes no suena nada al abrir la app 
+  ✔ en toda la prueba la app nunca llamó a Gemini directamente 
+
+RESULTADO (introducción e idiomas): 35/35 verificaciones OK
+ERRORES DE PÁGINA: []

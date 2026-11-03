@@ -1,12 +1,12 @@
 // Backtest del radar de tensión.   npx tsx evals/radar-cli.ts            → con datos reales de Yahoo (necesita internet)
 //                                  npx tsx evals/radar-cli.ts --synthetic → con caminos aleatorios (prueba del circuito, sin internet)
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { backtest, type AssetSeries } from '../src/radarBacktest';
+import { backtest, rowsFor, type AssetSeries } from '../src/radarBacktest';
 import { fetchDaily, synthetic } from './radar/data';
 import { buildReport } from './radar/report';
 import { UNIVERSE } from './radar/universe';
 
-const args = process.argv.slice(2), isSynthetic = args.includes('--synthetic');
+const args = process.argv.slice(2), isSynthetic = args.includes('--synthetic'), strict = args.includes('--strict');   // --strict: solo días con las 4 condiciones medibles y datos de rango reales
 const only = args.find((a) => a.startsWith('--symbols='))?.slice(10).split(',').filter(Boolean);
 const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -27,9 +27,19 @@ for (const [symbol, group] of list) {
   if (!isSynthetic && state.blocked < 4) await sleep(300);
 }
 if (series.length < 5) { console.error(`Datos insuficientes: solo ${series.length} activos utilizables.`); process.exitCode = 1; }
-const blocks = backtest(series);
+const blocks = backtest(series, { strict });
 const md = buildReport(blocks, { when: new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC', synthetic: isSynthetic, excluded, used: series.map((s) => ({ symbol: s.symbol, group: s.group, bars: s.bars.length, from: day(s.bars[0].t), to: day(s.bars[s.bars.length - 1].t) })) });
 mkdirSync('evals/reports', { recursive: true });
-const name = isSynthetic ? 'radar-backtest-sintetico' : 'radar-backtest';
-writeFileSync(`evals/reports/${name}.md`, md); writeFileSync(`evals/reports/${name}.json`, JSON.stringify(blocks));
+const name = (isSynthetic ? 'radar-backtest-sintetico' : 'radar-backtest') + (strict ? '-estricto' : '');
+writeFileSync(`evals/reports/${name}.md`, md);
+if (strict) {                                                  // desde cuándo hay datos válidos por tipo de activo (para decirlo bien en la app)
+  const meta: Record<string, { desde: number; hasta: number; dias: number; activos: number }> = {};
+  for (const g of ['índices', 'ETF', 'acciones', 'cripto', 'todos']) {
+    const rs = series.filter((a2) => g === 'todos' || a2.group === g).map((a2) => ({ a: a2.symbol, rows: rowsFor(a2, 5, { strict: true }) })).filter((x) => x.rows.length);
+    const ts = rs.flatMap((x) => x.rows.map((r) => r.t));
+    if (ts.length) { let lo = Infinity, hi = -Infinity; for (const t of ts) { if (t < lo) lo = t; if (t > hi) hi = t; }      // (sin Math.min(...ts): con cientos de miles de fechas desborda la pila)
+      meta[g] = { desde: new Date(lo * 1000).getUTCFullYear(), hasta: new Date(hi * 1000).getUTCFullYear(), dias: ts.length, activos: rs.length }; }
+  }
+  writeFileSync(`evals/reports/${name}-meta.json`, JSON.stringify(meta, null, 1));
+} writeFileSync(`evals/reports/${name}.json`, JSON.stringify(blocks));
 console.log(`\nReporte: evals/reports/${name}.md (${series.length} activos, ${blocks.length} bloques)`);

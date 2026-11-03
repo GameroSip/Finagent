@@ -11,8 +11,8 @@ import { $, esc, h, openUrl, safeUrl, toast } from '../ui/dom';
 import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 import { locale, t } from '../i18n';
-import { stressNow } from '../stress';
-import { bindStress, stressHtml } from '../ui/stressCard';
+import { expectedMove, stressNow } from '../stress';
+import { bindStress, moveHtml, stressHtml } from '../ui/stressCard';
 
 export interface Overlay { el: HTMLElement; close(): void }
 
@@ -177,7 +177,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
           <div class="stat-grid" style="margin-top:12px">${stat('RSI (14)', fmtNum(snap.rsi14, 1))}${stat('vs EMA 200', snap.pct_vs_ema200 === null ? '—' : fmtPct(snap.pct_vs_ema200), snap.pct_vs_ema200 === null ? 'datos insuficientes' : '')}</div></div>`;
       }
       // termómetro de tensión: con ruedas completas (se descarta la rueda en curso) y solo para tipos de activo que el backtest respaldó
-      const drawStress = () => { try { q('#a-stress').innerHTML = stressHtml(stressNow(yd.bars, sym, yd.meta)); bindStress(q('#a-stress'), drawStress); } catch { q('#a-stress').innerHTML = ''; } };
+      const drawStress = () => { try { q('#a-stress').innerHTML = moveHtml(expectedMove(yd.bars, sym, yd.meta)) + stressHtml(stressNow(yd.bars, sym, yd.meta)); bindStress(q('#a-stress'), drawStress); } catch { q('#a-stress').innerHTML = ''; } };
       drawStress();
     } catch { /* se muestran solo los fundamentales */ }
     q('#a-stats').innerHTML = tiles.join('') || '';

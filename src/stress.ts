@@ -4,6 +4,9 @@
 import { classify } from './ui/assetIcon';
 import { radarSeries, type DayBar, type RadarConditions } from './radar';
 import { RADAR_STATS, type LevelStats, type StressGroup, type StressLevel } from './data/radarStats';
+import { VOL_MODEL } from './data/volModel';
+import { forecast, habitual, interval, MAX_FLAT, Q_WIN, xAt } from './volPooled';
+import { gk } from './volForecast';
 
 export type { StressGroup, StressLevel };
 export interface MarketMeta { instrumentType?: string; gmtoffset?: number; currentTradingPeriod?: { regular?: { start: number; end: number } } }
@@ -45,10 +48,29 @@ export function stressNow(bars: DayBar[], symbol: string, meta: MarketMeta, nowM
   return { kind: 'ok', level: LEVEL[p.level], score: p.score, available: p.available, conditions: p.conditions, asOf: done[done.length - 1].t, group };
 }
 
-export const historyOf = (group: StressGroup, level: StressLevel): { assets: number; days: number; stats: LevelStats } => {
+export const historyOf = (group: StressGroup, level: StressLevel): { assets: number; days: number; desde: number; stats: LevelStats } => {
   const g = RADAR_STATS.groups[group];
-  return { assets: g.assets, days: g.days, stats: g.levels[level] };
+  return { assets: g.assets, days: g.days, desde: g.desde, stats: g.levels[level] };
 };
+
+export type MoveResult =
+  | { kind: 'ok'; group: StressGroup; low: number; high: number; ratio: number; asOf: number; assets: number }
+  | { kind: 'unsupported'; reason: 'tipo' | 'datos' | 'historia' };
+
+/** Movimiento esperado de la semana (5 ruedas): rango del 5 % al 95 % del retorno y cuántas veces lo habitual es el pronóstico de volatilidad de hoy.
+ *  Modelo validado en el backtest 4 (evals/radar/PREREGISTRO-VOL4.md): coeficientes comunes por tipo de activo y solo 250 ruedas de datos del propio activo. Solo con ruedas completas. */
+export function expectedMove(bars: DayBar[], symbol: string, meta: MarketMeta, nowMs = Date.now()): MoveResult {
+  const group = stressGroup(symbol, meta.instrumentType);
+  if (!group) return { kind: 'unsupported', reason: 'tipo' };
+  const done = completedBars(bars, meta, nowMs), t = done.length - 1;
+  if (done.length < Q_WIN) return { kind: 'unsupported', reason: 'historia' };
+  let flat = 0; for (let i = t - Q_WIN + 1; i <= t; i++) if (done[i].h === done[i].l) flat++;
+  if (flat / Q_WIN > MAX_FLAT) return { kind: 'unsupported', reason: 'datos' };           // ruedas sin rango: no es volatilidad cero, es un dato que falta (regla de calidad del backtest 4)
+  const g = done.map(gk), model = VOL_MODEL.groups[group], x = xAt(g, t);
+  if (!x) return { kind: 'unsupported', reason: 'historia' };
+  const sigma2 = forecast(model, x), [low, high] = interval(model, sigma2);
+  return { kind: 'ok', group, low, high, ratio: sigma2 / habitual(g, t), asOf: done[t].t, assets: model.assets };
+}
 
 /** Todos los textos fijos del termómetro (las pruebas verifican que estén traducidos y que no prometan nada indebido). */
 export const STRESS_TEXTS = {
@@ -60,6 +82,15 @@ export const STRESS_TEXTS = {
     media: 'Hay algunas señales de tensión. Históricamente, los movimientos grandes fueron más frecuentes en situaciones como esta.',
     alta: 'Hay varias señales de tensión a la vez. Históricamente, los movimientos grandes, hacia arriba o hacia abajo, fueron bastante más frecuentes.',
   } as Record<StressLevel, string>,
+  move: {
+    title: 'Movimiento esperado de la semana',
+    range: '{lo} a {hi}',
+    cover: 'Rango dentro del cual terminaron alrededor de 9 de cada 10 semanas con un pronóstico como este (próximas 5 ruedas).',
+    ratio: 'Hoy: {x} veces lo habitual de este activo (promedio del último año).',
+    outside: 'Fuera del rango quedó cerca de 1 de cada 10 semanas, más o menos la mitad por debajo y la mitad por encima. Es un rango de volatilidad: no es un tope ni una predicción de dirección.',
+    source: '{a} activos del mismo tipo ({g}) · coeficientes comunes, validados con un backtest propio. Solo incluye activos que hoy existen, así que la realidad pudo ser algo peor.',
+    unsupported: { tipo: 'No disponible para este tipo de activo.', datos: 'No disponible: los datos diarios de este activo no traen el rango (máximo y mínimo) completo.', historia: 'No disponible: se necesita aproximadamente 1 año de datos diarios.' } as Record<'tipo' | 'datos' | 'historia', string>,
+  },
   conditions: {
     momentum: 'Impulso debilitado tras una sobrecompra',
     support: 'Cierre por debajo del mínimo de las últimas 20 ruedas',
@@ -83,6 +114,7 @@ export const STRESS_TEXTS = {
 };
 export const stressTexts = (): string[] => {
   const T = STRESS_TEXTS, out: string[] = [T.title, T.today, T.after, T.usual, T.drop, T.up, T.usualNote, T.note];
-  for (const o of [T.levels, T.levelShort, T.summary, T.conditions, T.groups, T.unsupported, T.plan]) out.push(...Object.values(o));
+  for (const o of [T.levels, T.levelShort, T.summary, T.conditions, T.groups, T.unsupported, T.plan, T.move.unsupported]) out.push(...Object.values(o));
+  out.push(T.move.title, T.move.range, T.move.cover, T.move.ratio, T.move.outside, T.move.source);
   return out;
 };

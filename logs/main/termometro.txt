@@ -8,6 +8,11 @@
   ✔ no usa lenguaje de recomendación, garantía ni de "seguro" 
   ✔ el termómetro no usa verde ni rojo (no dice si algo es bueno o malo): solo el acento de la marca 
   ✔ sin desborde horizontal 
+  ✔ aparece el bloque "Movimiento esperado de la semana" con un rango de 5 ruedas (de un % negativo a uno positivo) 
+  ✔ el rango dice qué significa: alrededor de 9 de cada 10 semanas, y cuántas veces lo habitual es hoy 
+  ✔ aclara que no es un tope ni una predicción de dirección, y de dónde sale (activos del mismo tipo, backtest propio, supervivencia) 
+  ✔ el rango es coherente: el límite inferior es negativo, el superior positivo y la caída extrema no supera -60 % 
+  ✔ sin desborde horizontal en TS1b-movimiento 
   ✔ sin plan, ofrece escribirlo y aclara que queda solo en el teléfono 
   ✔ sin desborde horizontal en TS2-plan 
   ✔ se abre la hoja "Mi plan" con aclaración de que la app no dice qué hacer, y sin texto de ejemplo que parezca un consejo 
@@ -19,8 +24,9 @@
   ✔ al borrar, se quita de la tarjeta y del teléfono 
   ✔ en una divisa el termómetro no aparece (el backtest no la cubre) 
   ✔ sin desborde horizontal en TS3-ingles 
+  ✔ en inglés el movimiento esperado también se traduce (rango con "to" y cuántas veces lo habitual) 
   ✔ en inglés se traduce completo: título, nivel, condiciones, historial y advertencias 
   ✔ en inglés no queda ningún texto en español en la tarjeta 
 
-RESULTADO (termómetro): 23/23 verificaciones OK
+RESULTADO (termómetro): 29/29 verificaciones OK
 ERRORES DE PÁGINA: []

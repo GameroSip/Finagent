@@ -19,6 +19,9 @@ button{background:var(--ac);color:#04140d;border:0;font-weight:650;cursor:pointe
 <div class="card" id="login"><h2>Ingresar</h2><label for="tok">Token de administrador</label><input id="tok" type="password" autocomplete="off" placeholder="El ADMIN_TOKEN del servidor"><button id="go">Entrar</button><p class="mu err" id="lerr"></p></div>
 <div id="app" hidden>
  <div class="card"><h2>Uso y costo (últimos 7 días)</h2><div class="kpis" id="kpis"></div><div style="overflow:auto"><table id="byday"></table></div><p class="mu" id="top"></p><button class="sec" id="refresh">Actualizar</button></div>
+ <div class="card" id="beta"><h2>Beta: uso, retención y qué piden</h2><p class="mu">Solo cuentan quienes aceptaron las estadísticas. Cada porcentaje trae entre paréntesis cuántas personas hay detrás y su intervalo de confianza del 95 %: con pocas personas el margen es enorme, así que sirve para detectar problemas grandes, no diferencias chicas.</p>
+  <div class="row"><div><label for="b-days">Período</label><select id="b-days"><option value="7">7 días</option><option value="14" selected>14 días</option><option value="30">30 días</option></select></div><div><button id="b-go">Actualizar</button> <button class="sec" id="b-csv">Descargar eventos (CSV)</button></div></div>
+  <div id="b-out"></div></div>
  <div class="card"><h2>Calculadora de precios</h2><p class="mu">Cuánto cuesta atender a una persona de cada plan y qué precio conviene cobrar. Usa los costos reales medidos cuando hay muestra suficiente; si no, estima con el precio oficial de Gemini.</p>
   <div class="row"><div><label for="p-util">Uso del cupo diario (%)</label><input id="p-util" type="number" min="1" max="100" value="40"></div><div><label for="p-days">Días de uso por mes</label><input id="p-days" type="number" min="1" max="30" value="15"></div></div>
   <div class="row"><div><label for="p-fee">Comisión de Google Play (%)</label><input id="p-fee" type="number" min="0" max="50" value="15"></div><div><label for="p-tax">Impuestos incluidos en el precio (%)</label><input id="p-tax" type="number" min="0" max="60" value="0"></div></div>
@@ -42,7 +45,7 @@ async function load(){const{s,j}=await api('GET','/v1/admin/usage?days=7');if(s!
  const tb=$('byday');tb.replaceChildren();const h=document.createElement('tr');for(const x of['Día','Modelo','Pedidos','Entrada','Salida','Razonam.','USD'])cell(h,x,1);tb.appendChild(h);
  for(const r of j.byDay){const tr=document.createElement('tr');for(const x of[r.day,r.model,r.calls,r.input,r.output,r.thoughts,r.cost.toFixed(4)])cell(tr,x);tb.appendChild(tr)}
  $('top').textContent=j.topUsers.length?'Mayor gasto: '+j.topUsers.map(u=>u.user_id.slice(0,8)+' ('+u.calls+' pedidos, USD '+u.cost.toFixed(4)+')').join(' · '):'Todavía no hay uso.';return true}
-$('go').onclick=async()=>{T=$('tok').value.trim();sessionStorage.setItem('fa-admin',T);await load()};
+$('go').onclick=async()=>{T=$('tok').value.trim();sessionStorage.setItem('fa-admin',T);if(await load())loadBeta()};
 $('p-go').onclick=async()=>{const q=new URLSearchParams({utilization:$('p-util').value/100,daysActive:$('p-days').value,playFee:$('p-fee').value/100,tax:$('p-tax').value/100,margin:$('p-margin').value/100});
  const{s,j}=await api('GET','/v1/admin/pricing?'+q);const o=$('p-out');o.replaceChildren();if(s!==200){o.textContent='Error '+s;return}
  const usd=(n,d=2)=>'USD '+n.toFixed(d);
@@ -57,6 +60,42 @@ $('mk').onclick=async()=>{const{s,j}=await api('POST','/v1/admin/invites',{count
  c.hidden=false;c.textContent=j.codes.join('\\n');$('copy').hidden=false;$('copy').onclick=()=>navigator.clipboard.writeText(j.codes.join('\\n'))};
 $('upd').onclick=async()=>{const w=$('who').value.trim();if(!w)return;const b={};if(/^FA-/i.test(w))b.code=w.toUpperCase();else b.userId=w;if($('plan2').value)b.plan=$('plan2').value;if($('blk').value!=='')b.disabled=$('blk').value==='1';
  const{s,j}=await api('POST','/v1/admin/users',b);$('umsg').textContent=s===200?'Listo: '+j.updated+' usuario(s) modificado(s).':'Error '+s}
-if(T)load();
+
+const FEAT={cartera:'Mi cartera',calculadora:'Calculadora de escenarios',alertas:'Avisos en el celular',cuentas:'Conectar mis cuentas',ejecucion:'Operar desde la app',recomendaciones:'Recomendaciones personalizadas',tiempo_real:'Precios en tiempo real'};
+const EVN={app_open:'Abrió la app',screen:'Cambió de pantalla',asset_open:'Abrió un activo',search:'Buscó',search_miss:'Búsqueda sin resultado',chart_range:'Cambió el período del gráfico',chart_kind:'Cambió línea/velas',chart_tool:'Usó una herramienta del gráfico',stress_view:'Vio el termómetro',move_view:'Vio el movimiento esperado',plan_open:'Abrió Mi plan',plan_saved:'Guardó Mi plan',plan_removed:'Borró Mi plan',watch:'Agregó/quitó un favorito',ai_send:'Le preguntó al asistente',ai_done:'El asistente respondió',ai_error:'Error del asistente',ai_rate:'Calificó una respuesta',quota_block:'Chocó con el tope diario',upsell:'Aviso de planes',fakedoor:'Lista de funciones futuras',setting:'Cambió un ajuste',feedback_sent:'Envió un comentario',intro_step:'Paso de la introducción',tour_slide:'Diapositiva del recorrido',error:'Error de la app'};
+function mk(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e}
+function pct(p){if(!p||p.rate==null)return '— (sin base: '+(p?p.n:0)+')';return (p.rate*100).toFixed(0)+' % ('+p.k+' de '+p.n+'; entre '+(p.lo*100).toFixed(0)+' y '+(p.hi*100).toFixed(0)+' %)'}
+function tbl(parent,head,rows){const t=mk('table');const h=mk('tr');for(const x of head)h.appendChild(mk('th',x));t.appendChild(h);for(const r of rows){const tr=mk('tr');for(const x of r)tr.appendChild(mk('td',x==null?'—':String(x)));t.appendChild(tr)}const w=mk('div');w.style.overflow='auto';w.appendChild(t);parent.appendChild(w)}
+function sec(parent,title,note){parent.appendChild(mk('h2',title)).style.marginTop='18px';if(note)parent.appendChild(mk('p',note,'mu'))}
+function kv(parent,rows){tbl(parent,['Dato','Valor'],rows)}
+function num(x,d){return x==null?'—':(+x).toFixed(d==null?1:d)}
+function fmtDate(ts){return new Date(ts).toISOString().slice(0,16).replace('T',' ')}
+function renderBeta(m){const o=$('b-out');o.replaceChildren();
+ for(const w of m.warnings)o.appendChild(mk('p','⚠ '+w,'err'));
+ sec(o,'Usuarios');kv(o,[['Registrados',m.users.registered],['Con datos (aceptaron las estadísticas y usaron la app)',m.users.withData],['Aceptaron / no aceptaron / sin responder',m.users.consentYes+' / '+m.users.consentNo+' / '+m.users.undecided],['Activos hoy',m.active.dauToday],['Activos en 7 días',m.active.wau],['Activos en 30 días',m.active.mau],['Activos hoy ÷ activos en 7 días',m.active.stickiness==null?'—':(m.active.stickiness*100).toFixed(0)+' %'],['Días activos por persona (mediana)',num(m.intensity.activeDaysMedian)],['Con 3 o más días activos',pct(m.intensity.usersWith3PlusDays)]]);
+ sec(o,'¿Vuelven?','Día 1: volvió al día siguiente. Día 7: volvió exactamente al día 7. Semana 2: volvió algún día entre el 7 y el 13. Solo cuentan quienes ya cumplieron ese plazo.');
+ kv(o,[['Día 1',pct(m.retention.d1)],['Día 7',pct(m.retention.d7)],['Semana 2',pct(m.retention.w2)]]);
+ tbl(o,['Cohorte (día del primer uso)','Personas','Día 1','Día 7','Semana 2'],m.retention.cohorts.map(c=>[c.day,c.size,c.d1,c.d7,c.w2]));
+ sec(o,'Asistente de IA');const a=m.ai;
+ kv(o,[['Usaron el asistente',pct(a.users)],['Consultas',a.sends],['Consultas por persona y día activo',num(a.perUserPerActiveDay,2)],['Usaron la IA el primer día',pct(a.usedAiOnFirstDay)],['Personas con 1 / 2–4 / 5–9 / 10+ consultas',a.usage.once+' / '+a.usage.few+' / '+a.usage.some+' / '+a.usage.heavy],['Cómo empezaron la consulta',JSON.stringify(a.sources)],['Respuestas completadas sobre consultas enviadas',pct(a.completed)],['Errores',a.errorCount+' '+JSON.stringify(a.errors)],['Chocaron con el tope diario/mensual',a.quotaBlocks+' veces, '+a.quotaBlockUsers+' personas'],['Tiempo de respuesta (mediana / p90)',a.latencyMs?(a.latencyMs.median/1000).toFixed(1)+' s / '+(a.latencyMs.p90/1000).toFixed(1)+' s':'—'],['Consultas a herramientas por respuesta',num(a.avgSteps)],['Cifras verificadas / quitadas por no tener respaldo',a.verifier.figuresChecked+' / '+a.verifier.figuresUnverified],['Respuestas que necesitaron corrección',pct(a.verifier.fixedShare)],['Útil (👍) / no útil (👎)',a.rating.up+' / '+a.rating.down+' · útil: '+pct(a.rating.helpful)],['Motivos del 👎',JSON.stringify(a.rating.reasons)]]);
+ tbl(o,['Herramienta','Usos','Personas'],a.tools.map(t=>[t.name,t.uses,t.users]));
+ if(a.unusedTools.length)o.appendChild(mk('p','Herramientas que nadie usó: '+a.unusedTools.join(', '),'mu'));
+ sec(o,'Qué piden y qué les falta');
+ tbl(o,['Activo','Tipo','Personas','Aperturas'],m.needs.topAssets.map(x=>[x.sym,x.group,x.users,x.opens]));
+ sec(o,'Búsquedas sin resultado','Activos que la gente buscó y la app no encontró: son los que faltan cubrir.');
+ tbl(o,['Búsqueda','Personas','Veces'],m.needs.searchMisses.map(x=>[x.q,x.users,x.searches]));
+ sec(o,'Votos por funciones que todavía no existen','Un voto por persona y función. La base son todos los usuarios registrados, hayan aceptado o no las estadísticas.');
+ tbl(o,['Función','Votos','Vieron la lista','% de registrados'],m.needs.features.map(f=>[FEAT[f.feature]||f.feature,f.votes,f.saw,pct(f)]));
+ sec(o,'Herramientas del gráfico más activadas');tbl(o,['Herramienta','Personas'],m.needs.chartTools.map(x=>[x.tool,x.users]));
+ sec(o,'Comentarios y recomendación');const n=m.feedback.nps;
+ kv(o,[['Respuestas de recomendación (0 a 10)',n.n],['Puntaje NPS (promotores 9–10 menos detractores 0–6)',n.score==null?'—':n.score],['Promotores / pasivos / detractores',n.promoters+' / '+n.passives+' / '+n.detractors],['Promedio',num(n.mean)],['Comentarios por tipo',JSON.stringify(m.feedback.byKind)]]);
+ tbl(o,['Fecha','Tipo','Nota','Versión','Persona','Texto'],m.feedback.latest.map(f=>[fmtDate(f.ts),f.kind,f.score,f.version,f.user,f.text]));
+ sec(o,'Todo lo que hicieron (personas distintas y cantidad)');
+ tbl(o,['Evento','Personas','% de los que tienen datos','Veces'],m.adoption.map(x=>[EVN[x.name]||x.name,x.users,pct(x),x.events]));
+}
+async function loadBeta(){const o=$('b-out');o.replaceChildren(mk('p','Cargando…','mu'));const{s,j}=await api('GET','/v1/admin/metrics?days='+$('b-days').value);if(s!==200){o.replaceChildren(mk('p','No pude cargar las métricas (error '+s+').','err'));return}renderBeta(j)}
+$('b-go').onclick=loadBeta;$('b-days').onchange=loadBeta;
+$('b-csv').onclick=async()=>{const r=await fetch('/v1/admin/events.csv?days=30',{headers:{authorization:'Bearer '+T}});if(!r.ok)return;const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='finagent-eventos.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+if(T)load().then(ok=>{if(ok)loadBeta()});
 </script></body></html>
 `;

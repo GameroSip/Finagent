@@ -17,6 +17,7 @@ export const ABOUT = {
   privacy: 'Tus preguntas se envían a Google (Gemini) con tu propia clave. FinAgent no tiene servidor propio ni guarda tus datos fuera de tu teléfono.',
   // Versión con servidor (beta): las consultas pasan por servidores de FinAgent. Es verdad porque el servidor registra solo números, nunca el texto (lo verifica tests/server.test.ts).
   privacyServer: 'Tus preguntas se procesan en los servidores de FinAgent y se envían a Google (Gemini) para generar la respuesta. FinAgent no guarda el texto de tus consultas en el servidor: solo cuenta cuántas hacés y cuántos tokens usan, para aplicar los límites de tu plan. Tu historial queda en este teléfono.',
+  privacyStats: 'Si aceptás ayudar a mejorar la beta, FinAgent también registra qué funciones usás, qué activos abrís y las búsquedas que no encontraron resultado, sin tu nombre ni tu correo. Nunca registra lo que le escribís al asistente, tu plan ni tus favoritos. Los comentarios que decidas enviar sí nos llegan. Podés apagarlo cuando quieras en Ajustes.',
   // Se muestra mientras el servidor use el nivel GRATUITO de Gemini (el servidor informa su nivel): en ese nivel Google puede usar las consultas para mejorar sus productos.
   freeTier: 'Por ahora FinAgent usa el nivel gratuito de Gemini: Google puede usar lo que escribas para mejorar sus productos. No incluyas datos personales ni información financiera sensible en tus consultas.',
   // Solo si la persona inicia sesión con Google: el servidor guarda únicamente el identificador de la cuenta (lo verifica tests/server.test.ts).
@@ -25,7 +26,7 @@ export const ABOUT = {
 };
 
 /** Todo el texto visible de la presentación, en una lista (para controlarlo). */
-export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
+export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyStats, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
 
 /** Frases que NO pueden aparecer en la presentación de la app mientras no sean ciertas. */
 export const FORBIDDEN_CLAIMS: Array<[string, RegExp]> = [

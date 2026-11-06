@@ -28,6 +28,7 @@ export interface StoredMsg {
   verification?: { checked: number; ok: boolean; unverified: string[] };
   flags?: { corrected?: boolean; truncated?: boolean; redacted?: number }; // redacted: cifras sin respaldo que se quitaron
   trace?: TraceItem[];
+  rated?: 'up' | 'down';                              // ia: la persona ya la calificó (solo con estadísticas aceptadas)
   ui?: any[];                                         // tarjetas gráficas (acotadas en tamaño)
   model?: string;
   errKind?: 'invalid_key' | 'busy' | 'unavailable' | 'other' | 'stopped' | 'limit' | 'session';

@@ -18,6 +18,8 @@ import { h } from './ui/dom';
 import { introDone, mountIntro, startupFailure } from './views/intro';
 import { mountLaunch } from './views/launch';
 import { mountOnboarding } from './views/onboarding';
+import { hasDecided, installLifecycle, track, trackAppOpen } from './analytics';
+import { maybeAskNps, noteOpenDay, openConsentSheet } from './views/feedback';
 
 function resolvedTheme(): 'dark' | 'light' {
   const t = getSettings().theme;
@@ -48,7 +50,15 @@ function start() {
 
 // Primera apertura: pantalla de carga con el logo en 3D → (el logo despega) → cuenta → idioma → recorrido. Las siguientes: la pantalla de carga y directo a la app.
 // Con servidor (beta) la cuenta se crea sola o con Google; sin servidor (desarrollo) al final se pide la clave de Gemini.
-const enter = () => { start(); root.querySelector('.app')?.classList.add('screen-in'); };
+/** Estadísticas de la beta: una sesión por apertura; a quien ya usaba la app se le pregunta una sola vez; y la encuesta de recomendación cuando corresponde. */
+function afterEnter() {
+  installLifecycle(); noteOpenDay(); trackAppOpen();
+  let crashes = 0;
+  window.addEventListener('error', () => { if (crashes++ < 5) track('error', { kind: 'render' }); });
+  window.addEventListener('unhandledrejection', () => { if (crashes++ < 5) track('error', { kind: 'other' }); });
+  if (isServerMode()) setTimeout(() => { if (!hasDecided()) openConsentSheet(); else maybeAskNps(); }, 3000);
+}
+const enter = () => { start(); root.querySelector('.app')?.classList.add('screen-in'); afterEnter(); };
 if (!introDone()) {
   mountIntro(root, { server: isServerMode(), onDone: enter, keyStep: !isServerMode() && !getSettings().apiKey ? (done) => mountOnboarding(root, models, done) : undefined });
 } else if (isServerMode() || getSettings().apiKey) {

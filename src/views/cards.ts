@@ -69,7 +69,7 @@ function quotesCard(ui: any, ctx: Ctx): Rich {
       c.innerHTML = `<div class="eyebrow" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div>
         <div class="num" style="font-weight:700;margin:3px 0 5px">${fmtNum(i.price, i.price > 1000 ? 0 : 2)}</div>${pillHtml(i.changePct)}
         <div style="margin:6px -2px 0;height:26px">${sparkSvg(i.spark ?? [], { w: 112, h: 26 })}</div>`;
-      c.onclick = () => ctx.openAsset(i.symbol, i.name);
+      c.onclick = () => ctx.openAsset(i.symbol, i.name, 'assistant');
       row.append(c);
     });
     body.append(row);
@@ -79,7 +79,7 @@ function quotesCard(ui: any, ctx: Ctx): Rich {
       r.innerHTML = `${assetIcon(i.symbol, { style: 'width:34px;height:34px;border-radius:11px;font-size:11px' })}
         <div style="flex:1;min-width:0;text-align:left"><div style="font-weight:700">${esc(i.symbol)}</div><div class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}</div></div>
         <div style="text-align:right"><div class="num" style="font-weight:650;margin-bottom:2px">${fmtPrice(i.price, i.currency ?? 'USD')}</div>${pillHtml(i.changePct)}</div>`;
-      r.onclick = () => ctx.openAsset(i.symbol, i.name);
+      r.onclick = () => ctx.openAsset(i.symbol, i.name, 'assistant');
       body.append(r);
     });
   }
@@ -136,7 +136,7 @@ function screenCard(ui: any, ctx: Ctx): Rich {
     r.innerHTML = `${assetIcon(p.ticker, { style: 'width:34px;height:34px;border-radius:11px;font-size:11px' })}
       <div style="flex:1;min-width:0;text-align:left"><div style="font-weight:700">${esc(p.ticker)}</div><div class="muted num" style="font-size:12px">P/E ${fmtNum(p.pe_ttm, 1)} · Div ${p.dividend_yield_pct !== undefined ? fmtPct(p.dividend_yield_pct, false) : '—'} · ROE ${p.roe_pct !== undefined ? fmtPct(p.roe_pct, false) : '—'}</div></div>
       <div class="num" style="font-weight:650">${fmtNum(p.price, 2)}</div>`;
-    r.onclick = () => ctx.openAsset(p.ticker);
+    r.onclick = () => ctx.openAsset(p.ticker, undefined, 'assistant');
     body.append(r);
   });
   if (excluded.length) {

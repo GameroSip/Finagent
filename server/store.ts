@@ -1,5 +1,6 @@
 // Almacenamiento del servidor sobre SQL (Cloudflare D1 en producción, SQLite de Node en desarrollo y pruebas).
 import type { Plan, PlanId, Ticket, UsageStore } from '../src/plans';
+import type { RawMetrics } from './metrics';
 import { SCHEMA_SQL } from './schema';
 
 /** Lo mínimo que se necesita de una base SQL. */
@@ -12,6 +13,8 @@ export interface Invite { code: string; plan: PlanId; max_devices: number; note:
 export interface UserRow { id: string; code: string; device_id: string; plan: PlanId; created_at: string; disabled: number; plan_code: string | null }
 export interface TurnRow { id: string; user_id: string; created_at: number; calls: number; model: string; ticket: string; refunded: number }
 export interface CallRow { user_id: string; ts: number; model: string; in_tokens: number; out_tokens: number; thoughts: number; cached: number; cost_usd: number }
+
+export interface EventRow { ts: number; day: string; name: string; props: string | null }
 
 export class SqlStore implements UsageStore {
   constructor(private sql: Sql) {}
@@ -97,6 +100,38 @@ export class SqlStore implements UsageStore {
   async markRefunded(id: string): Promise<boolean> {
     const rows = await this.sql.all<{ id: string }>('UPDATE turns SET refunded = 1 WHERE id = ? AND refunded = 0 RETURNING id', id);
     return rows.length > 0;
+  }
+
+  // ---- estadísticas de uso de la beta (solo valores de listas cerradas) y comentarios que la persona decide enviar
+  async setConsent(userId: string, analytics: boolean, ts: number): Promise<void> {
+    await this.sql.run('INSERT INTO consent (user_id, analytics, ts) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET analytics = excluded.analytics, ts = excluded.ts', userId, analytics ? 1 : 0, ts);
+  }
+  async hasConsent(userId: string): Promise<boolean> { return ((await this.sql.all<{ a: number }>('SELECT analytics AS a FROM consent WHERE user_id = ?', userId))[0]?.a ?? 0) === 1; }
+  /** Guarda los eventos de a 15 por consulta: el plan gratuito de Cloudflare limita las consultas por pedido y D1 admite 100 parámetros por consulta (15 filas × 5 = 75). Un lote de 40 son 3 consultas, no 40. */
+  async addEvents(userId: string, rows: EventRow[]): Promise<void> {
+    for (let i = 0; i < rows.length; i += 15) {
+      const chunk = rows.slice(i, i + 15);
+      await this.sql.run(`INSERT INTO events (user_id, ts, day, name, props) VALUES ${chunk.map(() => '(?, ?, ?, ?, ?)').join(', ')}`, ...chunk.flatMap((r) => [userId, r.ts, r.day, r.name, r.props]));
+    }
+  }
+  async addFeedback(f: { user_id: string; ts: number; kind: string; score: number | null; text: string | null; version: string | null }): Promise<void> {
+    await this.sql.run('INSERT INTO feedback (user_id, ts, kind, score, text, version) VALUES (?, ?, ?, ?, ?, ?)', f.user_id, f.ts, f.kind, f.score, f.text, f.version);
+  }
+  async metricsRaw(sinceDay: string, names: string[]): Promise<RawMetrics> {
+    const one = async (q: string, ...p: unknown[]) => (await this.sql.all<{ n: number }>(q, ...p))[0]?.n ?? 0;
+    const marks = names.map(() => '?').join(',');
+    return {
+      users: await one('SELECT COUNT(*) AS n FROM users'), consentYes: await one('SELECT COUNT(*) AS n FROM consent WHERE analytics = 1'), consentNo: await one('SELECT COUNT(*) AS n FROM consent WHERE analytics = 0'),
+      activity: await this.sql.all('SELECT user_id, day, COUNT(*) AS n FROM events WHERE day >= ? GROUP BY user_id, day', sinceDay),
+      firstDay: await this.sql.all('SELECT user_id, MIN(day) AS day FROM events GROUP BY user_id'),
+      byName: await this.sql.all('SELECT name, COUNT(*) AS n, COUNT(DISTINCT user_id) AS u FROM events WHERE day >= ? GROUP BY name', sinceDay),
+      rows: names.length ? await this.sql.all(`SELECT user_id, day, name, props FROM events WHERE day >= ? AND name IN (${marks})`, sinceDay, ...names) : [],
+      feedback: await this.sql.all('SELECT id, user_id, ts, kind, score, text, version FROM feedback ORDER BY ts DESC LIMIT 400'),
+      interest: await this.interestCounts(),
+    };
+  }
+  async eventsCsvRows(sinceDay: string, limit: number): Promise<Array<{ user_id: string; ts: number; day: string; name: string; props: string | null }>> {
+    return this.sql.all('SELECT user_id, ts, day, name, props FROM events WHERE day >= ? ORDER BY ts LIMIT ?', sinceDay, limit);
   }
 
   // ---- registro de uso (solo números, nunca el texto)

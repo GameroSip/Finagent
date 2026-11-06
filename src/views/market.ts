@@ -83,7 +83,7 @@ export function createMarketView(ctx: Ctx): View {
         <div class="big"><span class="num">${fmtNum(sp.price)}</span><span class="pill ${cls}" style="font-size:15px">${fmtPct(sp.changePct)}</span></div>
         <div style="margin:10px -2px 0;height:56px">${sparkSvg(sp.spark, { w: 340, h: 56, stroke: 1.6 })}</div></div>
       <button class="link-row" id="m-ai"><span>Resumen del día con IA</span>${icon('arrowUpRight', 16)}</button>`;
-    $('#m-ai', el).onclick = () => ctx.askAI(t('Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.'), t('Resumen del día'));
+    $('#m-ai', el).onclick = () => ctx.askAI(t('Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.'), t('Resumen del día'), 'market');
   }
 
   /** Filas de cotizaciones (índices, divisas, cripto…): ícono, nombre, mini gráfico, precio y variación. */
@@ -95,7 +95,7 @@ export function createMarketView(ctx: Ctx): View {
       row.innerHTML = `${assetIcon(i.symbol, { style: 'width:30px;height:30px;font-size:10px;flex:none' })}<div class="nm"><b>${esc(i.name)}</b><span data-notrans>${esc(i.symbol.replace(/^\^/, ''))}</span></div>` + (i.price === null
         ? `<div></div><div class="px muted" style="font-size:12px">${esc(t('No disponible'))}</div>`
         : `<div>${sparkSvg(i.spark, { w: 64, h: 26, up: inv ? !(i.changePct! >= 0) : undefined })}</div><div class="px"><span class="num">${fmtNum(i.price, i.price > 1000 ? 0 : i.price < 10 ? 4 : 2)}</span>${pill(i.changePct, inv)}</div>`);
-      row.onclick = () => ctx.openAsset(i.symbol, i.name);
+      row.onclick = () => ctx.openAsset(i.symbol, i.name, 'market');
       q(targetId).append(row);
     }
   }
@@ -127,7 +127,7 @@ export function createMarketView(ctx: Ctx): View {
       row.innerHTML = `${assetIcon(m.symbol)}
         <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(m.symbol)}</div><div class="muted" style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</div></div>
         <div style="text-align:right"><div class="num" style="font-weight:650;margin-bottom:3px">${fmtPrice(m.price, m.currency === 'USD' || !m.currency ? 'USD' : m.currency)}</div>${pill(m.changePct)}</div>`;
-      row.onclick = () => ctx.openAsset(m.symbol, m.name);
+      row.onclick = () => ctx.openAsset(m.symbol, m.name, 'market');
       box.append(row);
     });
   }

@@ -11,8 +11,9 @@ import { $, esc, h, openUrl, safeUrl, toast } from '../ui/dom';
 import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
 import { locale, t } from '../i18n';
-import { expectedMove, stressNow } from '../stress';
+import { expectedMove, stressGroup, stressNow } from '../stress';
 import { bindStress, moveHtml, stressHtml } from '../ui/stressCard';
+import { track } from '../analytics';
 
 export interface Overlay { el: HTMLElement; close(): void }
 
@@ -20,7 +21,7 @@ const RANGES = ['1D', '1S', '1M', '6M', '1A', '5A'] as const;
 type Range = (typeof RANGES)[number];
 const RANGE_LABEL: Record<Range, string> = { '1D': 'hoy', '1S': 'última semana', '1M': 'último mes', '6M': '6 meses', '1A': '1 año', '5A': '5 años' };
 
-export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, onClose?: () => void): Overlay {
+export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, onClose?: () => void, from: 'market' | 'search' | 'watchlist' | 'assistant' = 'market'): Overlay {
   const sym = symbol.toUpperCase();
   pushRecent(sym);
   const el = h('div', { class: 'overlay asset-ov' });
@@ -114,7 +115,13 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
     return (yearPromise ??= fetchChart(sym, '1y', '1d').then((d) => { yearData = d; applyMeta(d); return d; }).finally(() => { yearPromise = null; }));
   }
 
+  /** Una sola vez por apertura: qué activo, de qué tipo y desde dónde. Con el tipo exacto cuando llegan los metadatos (si no llegan en 5 s, con el que se deduce del símbolo). */
+  let openTracked = false;
+  const trackOpen = (instrumentType?: string) => { if (openTracked) return; openTracked = true; track('asset_open', { sym: sym.toUpperCase(), group: stressGroup(sym, instrumentType) ?? 'otro', from }); };
+  setTimeout(() => trackOpen(), 5000);
+
   function applyMeta(ch: ChartData) {
+    trackOpen(ch.meta.instrumentType);
     currency = sym.startsWith('^') ? null : (ch.meta.currency ?? currency); // los índices cotizan en puntos
     const n = ch.meta.longName ?? ch.meta.shortName;
     if (n && name === sym) { name = n; q('#a-name').textContent = n; }
@@ -177,7 +184,9 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
           <div class="stat-grid" style="margin-top:12px">${stat('RSI (14)', fmtNum(snap.rsi14, 1))}${stat('vs EMA 200', snap.pct_vs_ema200 === null ? '—' : fmtPct(snap.pct_vs_ema200), snap.pct_vs_ema200 === null ? 'datos insuficientes' : '')}</div></div>`;
       }
       // termómetro de tensión: con ruedas completas (se descarta la rueda en curso) y solo para tipos de activo que el backtest respaldó
-      const drawStress = () => { try { q('#a-stress').innerHTML = moveHtml(expectedMove(yd.bars, sym, yd.meta)) + stressHtml(stressNow(yd.bars, sym, yd.meta)); bindStress(q('#a-stress'), drawStress); } catch { q('#a-stress').innerHTML = ''; } };
+      let stressTracked = false;
+      const drawStress = () => { try {
+        if (!stressTracked) { stressTracked = true; const sn = stressNow(yd.bars, sym, yd.meta), em = expectedMove(yd.bars, sym, yd.meta); if (sn.kind === 'ok') track('stress_view', { level: sn.level, group: sn.group }); if (em.kind !== 'unsupported' || em.reason !== 'tipo') track('move_view', { group: stressGroup(sym, yd.meta.instrumentType) ?? 'otro', ok: em.kind === 'ok' }); } q('#a-stress').innerHTML = moveHtml(expectedMove(yd.bars, sym, yd.meta)) + stressHtml(stressNow(yd.bars, sym, yd.meta)); bindStress(q('#a-stress'), drawStress); } catch { q('#a-stress').innerHTML = ''; } };
       drawStress();
     } catch { /* se muestran solo los fundamentales */ }
     q('#a-stats').innerHTML = tiles.join('') || '';
@@ -234,25 +243,28 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
   q('#a-back').onclick = close;
   q('#a-star').onclick = () => {
     const on = toggleWatch(sym);
+    track('watch', { op: on ? 'add' : 'remove', group: stressGroup(sym) ?? 'otro' });
     q('#a-star').innerHTML = icon('star', 20, on);
     toast(on ? t('{s} agregado a favoritos', { s: sym }) : t('{s} quitado de favoritos', { s: sym }));
   };
   q('#a-ranges').addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button'); if (!b) return;
     range = b.dataset.r as Range;
+    track('chart_range', { range });
     q('#a-ranges').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     void drawChart();
   });
   q('#a-mode').addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button'); if (!b) return;
     mode = b.dataset.m as 'line' | 'candles';
+    track('chart_kind', { kind: mode });
     q('#a-mode').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     void drawChart();
   });
   const refreshToolsBadge = () => { const n = activeCount(tools); q('#a-tools-n').textContent = n ? ` · ${n}` : ''; q('#a-tools').classList.toggle('on', n > 0); };
   refreshToolsBadge();
-  q('#a-tools').addEventListener('click', () => openToolsSheet({ tools, intraday: lastIntraday, hasVolume, onChange: (t) => { tools = t; saveTools(t); announce = true; refreshToolsBadge(); void drawChart(); } }));
-  q('#a-ai').onclick = () => { close(); ctx.askAI(t('Analizá {s}: situación técnica, valuación, riesgos, y el caso alcista y bajista con qué lo invalidaría.', { s: `${sym}${name !== sym ? ` (${name})` : ''}` }), t('Analizar {s}', { s: sym })); };
+  q('#a-tools').addEventListener('click', () => openToolsSheet({ tools, intraday: lastIntraday, hasVolume, onChange: (t, changed) => { track('chart_tool', { tool: changed, on: !!t[changed] }); tools = t; saveTools(t); announce = true; refreshToolsBadge(); void drawChart(); } }));
+  q('#a-ai').onclick = () => { close(); ctx.askAI(t('Analizá {s}: situación técnica, valuación, riesgos, y el caso alcista y bajista con qué lo invalidaría.', { s: `${sym}${name !== sym ? ` (${name})` : ''}` }), t('Analizar {s}', { s: sym }), 'asset'); };
 
   void drawChart(); void loadStats(); void loadNews();
   return { el, close };

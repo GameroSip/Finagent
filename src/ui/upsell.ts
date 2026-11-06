@@ -5,6 +5,7 @@ import { decideUpsell, dismiss, DISMISS_HARD, DISMISS_SOFT, loadUpsell, markShow
 import { t } from '../i18n';
 import { esc, h } from './dom';
 import { icon } from './icons';
+import { track } from '../analytics';
 
 /** Devuelve la tarjeta si corresponde mostrarla ahora (y la da por mostrada); si no, null. */
 export async function maybeUpsellCard(trigger: Trigger, onPlans: () => void): Promise<HTMLElement | null> {
@@ -28,9 +29,9 @@ export async function maybeUpsellCard(trigger: Trigger, onPlans: () => void): Pr
   el.addEventListener('click', (e) => {
     const a = (e.target as HTMLElement).closest<HTMLElement>('[data-u]')?.dataset.u;
     if (!a) return;
-    if (a === 'plans') onPlans();
-    else { dismiss(a === 'never' ? DISMISS_HARD : DISMISS_SOFT); el.remove(); }
+    if (a === 'plans') { track('upsell', { action: 'click' }); onPlans(); }
+    else { track('upsell', { action: 'dismiss' }); dismiss(a === 'never' ? DISMISS_HARD : DISMISS_SOFT); el.remove(); }
   });
-  markShown();
+  markShown(); track('upsell', { action: 'view' });
   return el;
 }

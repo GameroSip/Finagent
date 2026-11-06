@@ -54,10 +54,11 @@
 .tour-view { flex: 1; overflow: hidden; touch-action: pan-y; min-height: 0; margin: 0 -24px; } .tour-track { display: flex; height: 100%; transition: transform .55s cubic-bezier(.2, .8, .2, 1); }
 .slide { flex: 0 0 100%; min-width: 0; padding: 22px 24px 8px; overflow-y: auto; display: flex; flex-direction: column; opacity: .25; transform: translateX(24px); transition: opacity .45s, transform .55s cubic-bezier(.2, .8, .2, 1); }
 .slide.active { opacity: 1; transform: none; }
-.slide-art { min-height: 150px; display: grid; align-items: center; margin-bottom: 20px; }
+.slide > * { flex-shrink: 0; }                                  /* nada se encoge: si no entra, la diapositiva se desplaza (antes la ilustración se achicaba y su contenido se montaba sobre el texto) */
+.slide-art { min-height: 96px; display: grid; align-items: center; margin-bottom: 14px; }
 .slide-n { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--brand); letter-spacing: .08em; }
 .slide h2 { margin: 8px 0 10px; font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; } .slide p { font-size: 15px; line-height: 1.55; color: var(--text-2); }
-.slide ul { list-style: none; padding: 0; margin: 14px 0 0; border-top: 1px solid var(--line); } .slide li { display: flex; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; line-height: 1.45; color: var(--text-2); } .slide li svg { flex: none; color: var(--up); margin-top: 2px; }
+.slide ul { list-style: none; padding: 0; margin: 10px 0 0; border-top: 1px solid var(--line); } .slide li { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; line-height: 1.45; color: var(--text-2); } .slide li svg { flex: none; color: var(--up); margin-top: 2px; }
 .tour-nav { display: flex; gap: 10px; padding-top: 12px; } .tour-nav .btn { flex: 1; }
 .art { width: 100%; } .art-welcome { display: flex; flex-direction: column; gap: 18px; } .art-welcome svg { color: var(--brand); } .a-rule { height: 1px; background: linear-gradient(90deg, var(--brand), transparent); }
 .a-strip { display: flex; flex-wrap: wrap; gap: 8px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 500; letter-spacing: .06em; padding: 14px 0; border-top: 1px solid var(--line-2); } .a-strip.dim { color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--line); }
@@ -85,3 +86,5 @@
 .back-row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 8px; } .back-k { min-width: 64px; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .chip3 { padding: 4px 9px; border-radius: 6px; font-size: 12.5px; font-weight: 500; border: 1px solid var(--line-2); color: var(--text-2); }
 .vs-tbl { width: 100%; border-collapse: collapse; font-size: 13px; } .vs-tbl th, .vs-tbl td { padding: 9px 6px 9px 0; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; } .vs-tbl thead th { color: var(--muted); font-weight: 500; font-size: 12px; } .vs-tbl tbody th { color: var(--muted); font-weight: 500; width: 24%; } .vs-tbl td.good { color: var(--text); font-weight: 500; }
+.a-kv { border-top: 1px solid var(--line-2); } .a-kv > div { padding: 11px 0; border-bottom: 1px solid var(--line); } .a-kv small { display: block; font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.a-kv b { display: block; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; line-height: 1.5; }

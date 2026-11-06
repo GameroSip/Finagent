@@ -6,12 +6,12 @@ export type TabId = 'market' | 'chat' | 'watch' | 'settings';
 /** Servicios compartidos entre pantallas. */
 export interface Ctx {
   models: ModelManager;
-  openAsset(symbol: string, name?: string): void;
+  openAsset(symbol: string, name?: string, from?: 'market' | 'search' | 'watchlist' | 'assistant'): void;
   openSearch(): void;
   /** Abre una pantalla superpuesta que participa del botón "atrás". `make` recibe `done`, que debe llamarse al terminar de cerrarse. */
   layer(make: (done: () => void) => Overlay): void;
   /** Inicia una conversación NUEVA con este mensaje (como "Analizar con IA" desde otra pantalla). */
-  askAI(prompt: string, label?: string): void;
+  askAI(prompt: string, label?: string, src?: 'asset' | 'market'): void;
   go(tab: TabId): void;
   logout(): void;
 }

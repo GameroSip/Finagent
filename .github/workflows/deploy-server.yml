@@ -37,7 +37,7 @@ jobs:
           if [ ${#JWT_SECRET} -lt 32 ] || [ ${#ADMIN_TOKEN} -lt 32 ]; then echo "::error::JWT_SECRET y ADMIN_TOKEN deben tener al menos 32 caracteres al azar."; exit 1; fi
 
       - name: Tests del servidor
-        run: npx vitest run tests/server.test.ts tests/client-server.test.ts
+        run: npx vitest run tests/server.test.ts tests/client-server.test.ts tests/analytics-server.test.ts
 
       - name: Crear la base de datos (si no existe) y preparar la configuración
         run: |

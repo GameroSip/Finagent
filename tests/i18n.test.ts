@@ -5,6 +5,7 @@ import { ABOUT } from '../src/about';
 import { TOUR } from '../src/content/tour';
 import { COMING_LANGS, detectLang, getLang, LANGS, locale, lookup, setLang, t, translateText, type UiLang } from '../src/i18n';
 import { FREE_FOREVER } from '../src/planPitch';
+import { betaTexts } from '../src/betaTexts';
 import { stressTexts } from '../src/stress';
 import { FLOW, VS } from '../src/views/about';
 
@@ -14,7 +15,7 @@ const SRC = walk('src');
 const vars = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 const LANG2: UiLang[] = ['en', 'pt'];
 // Siglas y nombres que se escriben igual en todos los idiomas.
-const SAME = /^(EMA \d+|VWAP|MACD|RSI \(14\)|Fibonacci|ETF)$/;
+const SAME = /^(EMA \d+|VWAP|MACD|RSI \(14\)|Fibonacci|ETF|Beta)$/;
 
 /** Todos los textos que el código manda por t('…') (se leen del código fuente: si alguien agrega uno nuevo sin traducirlo, esta prueba falla). */
 function tKeys(): Array<[string, string]> {
@@ -53,7 +54,7 @@ describe('el diccionario cubre TODOS los textos de la interfaz', () => {
   });
   it('no hay traducciones vacías y casi todas difieren del español (salvo nombres y siglas)', () => {
     for (const l of LANG2) {
-      const keys = [...new Set([...tKeys().map((x) => x[0]), ...contentKeys()])];
+      const keys = [...new Set([...tKeys().map((x) => x[0]), ...contentKeys(), ...betaTexts()])];       // betaTexts: listas de votos, motivos y tipos de comentario (describen funciones FUTURAS: no son promesas del recorrido, por eso no pasan por la prueba de promesas)
       let same = 0;
       for (const k of keys) { const tr = lookup(l, k); if (tr === null) continue; expect(tr.trim().length, `${l}: ${k.slice(0, 50)}`).toBeGreaterThan(0); if (tr === k && !SAME.test(k)) same++; }
       expect(same, `${l}: textos sin traducir (iguales al español)`).toBeLessThan(keys.length * (l === 'pt' ? 0.16 : 0.06));   // el portugués comparte muchas palabras con el español (Mercados, Favoritos, Copiar…)

@@ -100,8 +100,9 @@ const PLAN_LIST = [
   { ...PLUS, blurb: 'Un modelo más potente y más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: true },
   { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30, hasFallback: true },
 ];
-export const apiState = { used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [] };
-export const resetApi = () => Object.assign(apiState, { used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [] });
+const fresh = () => ({ used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [], consent: null, consentCalls: [], events: [], eventBatches: 0, feedback: [], votes: [], rawBodies: [] });
+export const apiState = fresh();
+export const resetApi = () => Object.assign(apiState, fresh());
 const planNow = () => (apiState.plan === 'plus' ? PLUS : FREE);
 const remaining = () => ({ day: Math.max(0, planNow().dailyLimit - apiState.used), month: Math.max(0, planNow().monthlyLimit - apiState.month) });
 
@@ -117,7 +118,19 @@ export function finagentApi(method, path, headers, body) {
   const tok = (headers.authorization ?? '').replace('Bearer ', '');
   if (!apiState.tokens.has(tok)) return j({ error: 'session' }, 401);
   if (path === '/v1/me') return j({ plan: planNow(), remaining: remaining(), resetsOn: '2026-10-20', tier: 'free' });
-  if (path === '/v1/interest') { if (!apiState.interest.includes(body.plan)) apiState.interest.push(body.plan); return j({ ok: true, first: true }); }
+  if (path === '/v1/interest') {
+    if (body.feature) { const first = !apiState.votes.includes(body.feature); if (first) apiState.votes.push(body.feature); return j({ ok: true, first }); }
+    if (!apiState.interest.includes(body.plan)) apiState.interest.push(body.plan); return j({ ok: true, first: true });
+  }
+  // estadísticas de la beta (como el servidor real: sin consentimiento guardado, los eventos se descartan)
+  if (path === '/v1/consent') { apiState.consent = body.analytics === true; apiState.consentCalls.push(apiState.consent); return j({ ok: true, analytics: apiState.consent }); }
+  if (path === '/v1/events') {
+    apiState.rawBodies.push(JSON.stringify(body)); apiState.eventBatches++;
+    const list = Array.isArray(body.events) ? body.events : [];
+    if (!apiState.consent) return j({ accepted: 0, dropped: list.length, consent: false });
+    apiState.events.push(...list); return j({ accepted: list.length, dropped: 0, consent: true });
+  }
+  if (path === '/v1/feedback') { apiState.feedback.push(body); return j({ ok: true }); }
   if (path === '/v1/plan/redeem') {
     if (body.code !== FA_CODE) return j({ error: 'code' }, 404);
     apiState.plan = 'plus'; return j({ plan: PLUS, unchanged: false, remaining: remaining() });

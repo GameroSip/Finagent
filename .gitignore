@@ -13,3 +13,4 @@ e2e-shots-server
 .dev.vars
 evals/radar/data/
 e2e-log/
+.vitest/

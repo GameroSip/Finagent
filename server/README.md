@@ -60,6 +60,13 @@ El **servidor ya lo soporta y está probado** (verifica la firma del token de Go
 1. En Google Cloud: crear el *OAuth client ID* de tipo Web y el de Android (con el SHA-1 de tu firma) y poner el ID web en `GOOGLE_CLIENT_ID` (`wrangler.toml`; acepta varios separados por coma).
 2. En la app: instalar un plugin nativo de Google Sign-In y registrarlo con `registerGoogleProvider(...)`. No está incluido a propósito: sin un teléfono real y tu proyecto de Google no se puede probar, y un plugin sin probar podría romper la compilación. Mientras tanto el botón se muestra como "Próximamente".
 
+## Estadísticas de la beta (opt-in)
+Guía completa, con los criterios para decidir: [`docs/BETA.md`](../docs/BETA.md).
+- **Rutas:** `POST /v1/consent`, `POST /v1/events` (lotes de hasta 40, 90 por hora y usuario), `POST /v1/feedback`, `POST /v1/interest` con `{feature}` (votos), y para el administrador `GET /v1/admin/metrics?days=14` y `GET /v1/admin/events.csv`. Se ven en `/admin`, tarjeta *Beta*.
+- **Migración `0002_analytics.sql`** (tablas `consent`, `events`, `feedback`): el workflow del servidor la aplica sola.
+- **Privacidad:** el servidor descarta los eventos de quien no dio su consentimiento y solo acepta valores de listas cerradas (`src/telemetry.ts`): no puede guardar texto libre. El comentario que la persona decide enviar sí es texto.
+- **No probado en Cloudflare real:** el cálculo del tablero carga los eventos del período en memoria; con una beta chica entra en el límite de CPU del plan gratuito (10 ms), pero si diera "CPU exceeded", usá el CSV o un período más corto.
+
 ## Operación
 - **Panel (`/admin`):** respuestas, tokens y dólares por día y por modelo; cuentas; **cuántas veces faltó cupo** (de Gemini y del servidor); **cuánta gente quiere Plus y Pro** (el dato para decidir precios); bloquear o cambiar de plan.
 - **Antiabuso sin pedir registro:** 5 cuentas nuevas por dirección y día, `MAX_NEW_USERS_PER_DAY` en total, freno por ráfagas y tope de gasto (`DAILY_BUDGET_USD`, importa con el nivel de pago). Una cuenta es un teléfono: reinstalar la app crea otra (otro cupo gratis); por eso los topes. **Para abrir al público hace falta inicio de sesión con Google** (1 cuenta de Google = 1 cupo) y verificar que la app es la original (Play Integrity).

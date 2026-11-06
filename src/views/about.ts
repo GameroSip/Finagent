@@ -37,7 +37,7 @@ export function openAbout(o: { version: string; onReplayIntro?: () => void }): v
     <section class="about-sec"><h3>${icon('scale', 18)} ${esc(t('FinAgent frente a una IA común'))}</h3>
       <table class="vs-tbl"><thead><tr><th></th><th>${esc(t('IA común'))}</th><th>FinAgent</th></tr></thead><tbody>${VS.map(([k, a, b]) => `<tr><th>${esc(t(k))}</th><td>${esc(t(a))}</td><td class="good">${esc(t(b))}</td></tr>`).join('')}</tbody></table></section>
     <section class="about-sec"><h3>${icon('globe', 18)} ${esc(t('Cobertura'))}</h3><p class="about-p">${esc(ABOUT.coverage)}</p></section>
-    <section class="about-sec"><h3>${icon('lock', 18)} ${esc(t('Tu privacidad'))}</h3><p class="about-p">${esc(server ? ABOUT.privacyServer : ABOUT.privacy)}</p>
+    <section class="about-sec"><h3>${icon('lock', 18)} ${esc(t('Tu privacidad'))}</h3><p class="about-p">${esc(server ? ABOUT.privacyServer : ABOUT.privacy)}</p>${server ? `<p class="about-p">${esc(ABOUT.privacyStats)}</p>` : ''}
       ${server && googleAvailable() ? `<p class="about-p">${esc(ABOUT.privacyGoogle)}</p>` : ''}${server && q.tier === 'free' ? `<p class="about-p">${esc(ABOUT.freeTier)}</p>` : ''}</section>
     <section class="about-sec"><h3>${icon('warn', 18)} ${esc(t('Límites y aviso legal'))}</h3><p class="about-p">${esc(ABOUT.limits)}</p>
       <ul class="about-ul">${ABOUT.how.map((x) => `<li>${icon('check', 15)}<span>${esc(x)}</span></li>`).join('')}</ul></section>

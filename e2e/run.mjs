@@ -69,7 +69,7 @@ async function route(req) {
 }
 
 const browser = await puppeteer.launch({ args: [...chromium.args, '--no-sandbox', '--disable-web-security'], executablePath: process.env.CHROME_PATH || await chromium.executablePath(), headless: 'shell' });
-async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, intro = false, lang = 'es', motion = false } = {}) {
+async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, intro = false, lang = 'es', motion = false, clean = false, analytics = '0' } = {}) {
   const page = await browser.newPage();
   await page.setViewport({ width: 412, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36');
@@ -79,13 +79,14 @@ async function newPage({ theme = 'dark', key = KEY, extra = {}, height = 915, in
   page.on('pageerror', (e) => log.errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') log.consoleErrors.push(m.text()); });
   page.on('response', (r) => { if (r.status() === 404 && !r.url().startsWith('data:')) log.consoleErrors.push('404 ' + r.url()); });
-  await page.evaluateOnNewDocument((k, extraObj) => {
+  await page.evaluateOnNewDocument((k, extraObj, wipe) => {
     if (!sessionStorage.getItem('__seeded')) {
       sessionStorage.setItem('__seeded', '1');
+      if (wipe) localStorage.clear();                       // otra persona en otro teléfono: sin nada guardado de la prueba anterior
       if (k) localStorage.setItem('finagent.settings.v2', JSON.stringify({ apiKey: k, theme: 'auto' }));
       for (const [kk, vv] of Object.entries(extraObj)) localStorage.setItem(kk, vv);
     }
-  }, key, { ...(intro ? {} : { 'finagent.intro.v1': '1' }), ...(lang ? { 'finagent.lang.v1': lang } : {}), ...extra });   // por defecto: sin introducción y en español (las pruebas de cada función no dependen de ella)
+  }, key, { ...(intro ? {} : { 'finagent.intro.v1': '1' }), ...(lang ? { 'finagent.lang.v1': lang } : {}), ...(!intro && analytics !== null ? { 'finagent.analytics.v1': analytics } : {}), ...extra }, clean);   // por defecto la persona ya decidió NO compartir estadísticas (las pruebas de cada función no dependen de eso); analytics: null = todavía no decidió   // por defecto: sin introducción y en español (las pruebas de cada función no dependen de ella)
   if (!motion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);   // salvo en las pruebas de la animación, el logo queda fijo: no depende de la velocidad de dibujo
   await page.goto('http://localhost:4173/', { waitUntil: 'load' });
   if (!intro && key) await page.waitForSelector('.tabbar', { timeout: 15000 }).catch(() => {}); // pasó el splash corto y la app está lista

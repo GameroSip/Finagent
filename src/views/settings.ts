@@ -1,6 +1,7 @@
 // Ajustes: lo mínimo. El modelo y los límites son automáticos; acá solo hay cuenta, tema, diagnóstico y datos.
 import { ABOUT } from '../about';
 import { getLang, LANGS, setLang } from '../i18n';
+import { VERSION } from '../version';
 import { setSound, soundOn } from '../ui/sfx';
 import { openAbout } from './about';
 import { openPlans } from './plans';
@@ -18,8 +19,10 @@ import { icon } from '../ui/icons';
 import { logoSvg } from '../ui/logo';
 import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
 import { t } from '../i18n';
+import { analyticsOn, setAnalytics, track } from '../analytics';
+import { openFeedback, openWishlist } from './feedback';
 
-const VERSION = '0.9.0';
+
 
 interface Probe { name: string; run: () => Promise<unknown> }
 
@@ -88,6 +91,11 @@ export function createSettingsView(ctx: Ctx): View {
         <button class="set-row danger" id="s-wipe"><span class="set-ic">${icon('trash', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Cerrar sesión y borrar todo</div><div class="set-sub">Elimina tu clave y tus datos de este teléfono</div></div></button>
       </div></div>
 
+      ${isServerMode() ? `<div class="set-group"><div class="set-title">${esc(t('Beta'))}</div><div class="card set-card">
+        <label class="set-row" id="s-analytics"><span class="set-ic">${icon('activity', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">${esc(t('Ayudar a mejorar la beta'))}</div><div class="set-sub">${esc(t('Estadísticas de uso anónimas. Nunca incluyen lo que escribís ni tu plan.'))}</div></div><input type="checkbox" class="tgl" id="s-analytics-t" ${analyticsOn() ? 'checked' : ''}></label>
+        <button class="set-row" id="s-feedback"><span class="set-ic">${icon('messageSquare', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">${esc(t('Contanos qué falta o qué falló'))}</div><div class="set-sub">${esc(t('Tu opinión nos dice qué mejorar primero'))}</div></div></button>
+        <button class="set-row" id="s-wishes"><span class="set-ic">${icon('gem', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">${esc(t('Qué te gustaría que sumemos'))}</div><div class="set-sub">${esc(t('Votá las funciones que más te servirían'))}</div></div></button>
+      </div></div>` : ''}
       <div class="set-group"><div class="set-title">Acerca de</div><div class="card set-card">
         <button class="set-row" id="s-about"><span class="set-ic">${icon('info', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Acerca de FinAgent</div><div class="set-sub">Cómo funciona, qué hay detrás, privacidad y límites</div></div></button>
         <button class="set-row" id="s-intro"><span class="set-ic">${icon('arrowUpRight', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Ver la introducción otra vez</div><div class="set-sub">El recorrido por las funciones de la app</div></div></button>
@@ -145,8 +153,12 @@ export function createSettingsView(ctx: Ctx): View {
     };
     const keyBtn = el.querySelector<HTMLElement>('#s-key');
     if (keyBtn) keyBtn.onclick = changeKey;
-    el.querySelector<HTMLElement>('#s-lang')!.onclick = () => actionSheet(t('Idioma'), LANGS.map((l) => ({ label: l.native, run: () => { if (l.id !== getLang()) { setLang(l.id); location.reload(); } } })));
-    el.querySelector<HTMLInputElement>('#s-sound-t')!.onchange = (e) => setSound((e.target as HTMLInputElement).checked);
+    el.querySelector<HTMLElement>('#s-lang')!.onclick = () => actionSheet(t('Idioma'), LANGS.map((l) => ({ label: l.native, run: () => { if (l.id !== getLang()) { track('setting', { key: 'lang', value: l.id }); setLang(l.id); location.reload(); } } })));
+    el.querySelector<HTMLInputElement>('#s-sound-t')!.onchange = (e) => { const on = (e.target as HTMLInputElement).checked; setSound(on); track('setting', { key: 'sound', value: on ? 'on' : 'off' }); };
+    const an = el.querySelector<HTMLInputElement>('#s-analytics-t');
+    if (an) an.onchange = () => { void setAnalytics(an.checked); if (an.checked) track('setting', { key: 'analytics', value: 'on' }); };         // al apagarlas se borra todo lo pendiente y se le avisa al servidor
+    el.querySelector<HTMLElement>('#s-feedback')?.addEventListener('click', openFeedback);
+    el.querySelector<HTMLElement>('#s-wishes')?.addEventListener('click', openWishlist);
     el.querySelector<HTMLElement>('#s-about')!.onclick = () => openAbout({ version: VERSION, onReplayIntro: replayIntro });
     el.querySelector<HTMLElement>('#s-intro')!.onclick = replayIntro;
     const googleBtn = el.querySelector<HTMLElement>('#s-google');
@@ -167,7 +179,7 @@ export function createSettingsView(ctx: Ctx): View {
     };
     $('#s-theme', el).addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;
-      saveSettings({ theme: b.dataset.t as Theme });
+      saveSettings({ theme: b.dataset.t as Theme }); track('setting', { key: 'theme', value: b.dataset.t as Theme });
       $('#s-theme', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     });
     $('#s-probe', el).onclick = () => void probeAll();

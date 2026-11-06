@@ -4,7 +4,7 @@ import { PLANS } from '../src/plans';
 import { SYSTEM_PROMPT } from '../src/prompt';
 import { signToken, verifyToken } from '../server/auth';
 import { NodeSql } from '../server/node-sql';
-import { SCHEMA_SQL } from '../server/schema';
+import { SCHEMA_SQL, SCHEMA_V1, SCHEMA_V2 } from '../server/schema';
 import { ADMIN, makeServer, user } from './helpers/make-server';
 
 const LITE = 'gemini-3.5-flash-lite', FLASH = 'gemini-3.8-flash';
@@ -23,7 +23,9 @@ describe('sesiones firmadas', () => {
     expect(await verifyToken('basura', 's', 1500)).toBeNull();
   });
   it('la migración de Cloudflare es idéntica al esquema usado en las pruebas', () => {
-    expect(readFileSync('server/migrations/0001_init.sql', 'utf8')).toBe(SCHEMA_SQL);
+    expect(readFileSync('server/migrations/0001_init.sql', 'utf8')).toBe(SCHEMA_V1);
+    expect(readFileSync('server/migrations/0002_analytics.sql', 'utf8')).toBe(SCHEMA_V2);
+    expect(SCHEMA_SQL).toBe(SCHEMA_V1 + SCHEMA_V2);
   });
 });
 

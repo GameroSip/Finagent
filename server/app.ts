@@ -7,6 +7,8 @@ import { ADMIN_HTML } from './admin-page';
 import { CODE_RE, newId, newInviteCode, signToken, timingSafeEqual, verifyToken } from './auth';
 import { chainFor, type ModelRouter } from './gemini';
 import { googleJwks, verifyGoogleIdToken, type JwksFetcher } from './google';
+import { computeMetrics, METRIC_EVENT_NAMES, addDays } from './metrics';
+import { cleanEvent, FEATURES, FEEDBACK_KINDS } from '../src/telemetry';
 import type { SqlStore, UserRow } from './store';
 
 export interface Env {
@@ -30,6 +32,10 @@ const GENERATE_PER_MINUTE = 20;           // ráfaga por usuario
 const DEVICE_AUTH_PER_HOUR = 30;          // intentos de crear/recuperar cuenta por dirección y hora
 const NEW_ACCOUNTS_PER_IP_DAY = 5;        // cuentas nuevas por dirección y día (contra quien crea cuentas en masa para cobrar más cupo gratis)
 const PLAN_REDEEM_PER_HOUR = 10;
+const EVENT_BATCH_MAX = 40;               // eventos por envío
+const EVENT_BATCHES_PER_HOUR = 90;        // envíos por usuario y hora (un uso normal manda unos pocos)
+const FEEDBACK_PER_DAY = 20;
+const EVENT_MAX_AGE_MS = 7 * 86_400_000;  // un evento guardado sin conexión se acepta hasta una semana después
 const DEVICE_RE = /^[A-Za-z0-9_-]{8,80}$/;
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-max-age': '86400' };
@@ -154,9 +160,67 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
   /** "Avisame cuando esté": mide cuánta gente querría cada plan de pago. */
   async function interest(req: Request): Promise<Response> {
     const { user } = await authUser(req);
-    const plan = String((await readJson(req)).plan ?? '');
+    const b = await readJson(req);
+    if (typeof b.feature === 'string') {                                                // voto por una función que todavía no existe (un voto por persona y función)
+      if (!(FEATURES as readonly string[]).includes(b.feature)) return json(400, { error: 'feature' });
+      return json(200, { ok: true, first: await store.addInterest(user.id, `feature:${b.feature}`, now().getTime()) });
+    }
+    const plan = String(b.plan ?? '');
     if (!PLANS[plan as PlanId] || PLANS[plan as PlanId].available) return json(400, { error: 'plan' });
     return json(200, { ok: true, first: await store.addInterest(user.id, plan, now().getTime()) });
+  }
+
+  // ------------------------------------------------------------------ estadísticas de uso de la beta (solo con el consentimiento de la persona)
+  async function consent(req: Request): Promise<Response> {
+    const { user } = await authUser(req);
+    const on = (await readJson(req)).analytics === true;
+    await store.setConsent(user.id, on, now().getTime());
+    return json(200, { ok: true, analytics: on });
+  }
+  /** Recibe eventos. Sin consentimiento guardado en el servidor, se descartan aunque la app los mande. Solo se guardan los que cumplen el vocabulario cerrado (src/telemetry.ts): nada de texto libre. */
+  async function events(req: Request): Promise<Response> {
+    const { user } = await authUser(req);
+    if (await store.incr(`rl:ev:${user.id}:${Math.floor(now().getTime() / 3_600_000)}`, 1) > EVENT_BATCHES_PER_HOUR) return json(429, { error: 'rate', retryAfterSec: 3600 });
+    const body = await readJson(req), list: any[] = Array.isArray(body.events) ? body.events : [];
+    return events2(user.id, list.slice(0, EVENT_BATCH_MAX), list.length);
+  }
+  async function events2(userId: string, list: any[], total: number): Promise<Response> {
+    if (!(await store.hasConsent(userId))) return json(200, { accepted: 0, dropped: total, consent: false });
+    const t0 = now().getTime(), rows: Array<{ ts: number; day: string; name: string; props: string | null }> = [];
+    for (const e of list) {
+      const props = cleanEvent(e?.n, e?.p);
+      if (!props) continue;
+      const t = Number(e?.t), ts = Number.isFinite(t) && t > t0 - EVENT_MAX_AGE_MS ? Math.min(t, t0) : t0;
+      rows.push({ ts, day: localDates(new Date(ts), tz).day, name: e.n, props: Object.keys(props).length ? JSON.stringify(props) : null });
+    }
+    await store.addEvents(userId, rows);
+    return json(200, { accepted: rows.length, dropped: total - rows.length, consent: true });
+  }
+  /** Comentarios que la persona decide enviar (idea, problema, algo que falta o puntaje de recomendación). Esto sí es texto libre, escrito a propósito. */
+  async function feedback(req: Request): Promise<Response> {
+    const { user } = await authUser(req);
+    if (await store.incr(`rl:fb:${user.id}:${localDates(now(), tz).day}`, 1) > FEEDBACK_PER_DAY) return json(429, { error: 'rate', retryAfterSec: 86400 });
+    const b = await readJson(req), kind = String(b.kind ?? '');
+    if (!(FEEDBACK_KINDS as readonly string[]).includes(kind)) return json(400, { error: 'kind' });
+    const score = Number.isInteger(b.score) && b.score >= 0 && b.score <= 10 ? (b.score as number) : null;
+    const text = typeof b.text === 'string' ? b.text.trim().slice(0, 1000) : '';
+    if (!text && score === null) return json(400, { error: 'empty' });
+    if (kind === 'nps' && score === null) return json(400, { error: 'score' });
+    const version = typeof b.version === 'string' && /^\d{1,2}\.\d{1,2}\.\d{1,2}$/.test(b.version) ? b.version : null;
+    await store.addFeedback({ user_id: user.id, ts: now().getTime(), kind, score, text: text || null, version });
+    return json(200, { ok: true });
+  }
+  async function adminMetrics(req: Request, url: URL): Promise<Response> {
+    admin(req);
+    const days = Math.min(Math.max(Number(url.searchParams.get('days') ?? 14), 1), 60), today = localDates(now(), tz).day;
+    return json(200, computeMetrics(await store.metricsRaw(addDays(today, -(days + 14)), METRIC_EVENT_NAMES), today, days));
+  }
+  async function adminEventsCsv(req: Request, url: URL): Promise<Response> {
+    admin(req);
+    const days = Math.min(Math.max(Number(url.searchParams.get('days') ?? 30), 1), 90), rows = await store.eventsCsvRows(addDays(localDates(now(), tz).day, -days), 50_000);
+    const q = (s: string | null) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const csv = 'usuario,fecha_hora,dia,evento,propiedades\n' + rows.map((r) => [r.user_id.slice(0, 8), new Date(r.ts).toISOString(), r.day, r.name, q(r.props)].join(',')).join('\n') + '\n';
+    return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="finagent-eventos.csv"', 'cache-control': 'no-store', ...CORS } });
   }
 
   async function generate(req: Request): Promise<Response> {
@@ -280,10 +344,15 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
         case 'GET /v1/me': return await me(req);
         case 'POST /v1/plan/redeem': return await planRedeem(req);
         case 'POST /v1/interest': return await interest(req);
+        case 'POST /v1/consent': return await consent(req);
+        case 'POST /v1/events': return await events(req);
+        case 'POST /v1/feedback': return await feedback(req);
         case 'POST /v1/generate': return await generate(req);
         case 'POST /v1/turn/abandon': return await abandon(req);
         case 'POST /v1/admin/invites': return await adminInvites(req);
         case 'GET /v1/admin/usage': return await adminUsage(req, url);
+        case 'GET /v1/admin/metrics': return await adminMetrics(req, url);
+        case 'GET /v1/admin/events.csv': return await adminEventsCsv(req, url);
         case 'GET /v1/admin/pricing': return await adminPricing(req, url);
         case 'POST /v1/admin/users': return await adminUsers(req);
         default: return json(404, { error: 'not_found' });

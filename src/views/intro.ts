@@ -7,6 +7,8 @@ import { $, esc, h } from '../ui/dom';
 import { icon } from '../ui/icons';
 import { markSvg } from '../ui/logo';
 import { mountLaunch } from './launch';
+import { hasDecided, setAnalytics, track } from '../analytics';
+import { consentBody } from './feedback';
 
 const DONE = 'finagent.intro.v1';
 export const introDone = (): boolean => { try { return globalThis.localStorage?.getItem(DONE) === '1'; } catch { return false; } };
@@ -32,7 +34,7 @@ function art(id: SlideId): string {
     case 'charts': return `<div class="art"><svg viewBox="0 0 280 120" width="100%" aria-hidden="true">${[[18, 70, 96, 82, 1], [40, 78, 102, 88, 0], [62, 58, 88, 66, 1], [84, 48, 74, 56, 1], [106, 54, 80, 62, 0], [128, 40, 64, 46, 1], [150, 30, 56, 36, 1], [172, 36, 62, 52, 0], [194, 24, 46, 32, 1]]
       .map(([x, hi, lo, c, up]) => `<line x1="${x}" x2="${x}" y1="${hi}" y2="${lo}" stroke="currentColor" stroke-width="1" opacity=".7"/><rect x="${x - 5}" y="${Math.min(hi + 8, c)}" width="10" height="${Math.abs(c - hi - 8) + 12}" fill="${up ? 'var(--up)' : 'var(--down)'}"/>`).join('')}
       <line x1="10" x2="270" y1="56" y2="56" stroke="var(--brand)" stroke-dasharray="3 4"/><text x="272" y="52" text-anchor="end" fill="var(--brand)" font-size="8" font-family="IBM Plex Mono">61,8%</text></svg></div>`;
-    case 'backing': return `<div class="art"><div class="a-table">${rows([[BACKING.ai, 'IA'], ...BACKING.data.map((d) => [d, ''] as [string, string]), [BACKING.charts, '']])}</div></div>`;
+    case 'backing': return `<div class="art"><div class="a-kv">${[['IA', BACKING.ai], ['Datos', BACKING.data.join(' · ')], ['Gráficos', BACKING.charts]].map(([k, v]) => `<div><small>${esc(t(k))}</small><b data-notrans>${esc(v)}</b></div>`).join('')}</div></div>`;
     case 'plans': return `<div class="art"><div class="a-plans">${[['Gratis', true], ['Plus', false], ['Pro', false]].map(([n, on]) => `<div class="${on ? 'on' : ''}"><b>${esc(t(n as string))}</b><small>${on ? icon('check', 13) : esc(t('Próximamente'))}</small></div>`).join('')}</div></div>`;
   }
 }
@@ -47,8 +49,8 @@ export interface IntroOpts {
 export function mountIntro(root: HTMLElement, o: IntroOpts): void {
   const el = h('div', { class: 'intro' });
   root.append(el);
-  const finish = () => { markDone(); el.classList.add('out'); setTimeout(() => { el.remove(); o.onDone(); }, 380); };
-  const afterTour = () => (o.keyStep ? (el.remove(), o.keyStep(() => { markDone(); o.onDone(); })) : finish());
+  const finish = () => { track('intro_step', { step: 'done', skipped: false }); markDone(); el.classList.add('out'); setTimeout(() => { el.remove(); o.onDone(); }, 380); };
+  const afterTour = (skipped = false) => { track('intro_step', { step: 'tour', skipped }); return o.keyStep ? (el.remove(), o.keyStep(() => { markDone(); o.onDone(); })) : finish(); };
   /** Cambia de pantalla con una transición corta (sale la actual, entra la nueva desde abajo). */
   const show = (render: () => void) => {
     const cur = el.firstElementChild;
@@ -86,7 +88,16 @@ export function mountIntro(root: HTMLElement, o: IntroOpts): void {
       <p class="s-note">${esc(t('La IA responde en el idioma en que le escribas.'))}</p>
       <button class="btn btn-primary btn-block" id="l-next" style="margin-top:18px">${esc(t('Continuar'))}</button></div></div>`;
     el.querySelectorAll<HTMLElement>('.lang-card').forEach((b) => { b.onclick = () => { setLang(b.dataset.l as UiLang); language(false); }; });
-    $('#l-next', el).onclick = () => show(() => tour(0));
+    $('#l-next', el).onclick = () => show(consent);
+  }
+
+  // ---------------------------------------------------------------- 3b) estadísticas de la beta (solo con servidor y una sola vez): se elige con la misma prominencia "sí" y "no"
+  function consent() {
+    if (!o.server || hasDecided()) return tour(0);
+    el.innerHTML = `<div class="screen screen-in">${top()}<div class="s-main">${consentBody()}
+      <button class="btn btn-primary btn-block" id="c-yes" style="margin-top:18px">${esc(t('Sí, ayudar'))}</button><button class="btn btn-ghost btn-block" id="c-no" style="margin-top:8px">${esc(t('No, gracias'))}</button></div></div>`;
+    const decide = (on: boolean) => { void setAnalytics(on).then(() => { if (on) track('intro_step', { step: 'consent', skipped: false }); }); show(() => tour(0)); };
+    $('#c-yes', el).onclick = () => decide(true); $('#c-no', el).onclick = () => decide(false);
   }
 
   // ---------------------------------------------------------------- 4) recorrido
@@ -97,16 +108,17 @@ export function mountIntro(root: HTMLElement, o: IntroOpts): void {
       <div class="tour-view"><div class="tour-track" id="t-track">${TOUR.map((s, k) => `<section class="slide"><div class="slide-art">${art(s.id)}</div><div class="slide-n" data-notrans>${String(k + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}</div><h2>${esc(t(s.title))}</h2><p>${esc(t(s.text))}</p>
         ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${icon('check', 15)}<span>${esc(t(b))}</span></li>`).join('')}</ul>` : ''}</section>`).join('')}</div></div>
       <div class="tour-nav"><button class="btn btn-ghost" id="t-back">${esc(t('Atrás'))}</button><button class="btn btn-primary" id="t-next"></button></div></div>`;
-    const track = $('#t-track', el), next = $('#t-next', el), back = $<HTMLButtonElement>('#t-back', el);
+    const trackEl = $('#t-track', el), next = $('#t-next', el), back = $<HTMLButtonElement>('#t-back', el);
     const paint = () => {
-      track.style.transform = `translateX(${-100 * i}%)`;
+      trackEl.style.transform = `translateX(${-100 * i}%)`;
       el.querySelectorAll<HTMLElement>('#t-dots i').forEach((d, k) => d.classList.toggle('on', k <= i));
+      track('tour_slide', { n: i + 1 });
       el.querySelectorAll<HTMLElement>('.slide').forEach((s, k) => s.classList.toggle('active', k === i));
       back.style.visibility = i === 0 ? 'hidden' : 'visible';
       next.textContent = i === n - 1 ? t('Empezar') : t('Siguiente');
     };
     const go = (d: number) => { if (i + d >= n) return afterTour(); i = Math.max(0, i + d); paint(); };
-    next.onclick = () => go(1); back.onclick = () => go(-1); $('#t-skip', el).onclick = afterTour;
+    next.onclick = () => go(1); back.onclick = () => go(-1); $('#t-skip', el).onclick = () => afterTour(true);
     let x0: number | null = null;                                                // deslizar con el dedo
     const view = $('.tour-view', el);
     view.addEventListener('pointerdown', (e) => { x0 = e.clientX; });

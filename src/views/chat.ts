@@ -16,12 +16,15 @@ import { aiTitle, fallbackTitle } from '../titles';
 import { $, esc, h, openUrl, toast } from '../ui/dom';
 import { markSvg } from '../ui/logo';
 import { icon, type IconName } from '../ui/icons';
-import { promptSheet } from '../ui/sheet';
+import { actionSheet, promptSheet } from '../ui/sheet';
 import { renderRich, type Rich } from './cards';
 import { openHistory } from './history';
+import { analyticsOn, track } from '../analytics';
+import { RATE_REASONS } from '../betaTexts';
+import { AI_TOOLS, lenBucket } from '../telemetry';
 import { t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
 
-export interface ChatView extends View { ask(prompt: string, label?: string): void }
+export interface ChatView extends View { ask(prompt: string, label?: string, src?: 'asset' | 'market'): void }
 
 const SUGGESTIONS: Array<{ ic: IconName; title: string; sub: string; prompt: string }> = [
   { ic: 'activity', title: 'Resumen del mercado', sub: 'Índices, movimientos y titulares', prompt: 'Hacé un resumen de cómo está el mercado hoy en el mundo: los principales índices de EE.UU., Europa y Asia, qué se mueve más y qué narrativa hay en los medios.' },
@@ -179,7 +182,8 @@ export function createChatView(ctx: Ctx): ChatView {
     if (m.flags?.truncated) pills += `<span class="vpill warn">${icon('clock', 13)} respuesta parcial</span>`;
     body.append(h('div', { class: 'ai-foot', html: `<div class="vrow">${pills}</div>
       <div class="msg-actions"><button class="act-btn" data-act="copy" aria-label="Copiar respuesta">${icon('copy', 15)}<span>Copiar</span></button>
-        <button class="act-btn regen hide" data-act="regen" aria-label="Regenerar respuesta">${icon('rotateCcw', 15)}<span>Regenerar</span></button></div>
+        <button class="act-btn regen hide" data-act="regen" aria-label="Regenerar respuesta">${icon('rotateCcw', 15)}<span>Regenerar</span></button>
+        ${analyticsOn() ? `<span class="rate-box">${m.rated ? `<span class="muted">${esc(t('Gracias por avisar'))}</span>` : `<button class="act-btn" data-act="up" aria-label="${esc(t('Útil'))}">${icon('thumbsUp', 15)}</button><button class="act-btn" data-act="down" aria-label="${esc(t('No útil'))}">${icon('thumbsDown', 15)}</button>`}</span>` : ''}</div>
       ${traceHtml(m.trace ?? [])}<div class="disc">Contenido informativo. No es asesoramiento financiero.</div>` }));
     return box;
   }
@@ -259,7 +263,7 @@ export function createChatView(ctx: Ctx): ChatView {
   }
 
   // ------------------------------------------------------------ enviar
-  async function send_(text: string, label?: string, opts: { echo?: boolean } = {}): Promise<void> {
+  async function send_(text: string, label?: string, opts: { echo?: boolean; src?: 'typed' | 'suggestion' | 'asset' | 'market' | 'regenerate' } = {}): Promise<void> {
     const prompt = text.trim();
     if (!prompt) return;
     if (!isServerMode() && !getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
@@ -267,6 +271,9 @@ export function createChatView(ctx: Ctx): ChatView {
 
     const chatId = ensureChat(prompt);
     const agent = agentFor(chatId);
+    // Estadísticas (si la persona las aceptó): solo de dónde vino la consulta y cuánto escribió en tres escalones. El texto NUNCA se envía.
+    track('ai_send', { src: opts.src ?? 'typed', chat: cur.data.messages.some((m) => m.role === 'ai') ? 'follow' : 'new', len: lenBucket(prompt.length) });
+    const t0 = Date.now();
     if (opts.echo !== false) {
       const um: StoredMsg = { id: newId(), role: 'user', at: Date.now(), text: label ?? prompt, ...(label && label !== prompt ? { prompt } : {}) };
       cur.data.messages.push(um);
@@ -283,14 +290,22 @@ export function createChatView(ctx: Ctx): ChatView {
         onTool: (n, a, r) => { const s = run.steps.find((x) => x.key === n + JSON.stringify(a) && x.state === 'run'); if (s) s.state = r.ok ? 'ok' : 'bad'; paintWorking(run); },
         onStatus: (m) => { run.status = m; paintWorking(run); },
       });
+      track('ai_done', { tools: [...new Set(res.toolCalls.map((c) => c.name))].filter((n) => (AI_TOOLS as readonly string[]).includes(n)).join(','), ms: Math.min(Date.now() - t0, 600000), steps: Math.min(res.toolCalls.length, 40), checked: Math.min(res.verification.checked, 99), unverified: Math.min(res.redacted ?? 0, 99), fixed: !!res.corrected });
       finishOk(run, prompt, res);
     } catch (e) {
+      trackAiError(e);
       finishError(run, prompt, e);
     } finally {
       run.el?.remove(); run.el = null;
       if (runs.get(chatId) === run) runs.delete(chatId);
       updateSend(); refreshActions();
     }
+  }
+
+  function trackAiError(e: unknown) {
+    if (e instanceof AbortedError) return;                                         // la persona detuvo la respuesta: no es un error
+    if (e instanceof LimitError) { track('quota_block', { reason: e.reason === 'monthly' ? 'monthly' : 'daily' }); track('ai_error', { kind: 'limit' }); return; }
+    track('ai_error', { kind: e instanceof SessionError ? 'session' : e instanceof ServerBusyError ? (e.kind === 'network' ? 'network' : e.kind === 'capacity' ? 'capacity' : 'other') : 'other' });
   }
 
   function finishOk(run: Run, prompt: string, res: AgentResult) {
@@ -360,7 +375,7 @@ export function createChatView(ctx: Ctx): ChatView {
     cur.data.messages.splice(i, 1);
     scroll.querySelector(`[data-mid="${msgId}"]`)?.remove();
     saveChat(cur.id, cur.data);
-    void send_(m.retry, undefined, { echo: false });
+    void send_(m.retry, undefined, { echo: false, src: 'regenerate' });
   }
 
   function regenerate() {
@@ -375,14 +390,27 @@ export function createChatView(ctx: Ctx): ChatView {
     cur.data.history = agent.history;
     scroll.querySelector(`[data-mid="${last.id}"]`)?.remove();
     saveChat(cur.id, cur.data);
-    void send_(asked.prompt ?? asked.text, undefined, { echo: false });
+    void send_(asked.prompt ?? asked.text, undefined, { echo: false, src: 'regenerate' });
+  }
+
+  /** 👍/👎 en una respuesta (solo con estadísticas aceptadas). Con 👎 se pregunta qué falló, con opciones cerradas: no hay texto libre. */
+  function rate(mid: string, rating: 'up' | 'down') {
+    const m = cur.data.messages.find((x) => x.id === mid);
+    if (!m || m.rated || !cur.id) return;
+    const chatId = cur.id, done = (reason?: 'wrong' | 'incomplete' | 'confusing' | 'slow' | 'other') => {
+      m.rated = rating; saveChat(chatId, cur.data);
+      track('ai_rate', { rating, ...(reason ? { reason } : {}) });
+      scroll.querySelector(`[data-mid="${mid}"] .rate-box`)?.replaceChildren(h('span', { class: 'muted', text: t('Gracias por avisar') }));
+    };
+    if (rating === 'up') { done(); return; }
+    actionSheet(t('¿Qué falló?'), RATE_REASONS.map(([r, l]) => ({ label: t(l), run: () => done(r) })));
   }
 
   // ------------------------------------------------------------ eventos
   scroll.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
     const sug = t.closest<HTMLElement>('.sug');
-    if (sug) { const s = SUGGESTIONS[Number(sug.dataset.i)]; void send_(tx(s.prompt), tx(s.title)); return; }
+    if (sug) { const s = SUGGESTIONS[Number(sug.dataset.i)]; void send_(tx(s.prompt), tx(s.title), { src: 'suggestion' }); return; }
     const link = t.closest<HTMLAnchorElement>('a.mdlink');
     if (link) { ev.preventDefault(); openUrl(link.href); return; }
     if (t.closest('[data-plans]')) { void openPlans(); return; }
@@ -393,6 +421,7 @@ export function createChatView(ctx: Ctx): ChatView {
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'copy' && msgEl) { const m = cur.data.messages.find((x) => x.id === msgEl.dataset.mid); if (m) void copyText(m.text); }
     if (act === 'regen') regenerate();
+    if ((act === 'up' || act === 'down') && msgEl) rate(msgEl.dataset.mid!, act);
   });
 
   form.addEventListener('submit', (e) => {
@@ -400,7 +429,7 @@ export function createChatView(ctx: Ctx): ChatView {
     if (running()) return;
     const t = input.value;
     input.value = ''; input.style.height = 'auto'; updateSend();
-    void send_(t);
+    void send_(t, undefined, { src: 'typed' });
   });
   send.addEventListener('click', (e) => { // con una respuesta en curso, el botón detiene
     const run = cur.id ? runs.get(cur.id) : undefined;
@@ -431,7 +460,7 @@ export function createChatView(ctx: Ctx): ChatView {
   showEmpty(); refreshHeader(); updateSend();
   return {
     el,
-    ask: (prompt, label) => { newChat(); void send_(prompt, label); }, // "Analizar con IA" desde otra pantalla abre un chat nuevo
+    ask: (prompt, label, src) => { newChat(); void send_(prompt, label, { src: src ?? 'typed' }); }, // "Analizar con IA" desde otra pantalla abre un chat nuevo
     onShow: () => { setModelChip(); refreshHeader(); if (isServerMode()) void fetchMe().then(() => setModelChip()).catch(() => {}); },
   };
 }

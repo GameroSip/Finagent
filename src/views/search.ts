@@ -8,6 +8,8 @@ import { $, esc, h } from '../ui/dom';
 import { icon } from '../ui/icons';
 import type { Overlay } from './asset';
 import { t } from '../i18n';
+import { track } from '../analytics';
+import { missQuery } from '../telemetry';
 
 const SUGGEST: Array<[string, string]> = [['AAPL', 'Apple'], ['MSFT', 'Microsoft'], ['NVDA', 'NVIDIA'], ['MELI', 'Mercado Libre'], ['GGAL', 'Grupo Galicia (ADR)'], ['YPFD.BA', 'YPF (BYMA)'], ['AAPL.BA', 'Apple CEDEAR'], ['BTC-USD', 'Bitcoin'], ['^MERV', 'Merval']];
 
@@ -34,7 +36,7 @@ export function openSearchOverlay(ctx: Ctx, onClose?: () => void): Overlay {
     r.onclick = (e) => {
       const sb = (e.target as HTMLElement).closest('.star-btn');
       if (sb) { e.stopPropagation(); sb.innerHTML = icon('star', 18, toggleWatch(sym)); return; }
-      close(); ctx.openAsset(sym, nm);
+      close(); ctx.openAsset(sym, nm, 'search');
     };
     return r;
   }
@@ -58,6 +60,7 @@ export function openSearchOverlay(ctx: Ctx, onClose?: () => void): Overlay {
       if (my !== seq || closed) return;
       body.innerHTML = '';
       const list = quotes.filter((x: any) => x?.symbol);
+      track('search', { found: list.length > 0 }); { const mq = list.length ? null : missQuery(qs); if (mq) track('search_miss', { q: mq }); }   // solo las búsquedas SIN resultado y con forma de símbolo o nombre corto
       if (!list.length) { body.innerHTML = `<div class="empty-note">${icon('search', 26)}<div>${esc(t('No encontré resultados para "{q}".', { q: qs }))}</div><div class="muted" style="font-size:12.5px">Probá con el ticker (por ej. AAPL, GGAL.BA, BTC-USD).</div></div>`; return; }
       list.forEach((x: any) => body.append(row(x.symbol, x.longname ?? x.shortname ?? '', [x.exchDisp ?? x.exchange, x.quoteType].filter(Boolean).join(' · '))));
     } catch (e: any) {

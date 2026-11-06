@@ -175,3 +175,20 @@ h1, h2, h3 { letter-spacing: -.01em; }
 .move-range { font-size: 30px; font-weight: 500; letter-spacing: -.02em; line-height: 1.15; }
 .move-cover { margin-top: 8px; font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
 .move-ratio { margin-top: 14px; padding: 11px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 14.5px; font-weight: 500; }
+
+/* ---- beta: consentimiento, comentarios, votos, encuesta, calificación de respuestas */
+.c-sub { margin: 16px 0 6px; font-size: 11.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.c-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.c-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; line-height: 1.45; }
+.c-list li svg { flex: none; margin-top: 2px; color: var(--accent); }
+.c-list.no li svg { color: var(--muted); }
+.fb-kinds, .nps-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: transparent; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.chip.on { background: var(--accent); color: var(--on-accent, #14110A); border-color: var(--accent); font-weight: 600; }
+.nps-grid .chip { min-width: 42px; text-align: center; padding: 10px 0; }
+.nps-ends { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.wish-list { border-top: 1px solid var(--line); margin-top: 8px; }
+.wish { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.wish-t { flex: 1; min-width: 0; } .wish-t b { display: block; font-size: 15px; } .wish-t span { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; color: var(--text-2); }
+.wish .btn { flex: none; white-space: nowrap; }
+.rate-box { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; font-size: 13px; }

@@ -9,6 +9,7 @@ M.resetApi();
 const text = (p, sel) => p.$eval(sel, (e) => e.innerText).catch(() => '');
 const click = (p, sel) => p.evaluate((s) => document.querySelector(s).click(), sel);
 const has = (p, sel) => p.$(sel).then((x) => x !== null);
+const consentNo = async (p) => { await p.waitForSelector('#c-no', { timeout: 5000 }); await sleep(300); await click(p, '#c-no'); };   // la pantalla de estadísticas aparece entre el idioma y el recorrido
 const activeTitle = (p) => p.$eval('.slide.active h2', (e) => e.textContent).catch(() => '');
 
 // ---- 1) pantalla de carga: logo 3D y despegue (reloj del escenario controlado para detenerlo en cada instante)
@@ -52,7 +53,14 @@ check('muestra los idiomas que vienen como "próximamente" (sin prometer fechas)
 await shot(p, 'T3-idioma');
 
 // ---- 4) recorrido por la app (en portugués)
-await click(p, '#l-next'); await p.waitForSelector('.tour .slide.active', { timeout: 4000 }); await sleep(500);
+await click(p, '#l-next'); await p.waitForSelector('#c-yes', { timeout: 4000 }); await sleep(500); await shot(p, 'T3b-estadisticas');
+{
+  const c = await text(p, '.intro'), r = await p.evaluate(() => ['#c-yes', '#c-no'].map((s) => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }));
+  check('antes del recorrido pregunta, en el idioma elegido, si quiere ayudar a mejorar la beta, y explica qué se registra y qué NO', /Ajude a melhorar o beta/i.test(c) && /O que registramos/i.test(c) && /O que NÃO registramos/i.test(c) && /O que você escreve ao assistente/i.test(c) && /Seu plano/i.test(c), c.slice(0, 120));
+  check('"Sim" y "No" tienen la misma prominencia (mismo ancho y alto) y ninguno viene preseleccionado', r[0][0] === r[1][0] && Math.abs(r[0][1] - r[1][1]) <= 2 && M.apiState.consent === null, JSON.stringify(r));
+  await click(p, '#c-no'); await p.waitForSelector('.tour .slide.active', { timeout: 4000 }); await sleep(500);
+  check('decir que no se le avisa al servidor y no se manda ningún evento', M.apiState.consent === false && M.apiState.events.length === 0 && M.apiState.eventBatches === 0, `consent=${M.apiState.consent} eventos=${M.apiState.events.length}`);
+}
 const titles = [];
 for (let i = 0; i < 7; i++) {
   await sleep(450); titles.push(await activeTitle(p));
@@ -97,12 +105,30 @@ await p.close();
 p = await newPage({ key: '', intro: true, lang: 'es' });
 await p.evaluateOnNewDocument(() => { window.__ac = 0; const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__ac++; } }; });
 await p.evaluate(() => { localStorage.clear(); localStorage.setItem('finagent.sound.v1', '0'); }); await p.reload({ waitUntil: 'load' });   // el almacenamiento se comparte entre pestañas: se empieza de cero (y con el sonido apagado)
-await p.waitForSelector('#a-guest', { timeout: 30000 }); await click(p, '#a-guest'); await p.waitForSelector('#l-next', { timeout: 5000 }); await sleep(300); await click(p, '#l-next'); await p.waitForSelector('#t-skip', { timeout: 5000 });
+await p.waitForSelector('#a-guest', { timeout: 30000 }); await click(p, '#a-guest'); await p.waitForSelector('#l-next', { timeout: 5000 }); await sleep(300); await click(p, '#l-next'); await consentNo(p); await p.waitForSelector('#t-skip', { timeout: 5000 });
 await click(p, '#t-skip'); await p.waitForSelector('.tabbar', { timeout: 8000 });
 check('"Omitir" salta el recorrido y entra a la app', (await has(p, '.tabbar')) && !(await has(p, '.intro')));
 check('con el sonido apagado en Ajustes no suena nada al abrir la app', (await p.evaluate(() => window.__ac)) === 0, String(await p.evaluate(() => window.__ac)));
 await p.close();
 
+// Regresión: la diapositiva "Qué hay detrás" montaba su lista de fuentes sobre el título y el texto (las ilustraciones se achicaban dentro de la columna). Ningún texto puede pisar a otro.
+{
+  const overlaps = () => p.evaluate(() => { const s = document.querySelector('.slide.active'); if (!s) return ['(sin diapositiva)'];
+    const items = [...s.querySelectorAll('.slide-n, h2, p, li, .a-row, .a-strip, .a-kv > div, .a-vs > div, .a-plans > div')].map((e) => ({ n: (e.className || e.tagName) + '«' + (e.innerText || '').slice(0, 14) + '»', r: e.getBoundingClientRect() })).filter((x) => x.r.width > 2 && x.r.height > 2), bad = [];
+    for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) { const A = items[i].r, B = items[j].r, ox = Math.min(A.right, B.right) - Math.max(A.left, B.left), oy = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top); const inside = (X, Y) => X.left >= Y.left - 1 && X.right <= Y.right + 1 && X.top >= Y.top - 1 && X.bottom <= Y.bottom + 1; if (ox > 4 && oy > 4 && !inside(A, B) && !inside(B, A)) bad.push(items[i].n + ' × ' + items[j].n); }   // una caja que contiene a otra (columna y su texto) no es un solape
+    return bad; });
+  let all = [];
+  for (const [lng, w, h] of [['pt', 320, 568], ['es', 360, 640], ['en', 320, 568]]) {
+    const q2 = await newPage({ key: '', intro: true, lang: lng, clean: true }); await q2.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+    const keep = p; p = q2;
+    await p.waitForSelector('#a-guest, #l-next', { timeout: 25000 }); await sleep(800);
+    if (await p.$('#a-guest')) { await click(p, '#a-guest'); await p.waitForSelector('#l-next', { timeout: 5000 }); await sleep(400); }
+    await click(p, '#l-next'); await consentNo(p); await p.waitForSelector('.tour .slide.active', { timeout: 5000 });
+    for (let i = 0; i < 7; i++) { await sleep(700); const o = await overlaps(); if (o.length) all.push(`${lng} ${w}×${h} diap. ${i + 1}: ${o.slice(0, 2).join(' | ')}`); if (i < 6) await click(p, '#t-next'); }
+    await q2.close(); p = keep;
+  }
+  check('ninguna diapositiva del recorrido superpone textos (en pantallas de 320 y 360 px y en los tres idiomas)', all.length === 0, all.slice(0, 3).join(' || '));
+}
 check('en toda la prueba la app nunca llamó a Gemini directamente', !log.requests.some((r) => r.includes('generativelanguage.googleapis.com')));
 const bad = checks.filter((c) => !c.ok);
 console.log(`\nRESULTADO (introducción e idiomas): ${checks.length - bad.length}/${checks.length} verificaciones OK`);

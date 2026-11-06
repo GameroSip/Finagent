@@ -58,7 +58,7 @@ export function createWatchView(ctx: Ctx): View {
           : '<div class="skeleton" style="height:34px;width:78px"></div>'}</div>`;
       // Mantener presionado quita el favorito; al soltar, el navegador igual emite un "click" que NO debe abrir el activo.
       let timer: number | undefined, longPress = false;
-      row.onclick = () => { if (longPress) { longPress = false; return; } ctx.openAsset(s, qd?.name); };
+      row.onclick = () => { if (longPress) { longPress = false; return; } ctx.openAsset(s, qd?.name, 'watchlist'); };
       row.addEventListener('contextmenu', (ev) => ev.preventDefault());
       row.addEventListener('touchstart', () => {
         longPress = false;

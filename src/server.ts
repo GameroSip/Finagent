@@ -177,6 +177,27 @@ export async function redeemPlanCode(code: string): Promise<{ plan: PlanInfo; un
 
 // "Avisame cuando esté disponible": se recuerda también en el teléfono para mostrarlo como anotado.
 export const getInterests = (): string[] => { try { const v = JSON.parse(store.get(INTEREST_KEY) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+/** Estadísticas de uso: el servidor guarda el consentimiento y descarta los eventos si no está aceptado. */
+export async function sendConsent(on: boolean): Promise<void> {
+  const r = await authed('POST', '/v1/consent', { analytics: on });
+  if (r.status !== 200) throw new Error(`consent ${r.status}`);
+}
+export async function sendEvents(events: Array<{ t: number; n: string; p: Record<string, unknown> }>): Promise<{ accepted: number; dropped: number; consent: boolean }> {
+  const r = await authed('POST', '/v1/events', { events });
+  if (r.status !== 200) throw new Error(`events ${r.status}`);
+  return r.json;
+}
+/** Comentario que la persona decide enviar (idea, problema, algo que falta o puntaje de recomendación). */
+export async function sendFeedback(kind: string, o: { text?: string; score?: number; version?: string }): Promise<void> {
+  const r = await authed('POST', '/v1/feedback', { kind, ...o });
+  if (r.status !== 200) throw new Error(`feedback ${r.status}`);
+}
+/** Voto "me interesa" por una función que todavía no existe. */
+export async function sendFeatureVote(feature: string): Promise<void> {
+  const r = await authed('POST', '/v1/interest', { feature });
+  if (r.status !== 200) throw new Error(`vote ${r.status}`);
+}
+
 export async function sendInterest(plan: string): Promise<void> {
   const r = await authed('POST', '/v1/interest', { plan });
   if (r.status !== 200) throw new ServerBusyError('busy');

@@ -6,6 +6,8 @@ import { esc, h, toast } from './dom';
 import { fmtNum } from './format';
 import { icon } from './icons';
 import { openSheet } from './sheet';
+import { track } from '../analytics';
+import { planLen } from '../telemetry';
 
 const KEY = 'finagent.plan.v1', MAX = 600;
 export const getPlan = (): string => { try { return (globalThis.localStorage?.getItem(KEY) ?? '').slice(0, MAX); } catch { return ''; } };
@@ -64,6 +66,7 @@ export function bindStress(host: HTMLElement, after: () => void): void {
 }
 
 export function openPlanSheet(after: () => void): void {
+  track('plan_open');
   const cur = getPlan(), el = h('div', { class: 'plan-sheet' });
   el.innerHTML = `<h3 class="plan-h">${esc(t(T.plan.title))}</h3><p class="stress-hint" style="margin:0 0 12px">${esc(t(T.plan.hint))}</p>
     <textarea id="plan-text" class="plan-ta" maxlength="${MAX}" rows="6" placeholder="${esc(t(T.plan.placeholder))}"></textarea>
@@ -74,6 +77,6 @@ export function openPlanSheet(after: () => void): void {
   ta.value = cur;
   const upd = () => { count.textContent = `${ta.value.length} / ${MAX}`; };
   ta.addEventListener('input', upd); upd();
-  el.querySelector('#plan-save')!.addEventListener('click', () => { setPlan(ta.value); close(); toast(t(ta.value.trim() ? T.plan.saved : T.plan.removed)); after(); });
-  el.querySelector('#plan-del')?.addEventListener('click', () => { setPlan(''); close(); toast(t(T.plan.removed)); after(); });
+  el.querySelector('#plan-save')!.addEventListener('click', () => { setPlan(ta.value); if (ta.value.trim()) track('plan_saved', { len: planLen(ta.value.trim().length) }); else track('plan_removed'); close(); toast(t(ta.value.trim() ? T.plan.saved : T.plan.removed)); after(); });
+  el.querySelector('#plan-del')?.addEventListener('click', () => { setPlan(''); track('plan_removed'); close(); toast(t(T.plan.removed)); after(); });
 }

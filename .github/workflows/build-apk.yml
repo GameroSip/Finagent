@@ -56,7 +56,8 @@ jobs:
           node run-server.mjs ../dist-server ../e2e-shots 2>&1 | tee ../e2e-log/beta-servidor.txt; a=${PIPESTATUS[0]}
           node run-intro.mjs ../dist-server ../e2e-shots 2>&1 | tee ../e2e-log/introduccion.txt; b=${PIPESTATUS[0]}
           node run-i18n.mjs ../dist-server ../e2e-shots 2>&1 | tee ../e2e-log/idiomas.txt; c=${PIPESTATUS[0]}
-          exit $((a + b + c))
+          node run-beta.mjs ../dist-server ../e2e-shots 2>&1 | tee ../e2e-log/estadisticas.txt; d=${PIPESTATUS[0]}
+          exit $((a + b + c + d))
 
       - name: Publicar capturas de la app
         if: always()

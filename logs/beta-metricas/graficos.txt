@@ -1,0 +1,21 @@
+  ✔ el gráfico tiene el botón "Herramientas" (con el volumen activado por defecto) 
+  ✔ el menú lista las 12 herramientas, todas con una explicación 
+  ✔ VWAP y Sesiones de mercado están bloqueadas en 6M y dicen por qué 
+  ✔ sin desborde horizontal en C0-menu-herramientas 
+  ✔ el contador del botón muestra las 8 herramientas activas 
+  ✔ el gráfico crece para alojar los paneles de RSI y MACD (250 + 2 × 92 px) 
+  ✔ el perfil de volumen se dibuja sobre el gráfico (capa propia con píxeles) 
+  ✔ no apareció ningún aviso de herramienta que no se pueda dibujar 
+  ✔ sin desborde horizontal en C1-diario-herramientas 
+  ✔ con velas siguen dibujándose las herramientas 
+  ✔ sin desborde horizontal en C2-velas-herramientas 
+  ✔ en 1D se habilitan VWAP y Sesiones 
+  ✔ en 1D se sombrean las sesiones (Londres y Nueva York) sobre el gráfico 
+  ✔ sin desborde horizontal en C3-1D-sesiones-vwap 
+  ✔ los pivotes en 1D avisan que faltan datos del día anterior (no inventan niveles) 
+  ✔ en 1S el gráfico sigue con sus herramientas 
+  ✔ sin desborde horizontal en C4-1S-tres-sesiones 
+  ✔ al reabrir la app se recuerdan las herramientas elegidas 
+
+RESULTADO (herramientas del gráfico): 18/18 verificaciones OK
+ERRORES DE PÁGINA: []

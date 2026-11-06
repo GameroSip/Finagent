@@ -1,0 +1,50 @@
+  ✔ sin desborde horizontal en B1-consentimiento 
+  ✔ la pantalla de estadísticas dice qué se registra y qué NO (lo que escribís al asistente, tu plan, tus favoritos, nombre y correo) 
+  ✔ todavía no se mandó nada ni se guardó ninguna decisión: la persona elige 
+  ✔ aceptar se le comunica al servidor, que guarda el consentimiento 
+  ✔ la apertura de la app informa solo versión, idioma, tema y sonido 
+  ✔ también registra el recorrido de la introducción (diapositivas vistas y que lo omitió) 
+  ✔ sin desborde horizontal en B2-respuesta-con-calificacion 
+  ✔ con las estadísticas aceptadas, cada respuesta del asistente se puede calificar (👍 / 👎) 
+  ✔ al calificar, los botones se reemplazan por un agradecimiento (no se puede calificar dos veces) 
+  ✔ llegaron al servidor las pantallas, el activo abierto, el gráfico, el favorito, el termómetro y el movimiento esperado 
+  ✔ del activo se informa símbolo (público), tipo y desde dónde se abrió 
+  ✔ de la consulta al asistente se informa de dónde vino, si abrió un chat y el tamaño en tres escalones: nunca el texto 
+  ✔ de la respuesta se informa qué herramientas usó, cuánto tardó y la verificación de cifras 
+  ✔ el plan se registró solo como "guardado" y su tamaño aproximado (corto), nunca su contenido 
+  ✔ NI LO QUE SE LE ESCRIBIÓ AL ASISTENTE NI EL PLAN viajaron al servidor en ningún envío de estadísticas 
+  ✔ en la pantalla de aprendizaje: no se pidió nada fuera de la lista (cada evento viene con "n" de la lista conocida) 
+  ✔ sin desborde horizontal en B3-ajustes-beta 
+  ✔ Ajustes tiene el grupo "Beta" con el interruptor de estadísticas encendido, y las dos entradas para opinar 
+  ✔ sin desborde horizontal en B4-contanos 
+  ✔ "Contanos" aclara que lo que se escribe ahí SÍ llega (a diferencia de las estadísticas) 
+  ✔ no deja enviar un comentario vacío 
+  ✔ el comentario llega al servidor con su tipo, el texto y la versión 
+  ✔ sin desborde horizontal en B5-funciones 
+  ✔ la lista de funciones aclara que todavía no existen y que algunas pueden requerir permisos o acuerdos 
+  ✔ votar "Me interesa" se registra una vez y el botón pasa a "Anotado ✓" (desactivado) 
+  ✔ apagar las estadísticas se le avisa al servidor 
+  ✔ después de apagar no se envía ni un evento más (y lo pendiente se borró) 
+  ✔ sin estadísticas, la respuesta nueva ya no muestra el 👍 / 👎 
+  ✔ volver a encenderlas se le avisa al servidor 
+  ✔ si dice que no: el servidor guarda "no", y no recibe NINGÚN evento de uso (ni un solo envío) 
+  ✔ si dice que no, las respuestas no muestran el 👍 / 👎 
+  ✔ en Ajustes el interruptor queda apagado, y puede opinar igual (comentarios y votos no dependen de las estadísticas) 
+  ✔ sin desborde horizontal en B6-consentimiento-existente 
+  ✔ a quien ya usaba la app (sin decisión) se le pregunta en una hoja, con las mismas explicaciones 
+  ✔ al aceptar queda registrado, y la hoja se cierra 
+  ✔ no se vuelve a preguntar en la próxima apertura 
+  ✔ con menos de 3 días de uso no pregunta si lo recomendaría 
+  ✔ con 3 días de uso (2 previos + hoy) pregunta "¿Qué tan probable es que recomiendes FinAgent a un amigo?" de 0 a 10 
+  ✔ sin desborde horizontal en B7-recomendacion 
+  ✔ no se puede enviar sin elegir un puntaje 
+  ✔ el puntaje llega al servidor como recomendación (nps) con la nota elegida 
+  ✔ una vez respondida, no se vuelve a preguntar 
+  ✔ en en el grupo "Beta" de Ajustes está traducido 
+  ✔ en en la lista de votos está traducida completa 
+  ✔ en pt el grupo "Beta" de Ajustes está traducido 
+  ✔ en pt la lista de votos está traducida completa 
+  ✔ en toda la prueba la app nunca llamó a Gemini directamente 
+
+RESULTADO (estadísticas de la beta): 47/47 verificaciones OK
+ERRORES DE PÁGINA: []

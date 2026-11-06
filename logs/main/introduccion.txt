@@ -15,6 +15,10 @@
   ✔ al elegir Português pasa a portugués 
   ✔ muestra los idiomas que vienen como "próximamente" (sin prometer fechas) 
   ✔ sin desborde horizontal en T3-idioma 
+  ✔ sin desborde horizontal en T3b-estadisticas 
+  ✔ antes del recorrido pregunta, en el idioma elegido, si quiere ayudar a mejorar la beta, y explica qué se registra y qué NO 
+  ✔ "Sim" y "No" tienen la misma prominencia (mismo ancho y alto) y ninguno viene preseleccionado 
+  ✔ decir que no se le avisa al servidor y no se manda ningún evento 
   ✔ sin desborde horizontal en T4-tour-3 
   ✔ sin desborde horizontal en T4-tour-5 
   ✔ el recorrido tiene 7 diapositivas, todas en portugués 
@@ -32,7 +36,8 @@
   ✔ cambiar el idioma desde Ajustes reinicia la app en el idioma elegido (inglés) 
   ✔ "Omitir" salta el recorrido y entra a la app 
   ✔ con el sonido apagado en Ajustes no suena nada al abrir la app 
+  ✔ ninguna diapositiva del recorrido superpone textos (en pantallas de 320 y 360 px y en los tres idiomas) 
   ✔ en toda la prueba la app nunca llamó a Gemini directamente 
 
-RESULTADO (introducción e idiomas): 35/35 verificaciones OK
+RESULTADO (introducción e idiomas): 40/40 verificaciones OK
 ERRORES DE PÁGINA: []

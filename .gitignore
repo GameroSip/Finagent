@@ -14,3 +14,5 @@ e2e-shots-server
 evals/radar/data/
 e2e-log/
 .vitest/
+play-assets/
+android/

@@ -13,6 +13,8 @@ export const WISHES: Record<(typeof FEATURES)[number], [string, string]> = {
 };
 export const KIND_LABELS: Array<['idea' | 'problema' | 'falta', string]> = [['idea', 'Una idea'], ['problema', 'Algo no funciona'], ['falta', 'Algo que falta']];
 export const RATE_REASONS: Array<['wrong' | 'incomplete' | 'confusing' | 'slow' | 'other', string]> = [['wrong', 'La respuesta es incorrecta'], ['incomplete', 'Le faltó información'], ['confusing', 'Es confusa'], ['slow', 'Tardó demasiado'], ['other', 'Otra cosa']];
+/** Motivos para reportar una respuesta de la IA (lista cerrada). El primero y el segundo son los que exige la política de IA generativa de Google Play. */
+export const REPORT_REASONS: Array<['offensive' | 'harmful' | 'advice' | 'other', string]> = [['offensive', 'Es ofensiva o inapropiada'], ['harmful', 'Es peligrosa o engañosa'], ['advice', 'Parece una recomendación de inversión'], ['other', 'Otro problema']];
 export const VOTE_LABELS = { vote: 'Me interesa', voted: 'Anotado ✓' } as const;
 
-export const betaTexts = (): string[] => [...Object.values(WISHES).flat(), ...KIND_LABELS.map(([, l]) => l), ...RATE_REASONS.map(([, l]) => l), VOTE_LABELS.vote, VOTE_LABELS.voted];
+export const betaTexts = (): string[] => [...Object.values(WISHES).flat(), ...KIND_LABELS.map(([, l]) => l), ...RATE_REASONS.map(([, l]) => l), ...REPORT_REASONS.map(([, l]) => l), VOTE_LABELS.vote, VOTE_LABELS.voted];

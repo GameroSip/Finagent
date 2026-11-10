@@ -100,7 +100,7 @@ const PLAN_LIST = [
   { ...PLUS, blurb: 'Un modelo más potente y más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: true },
   { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30, hasFallback: true },
 ];
-const fresh = () => ({ used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [], consent: null, consentCalls: [], events: [], eventBatches: 0, feedback: [], votes: [], rawBodies: [] });
+const fresh = () => ({ used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [], deleted: 0, failDelete: false, consent: null, consentCalls: [], events: [], eventBatches: 0, feedback: [], votes: [], rawBodies: [] });
 export const apiState = fresh();
 export const resetApi = () => Object.assign(apiState, fresh());
 const planNow = () => (apiState.plan === 'plus' ? PLUS : FREE);
@@ -108,7 +108,7 @@ const remaining = () => ({ day: Math.max(0, planNow().dailyLimit - apiState.used
 
 export function finagentApi(method, path, headers, body) {
   const j = (o, status = 200) => ({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(o) });
-  if (method === 'OPTIONS') return { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type' }, body: '' };
+  if (method === 'OPTIONS') return { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS' }, body: '' };
   if (path === '/v1/plans') return j({ tier: 'free', plans: PLAN_LIST });
   if (path === '/v1/auth/device') {              // cuenta automática: sin registro ni códigos
     if (apiState.banned) return j({ error: 'disabled' }, 403);
@@ -117,6 +117,7 @@ export function finagentApi(method, path, headers, body) {
   }
   const tok = (headers.authorization ?? '').replace('Bearer ', '');
   if (!apiState.tokens.has(tok)) return j({ error: 'session' }, 401);
+  if (method === 'DELETE' && path === '/v1/account') { if (apiState.failDelete) return j({ error: 'boom' }, 503); apiState.deleted++; apiState.tokens.delete(tok); return j({ ok: true }); }
   if (path === '/v1/me') return j({ plan: planNow(), remaining: remaining(), resetsOn: '2026-10-20', tier: 'free' });
   if (path === '/v1/interest') {
     if (body.feature) { const first = !apiState.votes.includes(body.feature); if (first) apiState.votes.push(body.feature); return j({ ok: true, first }); }

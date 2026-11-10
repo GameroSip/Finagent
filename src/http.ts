@@ -4,7 +4,7 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 export interface HttpRequest {
   url: string;
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'DELETE';
   headers?: Record<string, string>;
   body?: unknown;
   timeoutMs?: number;

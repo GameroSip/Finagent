@@ -117,6 +117,11 @@ export class SqlStore implements UsageStore {
   async addFeedback(f: { user_id: string; ts: number; kind: string; score: number | null; text: string | null; version: string | null }): Promise<void> {
     await this.sql.run('INSERT INTO feedback (user_id, ts, kind, score, text, version) VALUES (?, ?, ?, ?, ?, ?)', f.user_id, f.ts, f.kind, f.score, f.text, f.version);
   }
+  /** Borra TODO lo que el servidor guarda de una persona (cuenta, uso, consentimiento, eventos, comentarios, votos). Los contadores de límites quedan sin dueño: no se pueden asociar a nadie. */
+  async deleteUser(userId: string): Promise<void> {
+    for (const t of ['events', 'feedback', 'consent', 'interest', 'calls', 'turns']) await this.sql.run(`DELETE FROM ${t} WHERE user_id = ?`, userId);
+    await this.sql.run('DELETE FROM users WHERE id = ?', userId);
+  }
   async metricsRaw(sinceDay: string, names: string[]): Promise<RawMetrics> {
     const one = async (q: string, ...p: unknown[]) => (await this.sql.all<{ n: number }>(q, ...p))[0]?.n ?? 0;
     const marks = names.map(() => '?').join(',');

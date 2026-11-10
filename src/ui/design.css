@@ -192,3 +192,4 @@ h1, h2, h3 { letter-spacing: -.01em; }
 .wish-t { flex: 1; min-width: 0; } .wish-t b { display: block; font-size: 15px; } .wish-t span { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; color: var(--text-2); }
 .wish .btn { flex: none; white-space: nowrap; }
 .rate-box { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; font-size: 13px; }
+.rep-done { font-size: 12.5px; margin-left: 4px; }

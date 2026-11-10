@@ -18,10 +18,12 @@ describe('páginas que Google Play exige (política de privacidad y eliminación
     expect(text(del)).toContain('Eliminar todo'); expect(ABOUT.deletion).toContain('Eliminar mi cuenta y mis datos');
     expect(text(del)).toMatch(/no podemos reconocer cuál era tu cuenta/);                  // se dice con honestidad el límite de una cuenta anónima
   });
-  it('lo que falta completar está marcado de forma visible y uniforme (nada inventado)', () => {
-    const marks = [...(priv + del).matchAll(/\[COMPLETAR: ([^\]]+)\]/g)].map((m) => m[1]);
-    expect(marks.length).toBeGreaterThanOrEqual(5); expect(new Set(marks)).toEqual(new Set(['fecha', 'nombre o razón social del responsable', 'correo de contacto']));
-    expect(text(priv + del)).not.toMatch(/@[a-z0-9-]+\.[a-z]{2,}/i);                        // ningún correo escrito: lo completa la persona
+  it('lista para publicar: no queda ningún marcador sin completar, hay fecha y responsable, y el correo de contacto es uno solo y el mismo en las dos páginas', () => {
+    for (const h of [priv, del]) { expect(h).not.toMatch(/COMPLETAR/); expect(h).not.toContain('class="todo"'); }
+    const mails = (h: string) => new Set((h.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? []).map((m) => m.replace(/\.$/, '')));      // (sin el punto final de la oración)
+    expect(mails(priv).size).toBe(1); expect(mails(del).size).toBe(1); expect([...mails(priv)][0]).toBe([...mails(del)][0]);
+    expect(text(priv)).toMatch(/Última actualización: \d{1,2} de [a-záéíóú]+ de 20\d\d/i);
+    expect(text(priv)).toMatch(/responsable del tratamiento de los datos es [A-ZÁÉÍÓÚ][\wáéíóúñ]+( [A-ZÁÉÍÓÚ][\wáéíóúñ]+)+\./);
   });
   it('no promete lo que la app no hace', () => { const t = text(priv + del + idx).toLowerCase(); for (const bad of ['garantiz', 'cifrado de extremo', 'anónimo total', 'nunca compartimos', 'tiempo real', 'asesor financiero registrado']) expect(t, bad).not.toContain(bad); });
   it('los motivos de reporte cubren lo que pide la política de IA generativa de Google Play (ofensivo y peligroso o engañoso)', () => { const m = REPORT_REASONS.map(([k]) => k); expect(m).toContain('offensive'); expect(m).toContain('harmful'); });

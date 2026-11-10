@@ -95,8 +95,39 @@ await tab(p, 'market'); await sleep(500); await p.evaluate(() => document.queryS
 await tab(p, 'chat'); await sleep(400); await say(p, `Hola ${SECRET}`); await waitAnswer(p, 1); await sleep(600); await flushNow(p); await sleep(1500);
 check('si dice que no: el servidor guarda "no", y no recibe NINGÚN evento de uso (ni un solo envío)', M.apiState.consent === false && M.apiState.events.length === 0 && M.apiState.eventBatches === 0, `consent=${M.apiState.consent} envíos=${M.apiState.eventBatches}`);
 check('si dice que no, las respuestas no muestran el 👍 / 👎', !(await has(p, '.rate-box')));
+// ---- reportar una respuesta de la IA (lo exige Google Play): disponible aunque haya rechazado las estadísticas
+check('cada respuesta tiene el botón de reportar, aunque rechazó las estadísticas', await has(p, '.m-ai [data-act="report"]'));
+await click(p, '.m-ai [data-act="report"]'); await p.waitForSelector('.act-row', { timeout: 4000 }); await sleep(400); await shot(p, 'B8-reportar');
+const sheet = await text(p, '.sheet');
+check('la hoja de reporte dice, completo y a la vista, qué se envía (el texto de la respuesta y el motivo) y que NO se envía la pregunta', /Reportar respuesta/i.test(sheet) && /texto de esta respuesta y el motivo/.test(sheet) && /No enviamos tu pregunta/.test(sheet), sheet.slice(0, 160));
+check('ofrece los motivos de una lista cerrada (ofensiva, peligrosa o engañosa, parece recomendación de inversión, otro)', (await p.$$('.act-row')).length === 4 && /ofensiva/.test(sheet) && /peligrosa o engañosa/.test(sheet) && /recomendación de inversión/.test(sheet));
+await p.evaluate(() => [...document.querySelectorAll('.act-row')].find((b) => /peligrosa/.test(b.innerText)).click()); await until(() => M.apiState.feedback.length === 1);
+const rep = M.apiState.feedback[0] ?? {};
+check('el reporte llega al servidor como "reporte", con el motivo y el texto de la respuesta, y SIN la pregunta', rep.kind === 'reporte' && /Es peligrosa o engañosa/.test(rep.text ?? '') && /analista financiero/.test(rep.text ?? '') && !(rep.text ?? '').includes(SECRET) && /^\d+\.\d+\.\d+$/.test(rep.version ?? ''), JSON.stringify(rep).slice(0, 160));
+await sleep(500);
+check('después de reportar, el botón se reemplaza por "Reportada" (no se puede reportar dos veces)', /Reportada/.test(await text(p, '.m-ai .rep-done')) && !(await has(p, '.m-ai [data-act="report"]')));
+check('reportar no mandó ningún evento de uso (la persona rechazó las estadísticas)', M.apiState.events.length === 0 && M.apiState.eventBatches === 0);
 await tab(p, 'settings'); await sleep(500);
 check('en Ajustes el interruptor queda apagado, y puede opinar igual (comentarios y votos no dependen de las estadísticas)', !(await p.$eval('#s-analytics-t', (e) => e.checked)) && (await has(p, '#s-feedback')) && (await has(p, '#s-wishes')));
+await p.close();
+
+// ================================================================ 2b) eliminar la cuenta y los datos (lo exige Google Play)
+M.resetApi();
+p = await newPage({ key: '', intro: false, analytics: '0', lang: 'es', clean: true });
+await p.waitForSelector('.tabbar', { timeout: 20000 }); await sleep(900); await tab(p, 'settings'); await sleep(700);
+await p.evaluate(() => document.querySelector('#s-delete')?.scrollIntoView({ block: 'center' })); await sleep(300);
+check('con servidor, Ajustes ofrece "Eliminar mi cuenta y mis datos"', (await has(p, '#s-delete')) && /Eliminar mi cuenta y mis datos/.test(await text(p, '#s-delete')));
+M.apiState.failDelete = true;
+await click(p, '#s-delete'); await p.waitForSelector('.sheet-actions [data-r="1"]', { timeout: 4000 }); await sleep(300); await shot(p, 'B9-eliminar-cuenta');
+const dt = await text(p, '.sheet');
+check('antes de borrar pide confirmación y explica qué se elimina (cuenta, uso, estadísticas, comentarios y votos, y los datos del teléfono)', /¿Eliminar tu cuenta y tus datos\?/.test(dt) && /uso, estadísticas, comentarios y votos/.test(dt) && /No se puede deshacer/.test(dt));
+await click(p, '.sheet-actions [data-r="1"]'); await sleep(1500);
+check('si el servidor falla, avisa y NO borra nada del teléfono (se puede reintentar)', M.apiState.deleted === 0 && await p.evaluate(() => !!localStorage.getItem('finagent.session.v1') && !!localStorage.getItem('finagent.intro.v1')) && /No pude eliminar la cuenta/.test(await text(p, 'body')));
+M.apiState.failDelete = false;
+await click(p, '#s-delete'); await p.waitForSelector('.sheet-actions [data-r="1"]', { timeout: 4000 }); await sleep(300); await click(p, '.sheet-actions [data-r="1"]');
+check('con conexión, el servidor recibe el pedido de eliminación', await until(() => M.apiState.deleted === 1), String(M.apiState.deleted));
+await p.waitForSelector('#a-guest, #l-next', { timeout: 25000 }); await sleep(600);
+check('después de eliminar, la app vuelve a la introducción como nueva: no queda nada guardado en el teléfono', await p.evaluate(() => !localStorage.getItem('finagent.intro.v1') && !localStorage.getItem('finagent.analytics.v1') && !localStorage.getItem('finagent.votes.v1')));
 await p.close();
 
 // ================================================================ 3) quien ya usaba la app: se le pregunta una sola vez

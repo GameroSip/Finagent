@@ -113,7 +113,7 @@ export function normalizeCode(raw: string): string {
 export const isCodeShape = (s: string): boolean => /^FA-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(s);
 
 // ------------------------------------------------------------------ llamadas
-async function call(method: 'GET' | 'POST', path: string, body?: unknown, auth = true): Promise<{ status: number; json: any }> {
+async function call(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown, auth = true): Promise<{ status: number; json: any }> {
   const s = auth ? getSession() : null;
   const res = await http({ url: apiBase + path, method, headers: { 'content-type': 'application/json', ...(s ? { authorization: `Bearer ${s.token}` } : {}) }, body, timeoutMs: 90_000 });
   let json: any = null;
@@ -145,7 +145,7 @@ export async function ensureSession(): Promise<Session> {
 }
 
 /** Llamada con sesión: si el servidor dice que la sesión venció, se renueva sola (misma cuenta del teléfono) y se repite UNA vez. */
-async function authed(method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ status: number; json: any }> {
+async function authed(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<{ status: number; json: any }> {
   await ensureSession();
   let r = await netCall(method, path, body);
   if (r.status === 401) { store.remove(SESSION_KEY); await ensureSession(); r = await netCall(method, path, body); }
@@ -177,6 +177,13 @@ export async function redeemPlanCode(code: string): Promise<{ plan: PlanInfo; un
 
 // "Avisame cuando esté disponible": se recuerda también en el teléfono para mostrarlo como anotado.
 export const getInterests = (): string[] => { try { const v = JSON.parse(store.get(INTEREST_KEY) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+/** Elimina del servidor la cuenta y TODO lo que guarda de la persona. Si nunca se creó una cuenta, no hay nada que borrar; si la sesión ya no vale (401), la cuenta ya no existe. Falla (para reintentar) si no hay conexión. */
+export async function deleteAccount(): Promise<void> {
+  if (!getSession()) return;
+  const r = await netCall('DELETE', '/v1/account');
+  if (r.status !== 200 && r.status !== 401) throw new ServerBusyError('network');
+}
+
 /** Estadísticas de uso: el servidor guarda el consentimiento y descarta los eventos si no está aceptado. */
 export async function sendConsent(on: boolean): Promise<void> {
   const r = await authed('POST', '/v1/consent', { analytics: on });

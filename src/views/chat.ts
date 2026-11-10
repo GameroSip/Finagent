@@ -5,7 +5,7 @@ import { ABOUT } from '../about';
 import { maybeUpsellCard } from '../ui/upsell';
 import { noteAnswer } from '../upsell';
 import { openPlans } from './plans';
-import { AccessDeniedError, busyMessage, fetchMe, isServerMode, LimitError, limitMessage, quotaInfo, ServerBusyError, SessionError, signOut, subscribeQuota, transport } from '../server';
+import { AccessDeniedError, busyMessage, fetchMe, isServerMode, sendFeedback, LimitError, limitMessage, quotaInfo, ServerBusyError, SessionError, signOut, subscribeQuota, transport } from '../server';
 import { chatExists, createChat, emptyData, getMeta, loadChat, newId, renameChat, saveChat, setAutoTitle, setUnread, subscribeChats,
   traceOf, uiOf, type ChatData, type ChatMeta, type StoredMsg, type TraceItem } from '../chats';
 import type { Ctx, TabId, View } from '../ctx';
@@ -16,11 +16,12 @@ import { aiTitle, fallbackTitle } from '../titles';
 import { $, esc, h, openUrl, toast } from '../ui/dom';
 import { markSvg } from '../ui/logo';
 import { icon, type IconName } from '../ui/icons';
-import { actionSheet, promptSheet } from '../ui/sheet';
+import { actionSheet, openSheet, promptSheet } from '../ui/sheet';
 import { renderRich, type Rich } from './cards';
 import { openHistory } from './history';
 import { analyticsOn, track } from '../analytics';
-import { RATE_REASONS } from '../betaTexts';
+import { RATE_REASONS, REPORT_REASONS } from '../betaTexts';
+import { VERSION } from '../version';
 import { AI_TOOLS, lenBucket } from '../telemetry';
 import { t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
 
@@ -183,6 +184,7 @@ export function createChatView(ctx: Ctx): ChatView {
     body.append(h('div', { class: 'ai-foot', html: `<div class="vrow">${pills}</div>
       <div class="msg-actions"><button class="act-btn" data-act="copy" aria-label="Copiar respuesta">${icon('copy', 15)}<span>Copiar</span></button>
         <button class="act-btn regen hide" data-act="regen" aria-label="Regenerar respuesta">${icon('rotateCcw', 15)}<span>Regenerar</span></button>
+        ${isServerMode() ? (m.reported ? `<span class="muted rep-done">${esc(t('Reportada'))}</span>` : `<button class="act-btn" data-act="report" aria-label="${esc(t('Reportar respuesta'))}">${icon('flag', 15)}<span>${esc(t('Reportar'))}</span></button>`) : ''}
         ${analyticsOn() ? `<span class="rate-box">${m.rated ? `<span class="muted">${esc(t('Gracias por avisar'))}</span>` : `<button class="act-btn" data-act="up" aria-label="${esc(t('Útil'))}">${icon('thumbsUp', 15)}</button><button class="act-btn" data-act="down" aria-label="${esc(t('No útil'))}">${icon('thumbsDown', 15)}</button>`}</span>` : ''}</div>
       ${traceHtml(m.trace ?? [])}<div class="disc">Contenido informativo. No es asesoramiento financiero.</div>` }));
     return box;
@@ -393,6 +395,27 @@ export function createChatView(ctx: Ctx): ChatView {
     void send_(asked.prompt ?? asked.text, undefined, { echo: false, src: 'regenerate' });
   }
 
+  /** Reportar una respuesta de la IA (siempre disponible con servidor, haya o no aceptado las estadísticas: Google Play lo exige para apps con IA generativa). Se avisa qué se envía: el texto de ESA respuesta y el motivo, no la pregunta. */
+  function report(mid: string) {
+    const m = cur.data.messages.find((x) => x.id === mid);
+    if (!m || m.reported || !cur.id) return;
+    const chatId = cur.id;
+    const box = h('div');
+    box.innerHTML = `<h3 class="sheet-title">${esc(t('Reportar respuesta'))}</h3><p class="muted sheet-text">${esc(t('Se nos envía el texto de esta respuesta y el motivo, para revisarla. No enviamos tu pregunta.'))}</p>
+      <div class="act-list">${REPORT_REASONS.map(([k, label]) => `<button class="act-row" data-k="${k}"><span>${esc(t(label))}</span></button>`).join('')}</div>`;
+    const close = openSheet(box);
+    box.addEventListener('click', async (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-k]'); if (!row) return;
+      const label = REPORT_REASONS.find(([k]) => k === row.dataset.k)![1]; close();
+      try {
+        await sendFeedback('reporte', { text: `${label}\n---\n${m.text.slice(0, 700)}`, version: VERSION });
+        m.reported = true; saveChat(chatId, cur.data); track('feedback_sent', { kind: 'reporte' });
+        scroll.querySelector(`[data-mid="${mid}"] [data-act="report"]`)?.replaceWith(h('span', { class: 'muted rep-done', text: t('Reportada') }));
+        toast(t('Gracias, lo vamos a revisar'));
+      } catch { toast(t('No pude enviarlo ahora. Probá de nuevo.')); }
+    });
+  }
+
   /** 👍/👎 en una respuesta (solo con estadísticas aceptadas). Con 👎 se pregunta qué falló, con opciones cerradas: no hay texto libre. */
   function rate(mid: string, rating: 'up' | 'down') {
     const m = cur.data.messages.find((x) => x.id === mid);
@@ -422,6 +445,7 @@ export function createChatView(ctx: Ctx): ChatView {
     if (act === 'copy' && msgEl) { const m = cur.data.messages.find((x) => x.id === msgEl.dataset.mid); if (m) void copyText(m.text); }
     if (act === 'regen') regenerate();
     if ((act === 'up' || act === 'down') && msgEl) rate(msgEl.dataset.mid!, act);
+    if (act === 'report' && msgEl) report(msgEl.dataset.mid!);
   });
 
   form.addEventListener('submit', (e) => {

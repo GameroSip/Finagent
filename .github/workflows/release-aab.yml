@@ -1,0 +1,111 @@
+name: Paquete para Google Play (AAB firmado)
+
+# Genera el archivo que se sube a Google Play Console (AAB), firmado con TU clave de subida.
+# Pasos y explicación: docs/PLAY-STORE.md. Necesita 4 secretos (la clave de subida) y la variable API_BASE (la dirección del servidor).
+# Con "prueba" marcada firma con una clave descartable creada en el momento: sirve SOLO para verificar que el empaquetado funciona; Google Play la rechazaría.
+on:
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Firmar con una clave descartable (solo para verificar el empaquetado; NO sirve para subir a Play)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VITE_API_BASE: ${{ vars.API_BASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+
+      - name: Verificar lo necesario
+        env:
+          S1: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          S2: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          S3: ${{ secrets.ANDROID_KEY_ALIAS }}
+          S4: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PRUEBA: ${{ inputs.prueba }}
+        run: |
+          fail=0
+          if [ -z "$VITE_API_BASE" ]; then echo "::error::Falta la variable API_BASE (Settings → Secrets and variables → Actions → Variables): sin ella el paquete saldría sin servidor."; fail=1; fi
+          if [ "$PRUEBA" != "true" ]; then
+            for n in S1:ANDROID_KEYSTORE_BASE64 S2:ANDROID_KEYSTORE_PASSWORD S3:ANDROID_KEY_ALIAS S4:ANDROID_KEY_PASSWORD; do
+              v="${n%%:*}"; name="${n##*:}"
+              if [ -z "${!v}" ]; then echo "::error::Falta el secreto $name (ver docs/PLAY-STORE.md, paso de la clave de subida)."; fail=1; fi
+            done
+          fi
+          exit $fail
+
+      - name: Pruebas
+        run: npx vitest run
+
+      - name: Compilar la web (versión con servidor)
+        run: npm run build
+
+      - name: Generar proyecto Android
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Ícono y pantalla de inicio
+        run: npx capacitor-assets generate --android --assetPath assets
+
+      - name: Aceptar licencias del SDK de Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Clave de firma
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PRUEBA: ${{ inputs.prueba }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYPASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          KS="$RUNNER_TEMP/upload.jks"
+          if [ "$PRUEBA" = "true" ]; then
+            echo "::warning::MODO PRUEBA: clave descartable. El paquete NO sirve para subir a Google Play."
+            keytool -genkeypair -keystore "$KS" -alias prueba -keyalg RSA -keysize 2048 -validity 2 -storepass prueba123 -keypass prueba123 -dname "CN=Prueba" > /dev/null
+            echo "KEY_ALIAS=prueba" >> "$GITHUB_ENV"; echo "KEYSTORE_PASSWORD=prueba123" >> "$GITHUB_ENV"; echo "KEY_PASSWORD=prueba123" >> "$GITHUB_ENV"
+          else
+            echo "$KEYSTORE_B64" | base64 -d > "$KS"
+            echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"; echo "::add-mask::$STOREPASS"; echo "::add-mask::$KEYPASS"
+            echo "KEYSTORE_PASSWORD=$STOREPASS" >> "$GITHUB_ENV"; echo "KEY_PASSWORD=$KEYPASS" >> "$GITHUB_ENV"
+          fi
+          echo "KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
+
+      - name: Versión y firma en el proyecto Android
+        run: |
+          NAME=$(node -p "require('./package.json').version")
+          python3 scripts/android-release-config.py android/app/build.gradle "${{ github.run_number }}" "$NAME"
+
+      - name: Compilar el AAB de lanzamiento
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Verificar la firma y mostrar la huella
+        run: |
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          ls -la "$AAB"
+          jarsigner -verify "$AAB" | head -3
+          keytool -printcert -jarfile "$AAB" | grep -E "SHA256|Propietario|Owner" | head -3
+
+      - name: Publicar el AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: finagent-aab${{ inputs.prueba && '-PRUEBA-no-subir' || '' }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

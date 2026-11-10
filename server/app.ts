@@ -18,6 +18,7 @@ export interface Env {
   GEMINI_TIER?: string;             // "free" (por defecto) o "paid": define qué se le dice al usuario sobre sus datos y la capacidad
   GEMINI_RPM?: string;              // pedidos por minuto que el servidor se permite hacerle a Gemini (cuida el cupo gratuito)
   GLOBAL_DAILY_ANSWERS?: string;    // respuestas nuevas por día en total (cuida el cupo gratuito)
+  NEW_ACCOUNTS_PER_IP_DAY?: string; // cuentas nuevas por dirección IP y día (por defecto 5; en una prueba pública conviene subirlo: las operadoras móviles comparten IP entre muchos clientes)
   MAX_NEW_USERS_PER_DAY?: string;   // cuentas automáticas nuevas por día en total
   GOOGLE_CLIENT_ID?: string;        // client ID(s) de Google (separados por coma): si está, se habilita el inicio de sesión con Google
 }
@@ -38,7 +39,7 @@ const FEEDBACK_PER_DAY = 20;
 const EVENT_MAX_AGE_MS = 7 * 86_400_000;  // un evento guardado sin conexión se acepta hasta una semana después
 const DEVICE_RE = /^[A-Za-z0-9_-]{8,80}$/;
 
-const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-max-age': '86400' };
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS', 'access-control-max-age': '86400' };
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS, ...extra } });
 
@@ -94,7 +95,7 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
     let user = await store.findUser('device', deviceId);
     if (!user) {
       if (await store.peek(`new:all:${dt.day}`) >= num(env.MAX_NEW_USERS_PER_DAY, 300)) return capacity('signups', secondsToMidnight(now(), tz));
-      if (await store.peek(`new:ip:${ip}:${dt.day}`) >= NEW_ACCOUNTS_PER_IP_DAY) return json(429, { error: 'signups_ip', retryAfterSec: secondsToMidnight(now(), tz) });
+      if (await store.peek(`new:ip:${ip}:${dt.day}`) >= num(env.NEW_ACCOUNTS_PER_IP_DAY, NEW_ACCOUNTS_PER_IP_DAY)) return json(429, { error: 'signups_ip', retryAfterSec: secondsToMidnight(now(), tz) });
       user = { id: newId(), code: 'device', device_id: deviceId, plan: 'free', created_at: now().toISOString(), disabled: 0, plan_code: null };
       await store.createUser(user);
       await store.incr(`new:all:${dt.day}`, 1); await store.incr(`new:ip:${ip}:${dt.day}`, 1);
@@ -140,6 +141,13 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
   function plans(): Response {
     return json(200, { tier, plans: Object.values(PLANS).map((p) => ({ id: p.id, label: p.label, available: p.available, blurb: p.blurb, modelLabel: p.modelLabel, deepModelLabel: p.deepModelLabel ?? null,
       dailyLimit: p.dailyLimit, monthlyLimit: p.monthlyLimit, deepMonthlyLimit: p.deepMonthlyLimit, hasFallback: p.fallbacks.length > 0 })) });
+  }
+
+  /** Eliminar la cuenta y todos sus datos del servidor (lo exige Google Play y es un derecho de la persona). La sesión deja de valer en el acto. */
+  async function deleteAccount(req: Request): Promise<Response> {
+    const { user } = await authUser(req);
+    await store.deleteUser(user.id);
+    return json(200, { ok: true });
   }
 
   /** Un código de acceso desbloquea un plan (para testers): no se usa para entrar. */
@@ -344,6 +352,7 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
         case 'GET /v1/me': return await me(req);
         case 'POST /v1/plan/redeem': return await planRedeem(req);
         case 'POST /v1/interest': return await interest(req);
+        case 'DELETE /v1/account': return await deleteAccount(req);
         case 'POST /v1/consent': return await consent(req);
         case 'POST /v1/events': return await events(req);
         case 'POST /v1/feedback': return await feedback(req);

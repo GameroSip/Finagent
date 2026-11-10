@@ -5,7 +5,7 @@ import { VERSION } from '../version';
 import { setSound, soundOn } from '../ui/sfx';
 import { openAbout } from './about';
 import { openPlans } from './plans';
-import { fetchMe, isCodeShape, isServerMode, normalizeCode, PlanCodeError, planCodeMessage, quotaInfo, redeemPlanCode, googleAvailable, GoogleError, googleMessage, signInWithGoogle } from '../server';
+import { fetchMe, isCodeShape, isServerMode, normalizeCode, PlanCodeError, planCodeMessage, quotaInfo, redeemPlanCode, googleAvailable, GoogleError, googleMessage, signInWithGoogle, deleteAccount } from '../server';
 import type { Ctx, View } from '../ctx';
 import { fetchFearGreed } from '../data/market';
 import { fetchDolares, fetchRiesgoPais } from '../data/argentina';
@@ -88,6 +88,7 @@ export function createSettingsView(ctx: Ctx): View {
       <div class="set-group"><div class="set-title">Datos</div><div class="card set-card">
         <button class="set-row" id="s-clear-chats"><span class="set-ic">${icon('messageSquare', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Borrar historial de chats</div><div class="set-sub">${nChats ? `${nChats} ${nChats === 1 ? 'chat guardado' : 'chats guardados'} en este teléfono` : 'No hay chats guardados'}</div></div></button>
         <button class="set-row" id="s-clear-w"><span class="set-ic">${icon('star', 18)}</span><div class="set-main" style="flex:1;text-align:left">Borrar favoritos</div></button>
+        ${isServerMode() ? `<button class="set-row danger" id="s-delete"><span class="set-ic">${icon('trash', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">${esc(t('Eliminar mi cuenta y mis datos'))}</div><div class="set-sub">${esc(t('Borra tu cuenta y todo lo que guardamos de vos en el servidor'))}</div></div></button>` : ''}
         <button class="set-row danger" id="s-wipe"><span class="set-ic">${icon('trash', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Cerrar sesión y borrar todo</div><div class="set-sub">Elimina tu clave y tus datos de este teléfono</div></div></button>
       </div></div>
 
@@ -188,6 +189,11 @@ export function createSettingsView(ctx: Ctx): View {
       if (await confirmSheet({ title: '¿Borrar todo el historial de chats?', text: 'Se eliminan todas tus conversaciones de este teléfono. No se puede deshacer.', confirm: 'Borrar', danger: true })) { deleteAllChats(); toast('Historial borrado'); render(); }
     };
     $('#s-clear-w', el).onclick = async () => { if (await confirmSheet({ title: '¿Borrar todos tus favoritos?', confirm: 'Borrar', danger: true })) { clearWatchlist(); toast('Favoritos borrados'); } };
+    const del = el.querySelector<HTMLElement>('#s-delete');
+    if (del) del.onclick = async () => {
+      if (!(await confirmSheet({ title: t('¿Eliminar tu cuenta y tus datos?'), text: t('Se borran tu cuenta y todo lo que guardamos de vos en el servidor (uso, estadísticas, comentarios y votos), y los datos de este teléfono. No se puede deshacer.'), confirm: t('Eliminar todo'), danger: true }))) return;
+      try { await deleteAccount(); ctx.logout(); } catch { toast(t('No pude eliminar la cuenta ahora. Revisá tu conexión e intentá de nuevo.')); }     // si falla, no se borra nada del teléfono: se puede reintentar
+    };
     $('#s-wipe', el).onclick = async () => {
       if (await confirmSheet({ title: '¿Cerrar sesión y borrar todo?', text: isServerMode() ? 'Se eliminan tu sesión, tus favoritos y todos tus chats de este teléfono. No se puede deshacer.' : 'Se eliminan tu clave, tus favoritos y todos tus chats de este teléfono. No se puede deshacer.', confirm: 'Borrar todo', danger: true })) ctx.logout();
     };

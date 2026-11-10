@@ -10,7 +10,7 @@ export const AI_TOOLS = ['search_ticker', 'get_quote', 'get_fundamentals', 'get_
 export const CHART_TOOLS = ['ema20', 'ema50', 'ema200', 'bollinger', 'fib', 'pivots', 'vwap', 'profile', 'sessions', 'volume', 'rsi', 'macd'] as const;
 /** Funciones que todavía NO existen y sobre las que se mide interés (ver "Qué te gustaría que sumemos" en Ajustes). */
 export const FEATURES = ['cartera', 'calculadora', 'alertas', 'cuentas', 'ejecucion', 'recomendaciones', 'tiempo_real'] as const;
-export const FEEDBACK_KINDS = ['idea', 'problema', 'falta', 'nps'] as const;
+export const FEEDBACK_KINDS = ['idea', 'problema', 'falta', 'nps', 'reporte'] as const;   // 'reporte': la persona señala una respuesta de la IA (ofensiva, peligrosa o engañosa); lo exige la política de IA generativa de Google Play
 
 const SYM = /^[A-Z0-9.\-^=]{1,16}$/, QUERY = /^[a-z0-9.\-^=]{1,24}$/, VERSION = /^\d{1,2}\.\d{1,2}\.\d{1,2}$/;
 

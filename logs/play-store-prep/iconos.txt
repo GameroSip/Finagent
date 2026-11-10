@@ -1,0 +1,20 @@
+  ✔ una acción conocida (AAPL) muestra su logo cargado 
+  ✔ una cripto (BTC-USD) muestra su ícono desde la biblioteca pública 
+  ✔ una miniatura borrosa (MSFT: 16 px) se rechaza y queda el monograma 
+  ✔ un ticker sin empresa conocida (ZZZZ) muestra el monograma y no pide ningún logo a ningún servicio de imágenes 
+  ✔ una cripto sin ícono (DOGE-USD) prueba las dos fuentes y se queda con el monograma 
+  ✔ índice, divisa y materia prima usan bandera/emoji (sin red) 
+  ✔ sin desborde horizontal en I1-favoritos-iconos 
+  ✔ se recuerdan los logos que funcionaron (AAPL, BTC-USD) 
+  ✔ se recuerdan los que fallaron (DOGE-USD, MSFT) para no volver a pedirlos 
+  ✔ al volver a la lista NO se repiten los pedidos de los logos que ya fallaron 
+  ✔ y los que funcionaron siguen mostrándose 
+  ✔ las tarjetas de índices muestran su bandera (S&P 500 y Nasdaq: EE.UU.; Merval: Argentina) 
+  ✔ "Mercados del mundo" abre con índices de Europa, Asia y América 
+  ✔ en Cripto aparecen Bitcoin y Ethereum con su ícono cargado 
+  ✔ en Divisas cada par muestra la bandera de su moneda 
+  ✔ en Materias primas, el oro y el petróleo con su emoji 
+  ✔ sin desborde horizontal en I2-mercados-mundo 
+
+RESULTADO (íconos): 17/17 verificaciones OK
+ERRORES DE PÁGINA: []

@@ -8,7 +8,7 @@ export const TOUR: TourSlide[] = [
   { id: 'world', title: 'Mercados del mundo', text: 'Acciones, ETF, cripto, divisas, índices y materias primas de la mayoría de las bolsas, con herramientas especiales para Argentina: dólar, brecha, riesgo país y CEDEARs.',
     bullets: ['Algunos mercados o activos pueden no estar disponibles y los precios pueden tener demora.'] },
   { id: 'verified', title: 'Cada cifra, verificada', text: 'La IA redacta, pero no calcula. Los números salen de las herramientas de FinAgent y un verificador controla cada cifra antes de mostrártela. Si algo no se puede respaldar, se corrige o se quita.' },
-  { id: 'better', title: 'Por qué es mejor que una IA común', text: 'Una IA sin conectores responde de memoria y puede inventar números. FinAgent trabaja distinto:',
+  { id: 'better', title: 'En qué se diferencia de una IA común', text: 'Una IA sin herramientas de datos responde de memoria y puede inventar números. FinAgent trabaja distinto:',
     bullets: ['Usa datos reales y actualizados, no la memoria de la IA.', 'Calcula con herramientas: porcentajes, indicadores y comparaciones exactas.', 'Muestra la fuente y la fecha de cada dato.', 'Avisa cuando no tiene un dato, en lugar de inventarlo.'] },
   { id: 'charts', title: 'Gráficos de nivel profesional', text: 'Fibonacci, sesiones de mercado, perfil de volumen, RSI, MACD y más. Todo gratis, para explorar a tu ritmo.' },
   { id: 'backing', title: 'Qué hay detrás', text: 'Es importante que sepas en qué se apoya lo que ves:',

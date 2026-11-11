@@ -5,6 +5,7 @@ import { esc, h, toast } from '../ui/dom';
 import { icon } from '../ui/icons';
 import { openSheet } from '../ui/sheet';
 import { t } from '../i18n';
+import { brandOf } from '../brand';
 
 export async function openPlans(): Promise<void> {
   if (!isServerMode()) { toast('Los planes están disponibles en la versión con cuenta.'); return; }
@@ -19,7 +20,7 @@ export async function openPlans(): Promise<void> {
     return `<div class="plan-card${featured ? ' feat' : ''}">
       <div class="plan-badge">${isMine ? 'Tu plan actual' : featured ? 'El más completo' : 'Para empezar'}</div>
       <div class="plan-top"><div class="plan-name">${esc(t(p.label))}</div><div class="plan-mult"><b>${pitch.multiplier >= 2 ? `${pitch.multiplier}x` : '+'}</b><span>${pitch.multiplier >= 2 ? 'más usos que el plan gratuito' : 'más usos'}</span></div></div>
-      <div class="plan-model">${icon('zap', 15)} ${esc(p.modelLabel)}</div>
+      <div class="plan-model">${icon('zap', 15)} ${esc(brandOf(p.modelLabel))}</div>
       <ul class="plan-ul">${pitch.benefits.map((b) => `<li>${icon('check', 16)}<span>${esc(b)}</span></li>`).join('')}</ul>
       ${isMine ? '' : `<button class="btn ${featured ? 'btn-primary' : 'btn-ghost'} btn-block" data-plan="${esc(p.id)}" ${anotado && !p.available ? 'disabled' : ''}>${p.available ? 'Suscribirme' : anotado ? 'Anotado ✓' : 'Avisame cuando esté disponible'}</button>
       ${p.available ? '' : '<div class="plan-foot">Todavía no se puede contratar ni tiene precio definido. Anotarte no te compromete a nada.</div>'}`}</div>`;
@@ -31,7 +32,7 @@ export async function openPlans(): Promise<void> {
     ${paid.map((p, i) => card(p, i === paid.length - 1)).join('')}
     <div class="plans-free"><h3>${icon('badgeCheck', 18)} Gratis para siempre</h3><ul>${FREE_FOREVER.map((t) => `<li>${icon('check', 15)}<span>${esc(t)}</span></li>`).join('')}</ul></div>
     <div style="overflow-x:auto"><table class="plans-cmp"><thead><tr><th></th>${[free, ...paid].map((p) => `<th>${esc(t(p.label))}</th>`).join('')}</tr></thead><tbody>
-      ${row('Usos con IA', mult)}${row('Modelo', (p) => esc(p.modelLabel))}${row('Análisis profundo', (p) => (p.deepModelLabel ? '✓' : '—'))}${row('Gráficos y herramientas', () => '✓')}${row('Mercados del mundo', () => '✓')}
+      ${row('Usos con IA', mult)}${row('Nivel de IA', (p) => esc(brandOf(p.modelLabel)))}${row('Análisis profundo', (p) => (p.deepModelLabel ? '✓' : '—'))}${row('Gráficos y herramientas', () => '✓')}${row('Mercados del mundo', () => '✓')}
     </tbody></table></div>`;
   el.addEventListener('click', async (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-plan]');

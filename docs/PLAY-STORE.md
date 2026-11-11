@@ -93,13 +93,13 @@ Cifrado en tránsito: **Sí**. Solicitud de eliminación: **Sí** (en la app y e
 ### 3. Ficha de la tienda 👤 (textos listos)
 - **Nombre:** FinAgent
 - **Descripción breve (≤80):** `Mercados, gráficos y asistente de IA con fuentes. Información educativa.`  (72 caracteres)
-- **Descripción completa** (1399 caracteres de 4.000):
+- **Descripción completa** (1449 caracteres de 4.000):
 ```
 FinAgent te ayuda a entender los mercados sin que nada te empuje a operar.
 
 • Mercados del mundo: índices, acciones, ETF, criptomonedas, divisas y materias primas, con gráficos y herramientas técnicas.
 • Contexto argentino: dólar y brecha, riesgo país y CEDEARs.
-• Asistente de IA: responde con datos consultados en el momento, muestra la fuente y la fecha de cada cifra y quita las que no puede respaldar.
+• FinAgent AI: nuestro asistente, construido sobre Gemini de Google. Responde con datos consultados en el momento, muestra la fuente y la fecha de cada cifra y quita las que no puede respaldar.
 • Movimiento esperado de la semana: un rango de volatilidad calculado con un modelo que probamos con datos históricos. No predice hacia dónde irá el precio.
 • Termómetro de tensión: cuenta señales de estrés de un activo y muestra qué pasó históricamente después.
 • Mi plan: escribí qué vas a hacer cuando haya tensión; queda solo en tu teléfono.

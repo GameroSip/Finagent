@@ -23,10 +23,10 @@ describe('lo que se promete de cada plan sale de sus límites reales', () => {
   });
   it('solo enumera ventajas que el plan realmente tiene', () => {
     const plus = entry({ id: 'plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10, hasFallback: true }), pro = entry({ id: 'pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, deepModelLabel: 'Gemini 3.1 Pro', hasFallback: true });
-    expect(planPitch(plus, FREE).benefits).toEqual(['Un modelo más potente: Gemini 3.8 Flash', 'Respaldo automático si el modelo principal está saturado', 'Sin recordatorios de planes']);
-    expect(planPitch(pro, FREE).benefits).toContain('Análisis profundo con Gemini 3.1 Pro');
+    expect(planPitch(plus, FREE).benefits).toEqual(['Un nivel de IA más potente: FinAgent AI Avanzado', 'Respaldo automático si el modelo principal está saturado', 'Sin recordatorios de planes']);
+    expect(planPitch(pro, FREE).benefits).toContain('Análisis profundo (FinAgent AI Profundo)');
     expect(planPitch(plus, FREE).benefits.join()).not.toMatch(/profundo/);                     // Plus no tiene análisis profundo
-    expect(planPitch({ ...plus, modelLabel: FREE.modelLabel, hasFallback: false }, FREE).benefits.join()).not.toMatch(/más potente|Respaldo/);   // mismo modelo: no dice "más potente"
+    expect(planPitch({ ...plus, modelLabel: FREE.modelLabel, hasFallback: false }, FREE).benefits.join()).not.toMatch(/más potente|Respaldo/);   // mismo nivel: no dice "más potente"
   });
   it('lo que sigue gratis son funciones que existen hoy', () => {
     expect(FREE_FOREVER.length).toBeGreaterThanOrEqual(5);

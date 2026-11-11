@@ -21,6 +21,7 @@ import { renderRich, type Rich } from './cards';
 import { openHistory } from './history';
 import { analyticsOn, track } from '../analytics';
 import { RATE_REASONS, REPORT_REASONS } from '../betaTexts';
+import { answerTier } from '../brand';
 import { VERSION } from '../version';
 import { AI_TOOLS, lenBucket } from '../telemetry';
 import { t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
@@ -86,7 +87,7 @@ export function createChatView(ctx: Ctx): ChatView {
     </div>
     <div class="chat-scroll" id="c-scroll"></div>
     <form class="composer" id="c-form" autocomplete="off">
-      <textarea id="c-in" rows="1" placeholder="Preguntale algo a tu analista…" enterkeyhint="send"></textarea>
+      <textarea id="c-in" rows="1" placeholder="Preguntale algo a FinAgent AI…" enterkeyhint="send"></textarea>
       <button class="send" id="c-send" type="submit" aria-label="Enviar" disabled>${icon('arrowUp', 20)}</button>
     </form>`;
   const scroll = $('#c-scroll', el), input = $<HTMLTextAreaElement>('#c-in', el), send = $<HTMLButtonElement>('#c-send', el), form = $<HTMLFormElement>('#c-form', el);
@@ -186,7 +187,7 @@ export function createChatView(ctx: Ctx): ChatView {
         <button class="act-btn regen hide" data-act="regen" aria-label="Regenerar respuesta">${icon('rotateCcw', 15)}<span>Regenerar</span></button>
         ${isServerMode() ? (m.reported ? `<span class="muted rep-done">${esc(t('Reportada'))}</span>` : `<button class="act-btn" data-act="report" aria-label="${esc(t('Reportar respuesta'))}">${icon('flag', 15)}<span>${esc(t('Reportar'))}</span></button>`) : ''}
         ${analyticsOn() ? `<span class="rate-box">${m.rated ? `<span class="muted">${esc(t('Gracias por avisar'))}</span>` : `<button class="act-btn" data-act="up" aria-label="${esc(t('Útil'))}">${icon('thumbsUp', 15)}</button><button class="act-btn" data-act="down" aria-label="${esc(t('No útil'))}">${icon('thumbsDown', 15)}</button>`}</span>` : ''}</div>
-      ${traceHtml(m.trace ?? [])}<div class="disc">Contenido informativo. No es asesoramiento financiero.</div>` }));
+      ${traceHtml(m.trace ?? [])}<div class="disc">Contenido informativo. No es asesoramiento financiero.</div>${tierLine(m)}` }));
     return box;
   }
 
@@ -315,7 +316,7 @@ export function createChatView(ctx: Ctx): ChatView {
     if (!chatExists(chatId)) return; // el chat se eliminó mientras se respondía
     const data = dataOf(chatId);
     const am: StoredMsg = {
-      id: newId(), role: 'ai', at: Date.now(), text: res.answer, model: res.model,
+      id: newId(), role: 'ai', at: Date.now(), text: res.answer, model: res.model, planModel: isServerMode() ? quotaInfo().plan?.modelLabel : undefined,
       verification: { checked: res.verification.checked, ok: res.verification.ok, unverified: res.verification.unverified.map((u) => u.text) },
       flags: { ...(res.corrected ? { corrected: true } : {}), ...(res.truncated ? { truncated: true } : {}), ...(res.redacted ? { redacted: res.redacted } : {}) },
       trace: traceOf(res.toolCalls), ui: uiOf(res.toolCalls),
@@ -393,6 +394,13 @@ export function createChatView(ctx: Ctx): ChatView {
     scroll.querySelector(`[data-mid="${last.id}"]`)?.remove();
     saveChat(cur.id, cur.data);
     void send_(asked.prompt ?? asked.text, undefined, { echo: false, src: 'regenerate' });
+  }
+
+  /** Pie de cada respuesta (solo con servidor): qué nivel de FinAgent AI respondió; y si fue un nivel menor que el del plan, lo dice y por qué. */
+  function tierLine(m: StoredMsg): string {
+    const n = isServerMode() && m.model ? answerTier(m.model, m.planModel) : null;
+    if (!n) return '';
+    return `<div class="tier-line${n.fallback ? ' fb' : ''}">${esc(n.fallback ? t('Respondió {n} porque {p} no estaba disponible en ese momento.', { n: n.used, p: n.plan }) : t('Respondió {n}', { n: n.used }))}</div>`;
   }
 
   /** Reportar una respuesta de la IA (siempre disponible con servidor, haya o no aceptado las estadísticas: Google Play lo exige para apps con IA generativa). Se avisa qué se envía: el texto de ESA respuesta y el motivo, no la pregunta. */

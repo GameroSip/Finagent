@@ -133,6 +133,7 @@ export class SqlStore implements UsageStore {
       rows: names.length ? await this.sql.all(`SELECT user_id, day, name, props FROM events WHERE day >= ? AND name IN (${marks})`, sinceDay, ...names) : [],
       feedback: await this.sql.all('SELECT id, user_id, ts, kind, score, text, version FROM feedback ORDER BY ts DESC LIMIT 400'),
       interest: await this.interestCounts(),
+      calls: await this.sql.all('SELECT c.model AS model, u.plan AS plan, COUNT(*) AS n FROM calls c JOIN users u ON u.id = c.user_id WHERE c.ts >= ? GROUP BY c.model, u.plan', Date.parse(`${sinceDay}T00:00:00Z`)),
     };
   }
   async eventsCsvRows(sinceDay: string, limit: number): Promise<Array<{ user_id: string; ts: number; day: string; name: string; props: string | null }>> {

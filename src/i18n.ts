@@ -48,6 +48,8 @@ export function translateText(text: string): string {
 
 // ------------------------------------------------------------------ traducción automática del HTML
 const SKIP = 'script,style,input,textarea,[data-notrans],.md,.m-user,.bubble-user';
+/** Para los ATRIBUTOS (placeholder, aria-label…): igual que SKIP pero SIN input ni textarea, porque su texto de ayuda sí se traduce (lo que escribe la persona está en el contenido, no en el atributo). */
+const SKIP_ATTR = 'script,style,[data-notrans],.md,.m-user,.bubble-user';
 const ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
 function textNodes(root: Node, fn: (n: Text) => void) {
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -58,7 +60,7 @@ function translateTree(root: Node) {
   if (root.nodeType !== Node.ELEMENT_NODE) return;
   textNodes(root, (n) => { const v = translateText(n.nodeValue ?? ''); if (v !== n.nodeValue) n.nodeValue = v; });
   const els = [root as Element, ...(root as Element).querySelectorAll('*')];
-  for (const el of els) { if (el.closest(SKIP)) continue; for (const a of ATTRS) { const v = el.getAttribute(a); if (v) { const tr = translateText(v); if (tr !== v) el.setAttribute(a, tr); } } }
+  for (const el of els) { if (el.closest(SKIP_ATTR)) continue; for (const a of ATTRS) { const v = el.getAttribute(a); if (v) { const tr = translateText(v); if (tr !== v) el.setAttribute(a, tr); } } }
 }
 /** Traduce lo que ya está en pantalla y todo lo que se agregue después (hojas, avisos, listas que se redibujan). En español no cambia nada. */
 export function startDomTranslation(): void {
@@ -68,7 +70,7 @@ export function startDomTranslation(): void {
     for (const m of muts) {
       if (m.type === 'childList') m.addedNodes.forEach(translateTree);
       else if (m.type === 'characterData') translateTree(m.target);
-      else if (m.target instanceof Element && !m.target.closest(SKIP)) { const v = m.target.getAttribute(m.attributeName!); if (v) { const tr = translateText(v); if (tr !== v) m.target.setAttribute(m.attributeName!, tr); } }
+      else if (m.target instanceof Element && !m.target.closest(SKIP_ATTR)) { const v = m.target.getAttribute(m.attributeName!); if (v) { const tr = translateText(v); if (tr !== v) m.target.setAttribute(m.attributeName!, tr); } }
     }
   }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
 }

@@ -193,3 +193,7 @@ h1, h2, h3 { letter-spacing: -.01em; }
 .wish .btn { flex: none; white-space: nowrap; }
 .rate-box { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; font-size: 13px; }
 .rep-done { font-size: 12.5px; margin-left: 4px; }
+
+/* ---- nivel que respondió */
+.tier-line { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+.tier-line.fb { color: var(--text-2); }

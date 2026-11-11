@@ -86,7 +86,7 @@ export function createChatView(ctx: Ctx): ChatView {
     </div>
     <div class="chat-scroll" id="c-scroll"></div>
     <form class="composer" id="c-form" autocomplete="off">
-      <textarea id="c-in" rows="1" placeholder="Preguntale algo a tu analista…" enterkeyhint="send"></textarea>
+      <textarea id="c-in" rows="1" placeholder="Preguntale algo a FinAgent AI…" enterkeyhint="send"></textarea>
       <button class="send" id="c-send" type="submit" aria-label="Enviar" disabled>${icon('arrowUp', 20)}</button>
     </form>`;
   const scroll = $('#c-scroll', el), input = $<HTMLTextAreaElement>('#c-in', el), send = $<HTMLButtonElement>('#c-send', el), form = $<HTMLFormElement>('#c-form', el);

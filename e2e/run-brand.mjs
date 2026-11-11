@@ -1,0 +1,39 @@
+// La marca "FinAgent AI" de punta a punta (app con servidor): niveles de IA con nombre de FinAgent en lugar del nombre del modelo de Google,
+// y siempre a la vista que corre sobre Gemini. Verifica español e inglés.
+//   VITE_API_BASE=https://api.finagent.test npx vite build --outDir dist-server --emptyOutDir
+//   cd e2e && node run-brand.mjs ../dist-server ../e2e-shots
+import * as M from './mocks.mjs';
+import { browser, check, checks, log, newPage, server, shot, sleep, tab } from './run.mjs';
+
+const text = (p, sel) => p.$eval(sel, (e) => e.innerText).catch(() => '');
+const click = (p, sel) => p.evaluate((s) => document.querySelector(s).click(), sel);
+
+for (const [lang, L] of [['es', { lvl: /Nivel de IA/, fast: 'FinAgent AI Rápido', adv: 'FinAgent AI Avanzado', pow: /Impulsado por Gemini de Google/, what: /Qué es FinAgent AI/i, ph: 'Preguntale algo a FinAgent AI…', eng: /Motor FinAgent v1\.0/ }], ['en', { lvl: /AI level/, fast: 'FinAgent AI Fast', adv: 'FinAgent AI Advanced', pow: /Powered by Google Gemini/, what: /What FinAgent AI is/i, ph: 'Ask FinAgent AI something…', eng: /Engine FinAgent v1\.0/ }]]) {
+  M.resetApi();
+  const p = await newPage({ key: '', intro: false, analytics: '0', lang, clean: true });
+  await p.waitForSelector('.tabbar', { timeout: 20000 }); await sleep(800);
+  await tab(p, 'chat'); await sleep(500);
+  check(`[${lang}] el cuadro de texto del chat dice "${L.ph}"`, (await p.$eval('#c-in', (e) => e.placeholder)) === L.ph, await p.$eval('#c-in', (e) => e.placeholder));
+  await tab(p, 'settings'); await sleep(700);
+  const row = await text(p, '#s-model') , setTxt = await text(p, '.view.active, body');
+  check(`[${lang}] Ajustes muestra el nivel del plan con nombre de FinAgent ("${L.fast}"), no el nombre del modelo de Google`, row === L.fast && L.lvl.test(setTxt) && !/Gemini 3\.5/.test(await p.$eval('#s-model', (e) => e.closest('.set-row').innerText)), row);
+  await p.evaluate(() => document.querySelector('#s-plans-open')?.scrollIntoView({ block: 'center' })); await sleep(300);
+  await click(p, '#s-plans-open'); await p.waitForSelector('.plans-sheet .plan-card', { timeout: 6000 }); await sleep(600); await shot(p, `BR-${lang}-planes`);
+  const plans = await text(p, '.plans-sheet');
+  check(`[${lang}] la pantalla de planes muestra los niveles (${L.fast}, ${L.adv}) y NO los nombres de modelo de Google`, plans.includes(L.fast) && plans.includes(L.adv) && !/Gemini 3\.\d|Flash-Lite/.test(plans), plans.slice(0, 120));
+  check(`[${lang}] la tabla comparativa tiene la fila "${L.lvl.source.replace(/\\/g, '')}" y el beneficio dice que el nivel es más potente`, L.lvl.test(await text(p, '.plans-cmp')) && /más potente|more powerful/.test(plans));
+  await p.keyboard.press('Escape'); await p.evaluate(() => { const b = document.querySelector('.sheet-back'); if (b) b.click(); }); await sleep(500);
+  await p.evaluate(() => document.querySelector('#s-about')?.scrollIntoView({ block: 'center' })); await sleep(300);
+  await click(p, '#s-about'); await p.waitForSelector('.about-sheet', { timeout: 6000 }); await sleep(700); await shot(p, `BR-${lang}-acerca`);
+  const about = await text(p, '.about-sheet');
+  check(`[${lang}] "Acerca de" explica qué es FinAgent AI y dice, a la vista, que corre sobre Gemini de Google`, L.what.test(about) && L.pow.test(about) && /FinAgent AI/.test(about) && /Gemini/.test(about));
+  check(`[${lang}] muestra la versión del motor junto a la versión de la app`, L.eng.test(about), about.match(/Motor[^\n]*|Engine[^\n]*/)?.[0]);
+  check(`[${lang}] aclara que los niveles son nombres de FinAgent para modelos Gemini de distinto tamaño, y que no se modifica el modelo de lenguaje`, /(Gemini)[^]{0,80}(tamaño|sizes)/.test(about) && /(no entrena ni ajusta el modelo|does not modify the language model)/.test(about));
+  if (lang === 'en') check('[en] no quedan textos en español en lo nuevo', !/[¿¡ñ]|\b(Impulsado|Qué es|Nivel de|Rápido|Avanzado|Profundo|Motor)\b/.test(about + plans + setTxt), (about + plans).match(/[¿¡ñ]|\b(Impulsado|Qué es|Nivel de|Rápido|Avanzado|Profundo|Motor)\b/)?.[0]);
+  await p.close();
+}
+const bad = checks.filter((x) => !x.ok);
+console.log(`\nRESULTADO (marca FinAgent AI): ${checks.length - bad.length}/${checks.length} verificaciones OK`);
+console.log('ERRORES DE PÁGINA:', JSON.stringify(log.errors, null, 1));
+await browser.close(); server.close();
+process.exit(bad.length || log.errors.length ? 1 : 0);

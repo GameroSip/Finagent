@@ -1,5 +1,6 @@
 // "Acerca de FinAgent": cómo funciona, qué hay detrás, en qué se diferencia de una IA común, cobertura, privacidad y límites. Todo texto sale de ABOUT / TOUR (controlados por pruebas).
 import { ABOUT } from '../about';
+import { AGENT_NAME, ENGINE_LABEL, POWERED_BY } from '../brand';
 import { BACKING } from '../content/tour';
 import { t } from '../i18n';
 import { googleAvailable, isServerMode, quotaInfo } from '../server';
@@ -25,7 +26,8 @@ export const VS: Array<[string, string, string]> = [
 export function openAbout(o: { version: string; onReplayIntro?: () => void }): void {
   const server = isServerMode(), q = quotaInfo();
   const el = h('div', { class: 'about-sheet' });
-  el.innerHTML = `<div class="about-hero">${markSvg(40)}<h2>FinAgent</h2><div class="about-ver" data-notrans>${esc(t('Versión'))} ${esc(o.version)}</div><p>${esc(ABOUT.what)}</p></div>
+  el.innerHTML = `<div class="about-hero">${markSvg(40)}<h2>FinAgent</h2><div class="about-ver" data-notrans>${esc(t('Versión'))} ${esc(o.version)} · ${esc(ENGINE_LABEL())}</div><p>${esc(ABOUT.what)}</p></div>
+    <section class="about-sec"><h3>${icon('badgeCheck', 18)} ${esc(t('Qué es FinAgent AI'))}</h3><p class="about-p"><b>${esc(AGENT_NAME)}</b> · ${esc(t(POWERED_BY))}</p><p class="about-p">${esc(ABOUT.engine)}</p><p class="about-p">${esc(ABOUT.tiers)}</p></section>
     <section class="about-sec"><h3>${icon('activity', 18)} ${esc(t('Cómo funciona'))}</h3>
       <div class="flow">${FLOW.map((f, i) => `<div class="flow-node" style="--d:${i * 0.12}s"><span class="flow-ic">${icon(f.ic, 20)}</span><div><b>${esc(t(f.title))}</b><span>${esc(t(f.text))}</span></div></div>${i < FLOW.length - 1 ? '<i class="flow-line"></i>' : ''}`).join('')}</div></section>
     <section class="about-sec"><h3>${icon('layers', 18)} ${esc(t('Qué hay detrás'))}</h3>

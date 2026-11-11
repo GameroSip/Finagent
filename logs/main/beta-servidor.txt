@@ -8,8 +8,8 @@
   ✔ sin desborde horizontal en S2-chat-vacio 
   ✔ "Ver planes" abre la pantalla de planes (Plus y Pro) 
   ✔ el multiplicador sale de los límites reales: Plus 3x (10 contra 3) y Pro 10x (30 contra 3) 
-  ✔ Pro ofrece análisis profundo con Gemini 3.1 Pro y Plus no (solo ventajas reales) 
-  ✔ explica por qué pagar: modelo más potente, respaldo automático y sin recordatorios 
+  ✔ Pro ofrece análisis profundo (nivel FinAgent AI Profundo) y Plus no (solo ventajas reales) 
+  ✔ explica por qué pagar: un nivel de IA más potente, respaldo automático y sin recordatorios 
   ✔ destaca lo que sigue gratis y compara los planes 
   ✔ aclara con honestidad que todavía no se puede contratar ni tiene precio 
   ✔ sin desborde horizontal en S2b-planes 
@@ -34,13 +34,13 @@
   ✔ ofrece "Ver mercados" y "Ver planes" 
   ✔ sin desborde horizontal en S5-limite 
   ✔ "Ver mercados" lleva a Mercados 
-  ✔ Ajustes muestra el plan, el modelo fijo y las conversaciones 
+  ✔ Ajustes muestra el plan, el nivel de IA fijo (con nombre de FinAgent) y las conversaciones 
   ✔ muestra el aviso del nivel gratuito de Gemini 
   ✔ Ajustes invita a ver los planes (Plus y Pro, próximamente) 
   ✔ NO hay ninguna clave de Gemini en Ajustes 
   ✔ sin desborde horizontal en S6-ajustes-plan 
   ✔ desde Ajustes también se abre la pantalla de planes, y recuerda que ya te anotaste en Plus 
-  ✔ el código desbloquea el plan Plus con su modelo más potente 
+  ✔ el código desbloquea el plan Plus con su nivel más potente (FinAgent AI Avanzado) 
   ✔ y el chat lo refleja: Plan Plus con 7 conversaciones (10 - 3 ya usadas) 
   ✔ sin desborde horizontal en S7-plan-plus 
   ✔ al reabrir entra directo y NO crea otra cuenta 

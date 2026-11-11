@@ -18,6 +18,7 @@ export const ABOUT = {
   privacy: 'Tus preguntas se envían a Google (Gemini) con tu propia clave. FinAgent no tiene servidor propio ni guarda tus datos fuera de tu teléfono.',
   // Versión con servidor (beta): las consultas pasan por servidores de FinAgent. Es verdad porque el servidor registra solo números, nunca el texto (lo verifica tests/server.test.ts).
   privacyServer: 'Tus preguntas se procesan en los servidores de FinAgent y se envían a Google (Gemini) para generar la respuesta. FinAgent no guarda el texto de tus consultas en el servidor: solo cuenta cuántas hacés y cuántos tokens usan, para aplicar los límites de tu plan. Tu historial queda en este teléfono.',
+  vsNote: 'Algunas IA también usan búsqueda o herramientas. La diferencia de FinAgent es que además verifica cada cifra antes de mostrártela.',
   engine: 'FinAgent AI es el asistente de FinAgent. Está construido sobre modelos Gemini de Google y lo completan herramientas de datos de mercado, un verificador de cifras y modelos de volatilidad propios. FinAgent no entrena ni ajusta el modelo de lenguaje: usa los de Google tal como son.',
   tiers: 'Los niveles Rápido, Avanzado y Profundo son nombres de FinAgent para modelos Gemini de distinto tamaño. Si el nivel de tu plan no está disponible en ese momento, se usa uno menor.',
   deletion: 'Podés eliminar tu cuenta y todos tus datos del servidor cuando quieras: Ajustes → Eliminar mi cuenta y mis datos.',
@@ -30,7 +31,7 @@ export const ABOUT = {
 };
 
 /** Todo el texto visible de la presentación, en una lista (para controlarlo). */
-export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyStats, ABOUT.deletion, ABOUT.engine, ABOUT.tiers, POWERED_BY, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
+export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyStats, ABOUT.deletion, ABOUT.engine, ABOUT.tiers, ABOUT.vsNote, POWERED_BY, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
 
 /** Frases que NO pueden aparecer en la presentación de la app mientras no sean ciertas. */
 export const FORBIDDEN_CLAIMS: Array<[string, RegExp]> = [
@@ -39,5 +40,6 @@ export const FORBIDDEN_CLAIMS: Array<[string, RegExp]> = [
   ['dice que Google o DeepMind la respaldan o avalan', /(respaldad[oa]|avalad[oa]|certificad[oa]|patrocinad[oa])\s+por\s+(google|deepmind)|alianza\s+con\s+google/i],
   ['dice que usa varias IA sin que sea así', /varias\s+(ia|ias|inteligencias)|m[úu]ltiples\s+(ia|modelos)|respaldos?\s+de\s+otras\s+ia/i],
   ['promete cobertura total o datos en tiempo real', /todos\s+los\s+mercados|cobertura\s+(total|completa)|\ben\s+tiempo\s+real\b/i],
+  ['dice que es mejor que otras IA (afirmación de superioridad que no se puede sostener)', /mejor\s+que\s+(chatgpt|gemini|claude|una\s+ia|cualquier|las\s+dem[áa]s|otras\s+ia)|la\s+mejor\s+ia|n[úu]mero\s+(1|uno)\b|\b#1\b|supera\s+a\s+(chatgpt|otras|las\s+dem)/i],
   ['promete precisión absoluta', /100\s*%\s*(preciso|exacto|confiable|seguro)|sin\s+errores|garantiz/i],
 ];

@@ -17,10 +17,11 @@ export const FLOW: Array<{ ic: IconName; title: string; text: string }> = [
   { ic: 'badgeCheck', title: 'Tu respuesta', text: 'Con la fuente y la fecha de cada dato.' },
 ];
 export const VS: Array<[string, string, string]> = [
-  ['Datos', 'De memoria, pueden estar viejos', 'Reales y actualizados'],
-  ['Cálculos', 'Aproximados', 'Exactos, con herramientas'],
-  ['Fuente', 'No suele citarla', 'Fuente y fecha de cada dato'],
-  ['Si no sabe', 'Puede inventar', 'Te lo dice'],
+  ['Datos', 'Responde de memoria: pueden estar viejos', 'Consulta datos reales y actualizados'],
+  ['Cálculos', 'Los hace "de cabeza" y puede errar', 'Los hace con herramientas, con exactitud'],
+  ['Fuente', 'Puede no citar la fuente', 'Fuente y fecha de cada dato'],
+  ['Cifras', 'Nadie las controla', 'Un verificador las compara con los datos'],
+  ['Si no sabe', 'Puede inventar', 'Si una cifra no se puede respaldar, se corrige o se quita'],
 ];
 
 export function openAbout(o: { version: string; onReplayIntro?: () => void }): void {
@@ -36,8 +37,8 @@ export function openAbout(o: { version: string; onReplayIntro?: () => void }): v
       <div class="back-row"><span class="back-k">${esc(t('Gráficos'))}</span><span class="chip3" data-notrans>${esc(BACKING.charts)}</span></div>
       <p class="about-p">${esc(t('IA: modelos Gemini de Google, desarrollados por Google DeepMind. FinAgent es independiente de Google.'))}</p>
       <p class="about-p">${esc(t('Datos: Yahoo Finance, DolarAPI, ArgentinaDatos, Google News y alternative.me. Son fuentes públicas y gratuitas, sin acuerdos comerciales: pueden tener demora o errores.'))}</p></section>
-    <section class="about-sec"><h3>${icon('scale', 18)} ${esc(t('FinAgent frente a una IA común'))}</h3>
-      <table class="vs-tbl"><thead><tr><th></th><th>${esc(t('IA común'))}</th><th>FinAgent</th></tr></thead><tbody>${VS.map(([k, a, b]) => `<tr><th>${esc(t(k))}</th><td>${esc(t(a))}</td><td class="good">${esc(t(b))}</td></tr>`).join('')}</tbody></table></section>
+    <section class="about-sec"><h3>${icon('scale', 18)} ${esc(t('FinAgent frente a una IA sin herramientas'))}</h3>
+      <table class="vs-tbl"><thead><tr><th></th><th>${esc(t('IA sin herramientas'))}</th><th>FinAgent</th></tr></thead><tbody>${VS.map(([k, a, b]) => `<tr><th>${esc(t(k))}</th><td>${esc(t(a))}</td><td class="good">${esc(t(b))}</td></tr>`).join('')}</tbody></table><p class="about-p vs-note">${esc(ABOUT.vsNote)}</p></section>
     <section class="about-sec"><h3>${icon('globe', 18)} ${esc(t('Cobertura'))}</h3><p class="about-p">${esc(ABOUT.coverage)}</p></section>
     <section class="about-sec"><h3>${icon('lock', 18)} ${esc(t('Tu privacidad'))}</h3><p class="about-p">${esc(server ? ABOUT.privacyServer : ABOUT.privacy)}</p>${server ? `<p class="about-p">${esc(ABOUT.privacyStats)}</p><p class="about-p">${esc(ABOUT.deletion)}</p>` : ''}
       ${server && googleAvailable() ? `<p class="about-p">${esc(ABOUT.privacyGoogle)}</p>` : ''}${server && q.tier === 'free' ? `<p class="about-p">${esc(ABOUT.freeTier)}</p>` : ''}</section>

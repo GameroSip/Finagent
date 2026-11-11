@@ -67,7 +67,7 @@ for (let i = 0; i < 7; i++) {
   if (i === 3 || i === 5) await shot(p, `T4-tour-${i}`);
   if (i < 6) await click(p, '#t-next');
 }
-check('el recorrido tiene 7 diapositivas, todas en portugués', titles.length === 7 && titles[0] === 'Seu analista financeiro com IA' && titles[1] === 'Mercados do mundo' && titles[3] === 'Por que é melhor que uma IA comum' && titles[5] === 'O que há por trás' && titles[6] === 'Comece grátis', JSON.stringify(titles));
+check('el recorrido tiene 7 diapositivas, todas en portugués', titles.length === 7 && titles[0] === 'Seu analista financeiro com IA' && titles[1] === 'Mercados do mundo' && titles[3] === 'Em que se diferencia de uma IA comum' && titles[5] === 'O que há por trás' && titles[6] === 'Comece grátis', JSON.stringify(titles));
 const last = await text(p, '.slide.active');
 check('explica los planes y lo que sigue gratis, sin inventar precios', /planos Plus e Pro/.test(last) && !/\$|US\$|USD|R\$\s?\d/.test(last));
 check('en la última diapositiva el botón dice "Começar"', (await text(p, '#t-next')) === 'Começar');
@@ -91,7 +91,7 @@ await tab(p, 'settings'); await sleep(900);
 check('en Ajustes está el selector de idioma con el actual', /Idioma/.test(await text(p, '#s-lang')) && /Português/.test(await text(p, '#s-lang')), await text(p, '#s-lang'));
 await click(p, '#s-about'); await p.waitForSelector('.about-sheet .flow', { timeout: 4000 }); await sleep(1400);
 const ab = await text(p, '.about-sheet');
-check('"Acerca de" muestra cómo funciona (5 pasos), qué hay detrás, la comparación con una IA común, cobertura, privacidad y límites', (await p.$$('.flow-node')).length === 5 && /como funciona/i.test(ab) && /o que há por trás/i.test(ab) && /ia comum/i.test(ab) && /cobertura/i.test(ab) && /sua privacidade/i.test(ab) && /limites e aviso legal/i.test(ab), ab.slice(0, 160));
+check('"Acerca de" muestra cómo funciona (5 pasos), qué hay detrás, la comparación con una IA sin herramientas, cobertura, privacidad y límites', (await p.$$('.flow-node')).length === 5 && /como funciona/i.test(ab) && /o que há por trás/i.test(ab) && /ia sem ferramentas/i.test(ab) && /cobertura/i.test(ab) && /sua privacidade/i.test(ab) && /limites e aviso legal/i.test(ab), ab.slice(0, 160));
 check('"Acerca de" no promete licencias, respaldo de Google ni tiempo real', !/licen[çc]|respaldad|avalizad|tempo real|todos os mercados/i.test(ab) && /independente do Google/.test(ab));
 await shot(p, 'T6-acerca-de');
 await p.evaluate(() => document.querySelector('.sheet-back').click()); await sleep(450);

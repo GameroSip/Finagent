@@ -2,6 +2,7 @@
 // Regla de oro: cada porcentaje sale CON su base (n) y su intervalo de confianza del 95 % (Wilson). Con pocos usuarios, el margen es enorme y el tablero lo dice.
 import { median, quantile, wilson } from '../src/radarBacktest';
 import { AI_TOOLS, FEATURES } from '../src/telemetry';
+import { tierOf } from '../src/tiers';
 
 export interface RawMetrics {
   users: number; consentYes: number; consentNo: number;
@@ -10,6 +11,7 @@ export interface RawMetrics {
   byName: Array<{ name: string; n: number; u: number }>;
   rows: Array<{ user_id: string; day: string; name: string; props: string | null }>;
   feedback: Array<{ id: number; user_id: string; ts: number; kind: string; score: number | null; text: string | null; version: string | null }>;
+  calls?: Array<{ model: string; plan: string; n: number }>;   // pedidos a Gemini por modelo y por plan de quien los hizo (para ver qué nivel respondió de verdad)
   interest?: Record<string, number>;              // votos "me interesa": personas por clave ("feature:cartera"); un voto por persona y función
 }
 export const METRIC_EVENT_NAMES = ['ai_send', 'ai_done', 'ai_error', 'ai_rate', 'quota_block', 'asset_open', 'search_miss', 'fakedoor', 'chart_tool', 'screen', 'upsell', 'stress_view', 'move_view', 'plan_saved', 'watch', 'intro_step'];
@@ -68,6 +70,12 @@ export function computeMetrics(raw: RawMetrics, today: string, days: number) {
     tools: top(tools, (v) => v.n, 14).map(([name, v]) => ({ name, uses: v.n, users: v.users.size })),
     unusedTools: AI_TOOLS.filter((t) => !tools.has(t)),
     rating: { up, down, reasons: countBy(rates.filter((x) => P(x.props).rating === 'down'), 'reason'), helpful: prop(up, up + down) },
+    // Nivel que respondió de verdad. En los planes de pago el nivel esperado es Avanzado: si contesta el Rápido, el nivel del plan estaba saturado (o no disponible).
+    tiers: (() => {
+      const by = { rapido: 0, avanzado: 0, profundo: 0, otro: 0 } as Record<string, number>; let paid = 0, paidLow = 0;
+      for (const c of raw.calls ?? []) { const k = tierOf(c.model) ?? 'otro'; by[k] += c.n; if (c.plan === 'plus' || c.plan === 'pro') { paid += c.n; if (k === 'rapido') paidLow += c.n; } }
+      return { calls: by, total: Object.values(by).reduce((s, x) => s + x, 0), paidFellBack: prop(paidLow, paid) };
+    })(),
     usedAiOnFirstDay: prop(raw.firstDay.filter((f) => firstSendByUser.get(f.user_id) === f.day).length, raw.firstDay.length),
   };
   // ---- qué piden: activos que abren, búsquedas sin resultado, funciones que les interesan

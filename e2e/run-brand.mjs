@@ -3,17 +3,21 @@
 //   VITE_API_BASE=https://api.finagent.test npx vite build --outDir dist-server --emptyOutDir
 //   cd e2e && node run-brand.mjs ../dist-server ../e2e-shots
 import * as M from './mocks.mjs';
-import { browser, check, checks, log, newPage, server, shot, sleep, tab } from './run.mjs';
+import { browser, check, checks, log, newPage, say, server, shot, sleep, tab, waitAnswer } from './run.mjs';
 
 const text = (p, sel) => p.$eval(sel, (e) => e.innerText).catch(() => '');
 const click = (p, sel) => p.evaluate((s) => document.querySelector(s).click(), sel);
 
-for (const [lang, L] of [['es', { lvl: /Nivel de IA/, fast: 'FinAgent AI Rápido', adv: 'FinAgent AI Avanzado', pow: /Impulsado por Gemini de Google/, what: /Qué es FinAgent AI/i, ph: 'Preguntale algo a FinAgent AI…', eng: /Motor FinAgent v1\.0/ }], ['en', { lvl: /AI level/, fast: 'FinAgent AI Fast', adv: 'FinAgent AI Advanced', pow: /Powered by Google Gemini/, what: /What FinAgent AI is/i, ph: 'Ask FinAgent AI something…', eng: /Engine FinAgent v1\.0/ }]]) {
+for (const [lang, L] of [['es', { tier: 'Respondió FinAgent AI Rápido', vs: /IA sin herramientas/, vsNote: /Algunas IA también usan búsqueda o herramientas/, lvl: /Nivel de IA/, fast: 'FinAgent AI Rápido', adv: 'FinAgent AI Avanzado', pow: /Impulsado por Gemini de Google/, what: /Qué es FinAgent AI/i, ph: 'Preguntale algo a FinAgent AI…', eng: /Motor FinAgent v1\.0/ }], ['en', { tier: 'Answered by FinAgent AI Fast', vs: /AI without tools/, vsNote: /Some AIs also use search or tools/, lvl: /AI level/, fast: 'FinAgent AI Fast', adv: 'FinAgent AI Advanced', pow: /Powered by Google Gemini/, what: /What FinAgent AI is/i, ph: 'Ask FinAgent AI something…', eng: /Engine FinAgent v1\.0/ }]]) {
   M.resetApi();
   const p = await newPage({ key: '', intro: false, analytics: '0', lang, clean: true });
   await p.waitForSelector('.tabbar', { timeout: 20000 }); await sleep(800);
   await tab(p, 'chat'); await sleep(500);
   check(`[${lang}] el cuadro de texto del chat dice "${L.ph}"`, (await p.$eval('#c-in', (e) => e.placeholder)) === L.ph, await p.$eval('#c-in', (e) => e.placeholder));
+  await say(p, 'Hola'); await waitAnswer(p, 1); await sleep(500); await shot(p, `BR-${lang}-pie-respuesta`);
+  const tl = await text(p, '.m-ai .tier-line');
+  check(`[${lang}] cada respuesta dice qué nivel respondió ("${L.tier}"), sin avisar de respaldo en el plan gratuito`, tl.trim() === L.tier && !(await p.$('.m-ai .tier-line.fb')), tl);
+  check(`[${lang}] el pie nunca muestra el nombre del modelo de Google`, !/Gemini 3|Flash/.test(await text(p, '.m-ai')));
   await tab(p, 'settings'); await sleep(700);
   const row = await text(p, '#s-model') , setTxt = await text(p, '.view.active, body');
   check(`[${lang}] Ajustes muestra el nivel del plan con nombre de FinAgent ("${L.fast}"), no el nombre del modelo de Google`, row === L.fast && L.lvl.test(setTxt) && !/Gemini 3\.5/.test(await p.$eval('#s-model', (e) => e.closest('.set-row').innerText)), row);
@@ -27,9 +31,20 @@ for (const [lang, L] of [['es', { lvl: /Nivel de IA/, fast: 'FinAgent AI Rápido
   await click(p, '#s-about'); await p.waitForSelector('.about-sheet', { timeout: 6000 }); await sleep(700); await shot(p, `BR-${lang}-acerca`);
   const about = await text(p, '.about-sheet');
   check(`[${lang}] "Acerca de" explica qué es FinAgent AI y dice, a la vista, que corre sobre Gemini de Google`, L.what.test(about) && L.pow.test(about) && /FinAgent AI/.test(about) && /Gemini/.test(about));
+  check(`[${lang}] la comparación es con una "${L.vs.source}", reconoce que otras IA también usan herramientas y no dice "mejor que"`, L.vs.test(about) && L.vsNote.test(about) && !/mejor que|better than|melhor que/i.test(about));
   check(`[${lang}] muestra la versión del motor junto a la versión de la app`, L.eng.test(about), about.match(/Motor[^\n]*|Engine[^\n]*/)?.[0]);
   check(`[${lang}] aclara que los niveles son nombres de FinAgent para modelos Gemini de distinto tamaño, y que no se modifica el modelo de lenguaje`, /(Gemini)[^]{0,80}(tamaño|sizes)/.test(about) && /(no entrena ni ajusta el modelo|does not modify the language model)/.test(about));
   if (lang === 'en') check('[en] no quedan textos en español en lo nuevo', !/[¿¡ñ]|\b(Impulsado|Qué es|Nivel de|Rápido|Avanzado|Profundo|Motor)\b/.test(about + plans + setTxt), (about + plans).match(/[¿¡ñ]|\b(Impulsado|Qué es|Nivel de|Rápido|Avanzado|Profundo|Motor)\b/)?.[0]);
+  await p.close();
+}
+// plan Plus: el modelo del plan es el Avanzado, pero (como pasa con la cuota gratuita de Google) contesta el Rápido: tiene que decirlo
+M.resetApi(); M.apiState.plan = 'plus';
+{
+  const p = await newPage({ key: '', intro: false, analytics: '0', lang: 'es', clean: true });
+  await p.waitForSelector('.tabbar', { timeout: 20000 }); await sleep(800); await tab(p, 'chat'); await sleep(500);
+  await say(p, 'Hola'); await waitAnswer(p, 1); await sleep(500); await shot(p, 'BR-es-respaldo');
+  const fb = await text(p, '.m-ai .tier-line.fb');
+  check('en un plan de pago, si respondió un nivel menor, el pie lo dice: qué nivel respondió y cuál era el del plan', /Respondió FinAgent AI Rápido porque FinAgent AI Avanzado no estaba disponible en ese momento\./.test(fb), fb);
   await p.close();
 }
 const bad = checks.filter((x) => !x.ok);

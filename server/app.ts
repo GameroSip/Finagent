@@ -265,7 +265,7 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
       ticket = c.ticket; remaining = c.remaining;
     }
 
-    const r = await router.generate({ chain: chainFor(plan, !!b.deep), pinned, contents, withTools: !!b.withTools, note: planNote(plan) });
+    const r = await router.generate({ chain: chainFor(plan, !!b.deep), pinned, contents, withTools: !!b.withTools, note: planNote(plan), thinking: b.deep ? (plan.deepThinking ?? plan.thinking) : plan.thinking, deep: !!b.deep });
     if (!r.ok) {
       if (ticket) await refund(store, ticket);                                                       // no se entregó nada: no se cobra la consulta
       if (r.error === 'capacity') { await stat('429'); return capacity(r.scope, r.retryAfterSec); }  // el cupo de Gemini se agotó: se explica, no es una falla

@@ -12,7 +12,7 @@ import { SqlStore } from './store';
 const key = process.env.GEMINI_API_KEY ?? '';
 const fake = fakeGemini('bueno');
 const call: GeminiFetch = key
-  ? async (model, body) => { const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) }); return { status: r.status, text: await r.text() }; }
+  ? async (model, body, timeoutMs) => { const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) }); return { status: r.status, text: await r.text() }; }
   : async (model, body) => { const r = await fake({ url: `https://fake/models/${model}:generateContent`, method: 'POST', body }); return { status: r.status, text: r.text }; };
 
 const store = new SqlStore(new NodeSql(process.env.DB_FILE ?? 'finagent-dev.db'));

@@ -21,6 +21,13 @@ for (const [lang, L] of [['es', { tier: 'Respondió FinAgent AI Rápido', vs: /I
   await tab(p, 'settings'); await sleep(700);
   const row = await text(p, '#s-model') , setTxt = await text(p, '.view.active, body');
   check(`[${lang}] Ajustes muestra el nivel del plan con nombre de FinAgent ("${L.fast}"), no el nombre del modelo de Google`, row === L.fast && L.lvl.test(setTxt) && !/Gemini 3\.5/.test(await p.$eval('#s-model', (e) => e.closest('.set-row').innerText)), row);
+  // Estado de las fuentes: con servidor se chequea el servidor de FinAgent (antes daba un falso "Permission denied" de Google porque el teléfono no tiene la clave de Gemini)
+  await p.evaluate(() => document.querySelector('#s-probe')?.scrollIntoView({ block: 'center' })); await sleep(300);
+  await click(p, '#s-probe'); await p.waitForFunction(() => [...document.querySelectorAll('#s-sources .src')].every((r) => r.querySelector('.sdot.ok, .sdot.bad, .sdot.err, .sdot.fail')), { timeout: 15000 }).catch(() => {}); await sleep(500); await shot(p, `BR-${lang}-estado-fuentes`);
+  const rows = await p.evaluate(() => [...document.querySelectorAll('#s-sources .src')].map((r) => ({ t: r.innerText.replace(/\s+/g, ' ').trim(), ok: !!r.querySelector('.sdot.ok') })));
+  const srv = rows.find((r) => /FinAgent AI · (servidor|server)/.test(r.t));
+  check(`[${lang}] el estado de las fuentes incluye el servidor de FinAgent AI, en verde`, !!srv && srv.ok, JSON.stringify(srv));
+  check(`[${lang}] y ya no muestra "Google Gemini · modelos" (con servidor la clave la tiene el servidor, no el teléfono)`, !rows.some((r) => /Gemini · (modelos|models)/.test(r.t)), rows.map((r) => r.t.slice(0, 30)).join(' | '));
   await p.evaluate(() => document.querySelector('#s-plans-open')?.scrollIntoView({ block: 'center' })); await sleep(300);
   await click(p, '#s-plans-open'); await p.waitForSelector('.plans-sheet .plan-card', { timeout: 6000 }); await sleep(600); await shot(p, `BR-${lang}-planes`);
   const plans = await text(p, '.plans-sheet');

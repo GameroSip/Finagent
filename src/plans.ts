@@ -3,6 +3,7 @@
 // Los valores son una propuesta inicial para ajustar con costos reales de la beta.
 
 export type PlanId = 'free' | 'plus' | 'pro';
+export type Thinking = 'minimal' | 'low' | 'medium' | 'high';
 export interface Plan {
   id: PlanId; label: string;
   model: string;                // el modelo FIJO de este plan (el usuario lo ve en la app)
@@ -12,18 +13,22 @@ export interface Plan {
   deepModelLabel?: string;
   available: boolean;           // ¿ya se puede contratar? Los de pago todavía no: se muestran como "próximamente"
   blurb: string;                // qué ofrece, en una frase
-  thinking: 'low' | 'medium' | 'high'; // nivel de razonamiento (pendiente de conectar al pedido cuando se verifique el nombre del parámetro en la documentación)
+  /** Nivel de razonamiento que se le pide a Gemini (generationConfig.thinkingConfig.thinkingLevel). Los modelos Gemini 3 razonan en "high" si no se indica nada, y eso retrasa mucho el primer texto: para chat Google recomienda "low".
+   *  Flash-Lite ya viene en "minimal" por defecto y no se le manda nada (ver thinkingFor en server/gemini.ts). */
+  thinking: Thinking;
+  /** Nivel para el análisis profundo (el modelo Pro), donde se acepta esperar más a cambio de más cuidado. */
+  deepThinking?: Thinking;
   dailyLimit: number; monthlyLimit: number; deepMonthlyLimit: number;
   maxToolSteps: number; maxOutputTokens: number;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: 'free', label: 'Gratis', model: 'gemini-3.5-flash-lite', modelLabel: 'Gemini 3.5 Flash-Lite', fallbacks: [], available: true, thinking: 'low', dailyLimit: 3, monthlyLimit: 90, deepMonthlyLimit: 0, maxToolSteps: 3, maxOutputTokens: 700,
+  free: { id: 'free', label: 'Gratis', model: 'gemini-3.5-flash-lite', modelLabel: 'Gemini 3.5 Flash-Lite', fallbacks: [], available: true, thinking: 'minimal', dailyLimit: 3, monthlyLimit: 90, deepMonthlyLimit: 0, maxToolSteps: 3, maxOutputTokens: 700,
     blurb: 'Respuestas rápidas con un modelo liviano.' },
   // Los planes de pago son una PROPUESTA preliminar (el precio no está definido y todavía no se pueden contratar): sirven para mostrar qué vendría y medir el interés.
-  plus: { id: 'plus', label: 'Plus', model: 'gemini-3.8-flash', modelLabel: 'Gemini 3.8 Flash', fallbacks: ['gemini-3.5-flash-lite'], available: false, thinking: 'medium', dailyLimit: 10, monthlyLimit: 200, deepMonthlyLimit: 0, maxToolSteps: 5, maxOutputTokens: 1200,
+  plus: { id: 'plus', label: 'Plus', model: 'gemini-3.8-flash', modelLabel: 'Gemini 3.8 Flash', fallbacks: ['gemini-3.5-flash-lite'], available: false, thinking: 'low', dailyLimit: 10, monthlyLimit: 200, deepMonthlyLimit: 0, maxToolSteps: 5, maxOutputTokens: 1200,
     blurb: 'Un modelo más potente y más conversaciones por día.' },
-  pro: { id: 'pro', label: 'Pro', model: 'gemini-3.8-flash', modelLabel: 'Gemini 3.8 Flash', fallbacks: ['gemini-3.5-flash-lite'], deepModel: 'gemini-3.1-pro-preview', deepModelLabel: 'Gemini 3.1 Pro', available: false, thinking: 'medium', dailyLimit: 30, monthlyLimit: 600, deepMonthlyLimit: 30, maxToolSteps: 6, maxOutputTokens: 2000,
+  pro: { id: 'pro', label: 'Pro', model: 'gemini-3.8-flash', modelLabel: 'Gemini 3.8 Flash', fallbacks: ['gemini-3.5-flash-lite'], deepModel: 'gemini-3.1-pro-preview', deepModelLabel: 'Gemini 3.1 Pro', available: false, thinking: 'low', deepThinking: 'medium', dailyLimit: 30, monthlyLimit: 600, deepMonthlyLimit: 30, maxToolSteps: 6, maxOutputTokens: 2000,
     blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.' },
 };
 export const PLAN_RANK: Record<PlanId, number> = { free: 0, plus: 1, pro: 2 };

@@ -22,6 +22,7 @@ import { openHistory } from './history';
 import { analyticsOn, track } from '../analytics';
 import { RATE_REASONS, REPORT_REASONS } from '../betaTexts';
 import { answerTier } from '../brand';
+import { tierOf } from '../tiers';
 import { VERSION } from '../version';
 import { AI_TOOLS, lenBucket } from '../telemetry';
 import { t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
@@ -293,7 +294,7 @@ export function createChatView(ctx: Ctx): ChatView {
         onTool: (n, a, r) => { const s = run.steps.find((x) => x.key === n + JSON.stringify(a) && x.state === 'run'); if (s) s.state = r.ok ? 'ok' : 'bad'; paintWorking(run); },
         onStatus: (m) => { run.status = m; paintWorking(run); },
       });
-      track('ai_done', { tools: [...new Set(res.toolCalls.map((c) => c.name))].filter((n) => (AI_TOOLS as readonly string[]).includes(n)).join(','), ms: Math.min(Date.now() - t0, 600000), steps: Math.min(res.toolCalls.length, 40), checked: Math.min(res.verification.checked, 99), unverified: Math.min(res.redacted ?? 0, 99), fixed: !!res.corrected });
+      track('ai_done', { tools: [...new Set(res.toolCalls.map((c) => c.name))].filter((n) => (AI_TOOLS as readonly string[]).includes(n)).join(','), ms: Math.min(Date.now() - t0, 600000), steps: Math.min(res.toolCalls.length, 40), checked: Math.min(res.verification.checked, 99), unverified: Math.min(res.redacted ?? 0, 99), fixed: !!res.corrected, ...(tierOf(res.model) ? { tier: tierOf(res.model)! } : {}) });
       finishOk(run, prompt, res);
     } catch (e) {
       trackAiError(e);

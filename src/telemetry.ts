@@ -32,7 +32,7 @@ export const EVENTS: Record<string, Spec> = {
   plan_removed: {},
   watch: { op: ['add', 'remove'], group: GROUPS },
   ai_send: { src: ['typed', 'suggestion', 'asset', 'market', 'regenerate'], chat: ['new', 'follow'], len: ['s', 'm', 'l'] },   // el texto de la consulta NUNCA se envía
-  ai_done: { tools: { csv: AI_TOOLS, max: 14 }, ms: { int: [0, 600000] }, steps: { int: [0, 40] }, checked: { int: [0, 99] }, unverified: { int: [0, 99] }, fixed: 'bool' },
+  ai_done: { tools: { csv: AI_TOOLS, max: 14 }, ms: { int: [0, 600000] }, steps: { int: [0, 40] }, checked: { int: [0, 99] }, unverified: { int: [0, 99] }, fixed: 'bool', tier: ['rapido', 'avanzado', 'profundo'] },
   ai_error: { kind: ['network', 'limit', 'capacity', 'session', 'other'] },
   ai_rate: { rating: ['up', 'down'], reason: ['wrong', 'incomplete', 'confusing', 'slow', 'other'] },
   quota_block: { reason: ['daily', 'monthly'] },

@@ -1,0 +1,22 @@
+  ✔ [es] el cuadro de texto del chat dice "Preguntale algo a FinAgent AI…" 
+  ✔ [es] Ajustes muestra el nivel del plan con nombre de FinAgent ("FinAgent AI Rápido"), no el nombre del modelo de Google 
+  ✔ sin desborde horizontal en BR-es-planes 
+  ✔ [es] la pantalla de planes muestra los niveles (FinAgent AI Rápido, FinAgent AI Avanzado) y NO los nombres de modelo de Google 
+  ✔ [es] la tabla comparativa tiene la fila "Nivel de IA" y el beneficio dice que el nivel es más potente 
+  ✔ sin desborde horizontal en BR-es-acerca 
+  ✔ [es] "Acerca de" explica qué es FinAgent AI y dice, a la vista, que corre sobre Gemini de Google 
+  ✔ [es] muestra la versión del motor junto a la versión de la app 
+  ✔ [es] aclara que los niveles son nombres de FinAgent para modelos Gemini de distinto tamaño, y que no se modifica el modelo de lenguaje 
+  ✔ [en] el cuadro de texto del chat dice "Ask FinAgent AI something…" 
+  ✔ [en] Ajustes muestra el nivel del plan con nombre de FinAgent ("FinAgent AI Fast"), no el nombre del modelo de Google 
+  ✔ sin desborde horizontal en BR-en-planes 
+  ✔ [en] la pantalla de planes muestra los niveles (FinAgent AI Fast, FinAgent AI Advanced) y NO los nombres de modelo de Google 
+  ✔ [en] la tabla comparativa tiene la fila "AI level" y el beneficio dice que el nivel es más potente 
+  ✔ sin desborde horizontal en BR-en-acerca 
+  ✔ [en] "Acerca de" explica qué es FinAgent AI y dice, a la vista, que corre sobre Gemini de Google 
+  ✔ [en] muestra la versión del motor junto a la versión de la app 
+  ✔ [en] aclara que los niveles son nombres de FinAgent para modelos Gemini de distinto tamaño, y que no se modifica el modelo de lenguaje 
+  ✔ [en] no quedan textos en español en lo nuevo 
+
+RESULTADO (marca FinAgent AI): 19/19 verificaciones OK
+ERRORES DE PÁGINA: []

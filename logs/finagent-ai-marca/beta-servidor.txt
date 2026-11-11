@@ -1,0 +1,71 @@
+  ✔ sin desborde horizontal en S1-mercados 
+  ✔ abre directo en la app, sin pedir código ni clave 
+  ✔ la cuenta se creó sola (una sola vez) 
+  ✔ el chat explica el plan: "Plan Gratis · Gemini 3.5 Flash-Lite · 3 conversaciones por día" 
+  ✔ ofrece los planes de pago como próximamente (más potentes, más conversaciones) 
+  ✔ avisa con honestidad que el nivel gratuito de Gemini puede usar las consultas 
+  ✔ el contador del chat muestra el plan y las conversaciones que quedan 
+  ✔ sin desborde horizontal en S2-chat-vacio 
+  ✔ "Ver planes" abre la pantalla de planes (Plus y Pro) 
+  ✔ el multiplicador sale de los límites reales: Plus 3x (10 contra 3) y Pro 10x (30 contra 3) 
+  ✘ Pro ofrece análisis profundo con Gemini 3.1 Pro y Plus no (solo ventajas reales) 
+  ✘ explica por qué pagar: modelo más potente, respaldo automático y sin recordatorios 
+  ✔ destaca lo que sigue gratis y compara los planes 
+  ✔ aclara con honestidad que todavía no se puede contratar ni tiene precio 
+  ✔ sin desborde horizontal en S2b-planes 
+  ✔ "Avisame" anota el interés en Plus y el botón queda en "Anotado ✓" 
+  ✔ responde con datos y sin cifras sin respaldo 
+  ✔ quedan 2 conversaciones (una conversación = una, aunque use varias vueltas al modelo) 
+  ✔ el chat tiene título provisorio (sin gastar una conversación en un título con IA) 
+  ✔ sin desborde horizontal en S3-chat 
+  ✔ sin cupo por minuto: dice que hay mucha demanda, la causa y cuánto esperar 
+  ✔ aclara que la conversación NO se descontó 
+  ✔ no hay ningún "reintentando" en pantalla 
+  ✔ quedan igual 2 conversaciones 
+  ✔ sin capacidad del día: lo explica y menciona que los planes de pago tendrán capacidad reservada 
+  ✔ sin desborde horizontal en S4-capacidad 
+  ✔ queda 1 conversación (singular) 
+  ✔ con 1 conversación restante aparece UNA sugerencia de planes, con el multiplicador real (10x) 
+  ✔ la sugerencia aclara que los gráficos, los mercados y las herramientas siguen gratis 
+  ✔ sin desborde horizontal en S5a-sugerencia-planes 
+  ✔ "Ahora no" la quita y la silencia por 7 días 
+  ✔ llegó a 0 
+  ✔ al pasarse del límite: dice cuál es, cuándo vuelve y ofrece los planes de pago 
+  ✔ ofrece "Ver mercados" y "Ver planes" 
+  ✔ sin desborde horizontal en S5-limite 
+  ✔ "Ver mercados" lleva a Mercados 
+  ✘ Ajustes muestra el plan, el modelo fijo y las conversaciones Tu plan usa un nivel fijo
+FinAgent AI Rápido
+Por ahora FinAgent usa el nivel gratuito de Gemini: Google puede usar lo que escribas para mejorar sus productos. No incluyas datos personales ni información fina
+  ✔ muestra el aviso del nivel gratuito de Gemini 
+  ✔ Ajustes invita a ver los planes (Plus y Pro, próximamente) 
+  ✔ NO hay ninguna clave de Gemini en Ajustes 
+  ✔ sin desborde horizontal en S6-ajustes-plan 
+  ✔ desde Ajustes también se abre la pantalla de planes, y recuerda que ya te anotaste en Plus 
+  ✘ el código desbloquea el plan Plus con su modelo más potente Tu plan usa un nivel fijo
+FinAgent AI Avanzado
+Por ahora FinAgent usa el nivel gratuito de Gemini: Google puede usar lo que escribas para mejorar sus productos. No inc
+  ✔ y el chat lo refleja: Plan Plus con 7 conversaciones (10 - 3 ya usadas) 
+  ✔ sin desborde horizontal en S7-plan-plus 
+  ✔ al reabrir entra directo y NO crea otra cuenta 
+  ✔ si la sesión venció, se renueva sola y la conversación sale igual 
+  ✔ si desactivan el acceso, lo dice claramente 
+  ✔ en Mercados aparece el recordatorio semanal (plan gratis, ya usó la app, pasó una semana) 
+  ✔ sin desborde horizontal en S8-recordatorio-semanal 
+  ✔ al volver no se repite (como máximo uno cada 24 horas) 
+  ✔ quien ya tiene un plan de pago NO recibe recordatorios 
+  ✔ la app jamás llamó a Gemini directamente (todo pasó por el servidor de FinAgent) 
+  ✔ usó el servidor de FinAgent 
+
+RESULTADO (modo servidor): 50/54 verificaciones OK
+ERRORES DE PÁGINA: []
+ERRORES DE CONSOLA: [
+ "404 https://fc.yahoo.com/",
+ "Failed to load resource: the server responded with a status of 404 (Not Found)",
+ "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+ "404 https://www.google.com/s2/favicons?domain=supermicro.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=palantir.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=rivian.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=sofi.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=robinhood.com&sz=128"
+]

@@ -65,6 +65,8 @@ export function computeMetrics(raw: RawMetrics, today: string, days: number) {
     sources: countBy(sends, 'src'), chats: countBy(sends, 'chat'), lengths: countBy(sends, 'len'),
     completed: prop(done.length, sends.length), errors: countBy(errs, 'kind'), errorCount: errs.length, quotaBlocks: blocks.length, quotaBlockUsers: new Set(blocks.map((b) => b.user_id)).size,
     latencyMs: ms.length ? { median: Math.round(median(ms)), p90: Math.round(quantile(ms, 0.9)), n: ms.length } : null,
+    // Tiempo de respuesta por nivel de FinAgent AI (mediana y p90, en milisegundos): para comprobar que el nivel Avanzado no es mucho más lento que el Rápido.
+    latencyByTier: Object.fromEntries((['rapido', 'avanzado', 'profundo'] as const).map((k) => { const v = done.filter((d) => P(d.props).tier === k).map((d) => P(d.props).ms).filter((x) => typeof x === 'number') as number[]; return [k, v.length ? { median: Math.round(median(v)), p90: Math.round(quantile(v, 0.9)), n: v.length } : null]; })) as Record<'rapido' | 'avanzado' | 'profundo', { median: number; p90: number; n: number } | null>,
     avgSteps: done.length ? done.reduce((s, d) => s + (P(d.props).steps ?? 0), 0) / done.length : null,
     verifier: { answers: done.length, figuresChecked: checked, figuresUnverified: unverified, fixedShare: prop(done.filter((d) => P(d.props).fixed === true).length, done.length) },
     tools: top(tools, (v) => v.n, 14).map(([name, v]) => ({ name, uses: v.n, users: v.users.size })),

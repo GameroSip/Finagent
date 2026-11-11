@@ -109,6 +109,7 @@ const remaining = () => ({ day: Math.max(0, planNow().dailyLimit - apiState.used
 export function finagentApi(method, path, headers, body) {
   const j = (o, status = 200) => ({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(o) });
   if (method === 'OPTIONS') return { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS' }, body: '' };
+  if (path === '/health') return j({ ok: true, version: 'mock', tier: 'free', google: false });
   if (path === '/v1/plans') return j({ tier: 'free', plans: PLAN_LIST });
   if (path === '/v1/auth/device') {              // cuenta automática: sin registro ni códigos
     if (apiState.banned) return j({ error: 'disabled' }, 403);

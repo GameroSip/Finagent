@@ -5,7 +5,7 @@ import { VERSION } from '../version';
 import { setSound, soundOn } from '../ui/sfx';
 import { openAbout } from './about';
 import { openPlans } from './plans';
-import { fetchMe, isCodeShape, isServerMode, normalizeCode, PlanCodeError, planCodeMessage, quotaInfo, redeemPlanCode, googleAvailable, GoogleError, googleMessage, signInWithGoogle, deleteAccount } from '../server';
+import { fetchMe, isCodeShape, isServerMode, normalizeCode, PlanCodeError, planCodeMessage, quotaInfo, redeemPlanCode, googleAvailable, GoogleError, googleMessage, signInWithGoogle, deleteAccount, pingServer } from '../server';
 import type { Ctx, View } from '../ctx';
 import { fetchFearGreed } from '../data/market';
 import { fetchDolares, fetchRiesgoPais } from '../data/argentina';
@@ -54,7 +54,8 @@ export function createSettingsView(ctx: Ctx): View {
     { name: 'ArgentinaDatos · riesgo país', run: () => fetchRiesgoPais() },
     { name: 'Google News · titulares', run: () => fetchHeadlines(undefined, 'ar', 3) },
     { name: 'alternative.me · miedo y codicia', run: () => fetchFearGreed() },
-    { name: 'Google Gemini · modelos', run: () => ctx.models.discover(key(), true, true) },
+    // Con servidor, la clave de Gemini está en el servidor: el teléfono no puede (ni debe) consultar a Google, así que se chequea el servidor de FinAgent.
+    isServerMode() ? { name: 'FinAgent AI · servidor', run: () => pingServer() } : { name: 'Google Gemini · modelos', run: () => ctx.models.discover(key(), true, true) },
   ];
 
   function render() {

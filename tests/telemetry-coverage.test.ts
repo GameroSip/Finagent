@@ -39,3 +39,11 @@ describe('versión y panel', () => {
     const js = /<script>([\s\S]*)<\/script>/.exec(ADMIN_HTML)![1]; expect(js).toMatch(/function mk\(tag,text,cls\)\{[^}]*textContent=text/); expect(js).not.toMatch(/insertAdjacentHTML|outerHTML|document\.write/);
   });
 });
+
+describe('indicador de estado en modo servidor', () => {
+  it('con servidor se chequea el servidor de FinAgent, no a Google (la clave de Gemini está en el servidor: llamarla desde el teléfono daba un falso "Permission denied")', () => {
+    const s = readFileSync('src/views/settings.ts', 'utf8');
+    expect(s).toMatch(/isServerMode\(\) \? \{ name: 'FinAgent AI · servidor', run: \(\) => pingServer\(\) \}/); expect(s).toContain("name: 'Google Gemini · modelos'");
+    expect(readFileSync('src/server.ts', 'utf8')).toMatch(/export async function pingServer[\s\S]{0,260}'\/health'/);
+  });
+});

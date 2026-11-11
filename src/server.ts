@@ -184,6 +184,12 @@ export async function deleteAccount(): Promise<void> {
   if (r.status !== 200 && r.status !== 401) throw new ServerBusyError('network');
 }
 
+/** Chequeo de estado para Ajustes: ¿responde el servidor de FinAgent? (La clave de Gemini la tiene el servidor, no el teléfono: llamar a Google desde acá daría un falso "Permission denied".) */
+export async function pingServer(): Promise<void> {
+  const r = await netCall('GET', '/health', undefined, false);
+  if (r.status !== 200 || !r.json?.ok) throw new Error(`servidor ${r.status}`);
+}
+
 /** Estadísticas de uso: el servidor guarda el consentimiento y descarta los eventos si no está aceptado. */
 export async function sendConsent(on: boolean): Promise<void> {
   const r = await authed('POST', '/v1/consent', { analytics: on });

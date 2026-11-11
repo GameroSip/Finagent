@@ -10,9 +10,10 @@ interface WorkerEnv extends Env { DB: D1Like; GEMINI_API_KEY: string; GEMINI_BAS
 let currentKey = '';
 let currentBase = 'https://generativelanguage.googleapis.com/v1beta';
 // El enrutador vive en el "isolate" y conserva qué modelos están sin cupo entre pedidos.
-const router = new ModelRouter(async (model, body) => {
+const router = new ModelRouter(async (model, body, timeoutMs) => {
   const res = await fetch(`${currentBase}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': currentKey }, body: JSON.stringify(body),
+    ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
   });
   return { status: res.status, text: await res.text() };
 });
@@ -21,6 +22,6 @@ export default {
   async fetch(req: Request, env: WorkerEnv): Promise<Response> {
     currentKey = env.GEMINI_API_KEY;
     currentBase = env.GEMINI_BASE ?? 'https://generativelanguage.googleapis.com/v1beta';
-    return createApp({ store: new SqlStore(new D1Sql(env.DB)), env, router, version: '0.12.0' })(req);
+    return createApp({ store: new SqlStore(new D1Sql(env.DB)), env, router, version: '0.12.1' })(req);
   },
 };

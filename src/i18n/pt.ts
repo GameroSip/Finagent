@@ -700,4 +700,5 @@ export const PT: Record<string, string> = {
   "Algunas IA también usan búsqueda o herramientas. La diferencia de FinAgent es que además verifica cada cifra antes de mostrártela.": "Algumas IAs também usam busca ou ferramentas. O diferencial do FinAgent é que ele também verifica cada número antes de mostrá-lo.",
   "Respondió {n}": "Respondido por {n}",
   "Respondió {n} porque {p} no estaba disponible en ese momento.": "Respondido por {n} porque {p} não estava disponível no momento.",
+  "FinAgent AI · servidor": "FinAgent AI · servidor",
 };

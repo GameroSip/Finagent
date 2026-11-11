@@ -3,6 +3,9 @@
   ✔ [es] cada respuesta dice qué nivel respondió ("Respondió FinAgent AI Rápido"), sin avisar de respaldo en el plan gratuito 
   ✔ [es] el pie nunca muestra el nombre del modelo de Google 
   ✔ [es] Ajustes muestra el nivel del plan con nombre de FinAgent ("FinAgent AI Rápido"), no el nombre del modelo de Google 
+  ✔ sin desborde horizontal en BR-es-estado-fuentes 
+  ✔ [es] el estado de las fuentes incluye el servidor de FinAgent AI, en verde 
+  ✔ [es] y ya no muestra "Google Gemini · modelos" (con servidor la clave la tiene el servidor, no el teléfono) 
   ✔ sin desborde horizontal en BR-es-planes 
   ✔ [es] la pantalla de planes muestra los niveles (FinAgent AI Rápido, FinAgent AI Avanzado) y NO los nombres de modelo de Google 
   ✔ [es] la tabla comparativa tiene la fila "Nivel de IA" y el beneficio dice que el nivel es más potente 
@@ -16,6 +19,9 @@
   ✔ [en] cada respuesta dice qué nivel respondió ("Answered by FinAgent AI Fast"), sin avisar de respaldo en el plan gratuito 
   ✔ [en] el pie nunca muestra el nombre del modelo de Google 
   ✔ [en] Ajustes muestra el nivel del plan con nombre de FinAgent ("FinAgent AI Fast"), no el nombre del modelo de Google 
+  ✔ sin desborde horizontal en BR-en-estado-fuentes 
+  ✔ [en] el estado de las fuentes incluye el servidor de FinAgent AI, en verde 
+  ✔ [en] y ya no muestra "Google Gemini · modelos" (con servidor la clave la tiene el servidor, no el teléfono) 
   ✔ sin desborde horizontal en BR-en-planes 
   ✔ [en] la pantalla de planes muestra los niveles (FinAgent AI Fast, FinAgent AI Advanced) y NO los nombres de modelo de Google 
   ✔ [en] la tabla comparativa tiene la fila "AI level" y el beneficio dice que el nivel es más potente 
@@ -28,5 +34,5 @@
   ✔ sin desborde horizontal en BR-es-respaldo 
   ✔ en un plan de pago, si respondió un nivel menor, el pie lo dice: qué nivel respondió y cuál era el del plan 
 
-RESULTADO (marca FinAgent AI): 29/29 verificaciones OK
+RESULTADO (marca FinAgent AI): 35/35 verificaciones OK
 ERRORES DE PÁGINA: []

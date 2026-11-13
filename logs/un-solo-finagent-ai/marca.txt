@@ -1,0 +1,38 @@
+  ✔ [es] el cuadro de texto del chat dice "Preguntale algo a FinAgent AI…" 
+  ✔ sin desborde horizontal en BR-es-pie-respuesta 
+  ✔ [es] las respuestas NO muestran nivel ni nombre de modelo de Google (hay un solo FinAgent AI) 
+  ✔ [es] Ajustes ya no muestra "Nivel de IA" ni nombres de modelo (muestra el plan y las conversaciones) 
+  ✔ sin desborde horizontal en BR-es-estado-fuentes 
+  ✔ [es] el estado de las fuentes incluye el servidor de FinAgent AI, en verde 
+  ✔ [es] y ya no muestra "Google Gemini · modelos" (con servidor la clave la tiene el servidor, no el teléfono) 
+  ✔ sin desborde horizontal en BR-es-planes 
+  ✔ [es] las tarjetas de planes NO muestran niveles ni nombres de modelo, ni prometen "más potente" ni análisis profundo 
+  ✔ [es] lo planeado va aparte bajo "Próximamente (todavía no existen)" (Plus 3, Pro 5) y lo incluido son 2 puntos por plan (cupo y sin recordatorios) 
+  ✔ [es] las funciones planeadas están en las tarjetas (cartera, PDF) y la tabla comparativa las marca como "Próximamente", no como incluidas 
+  ✔ sin desborde horizontal en BR-es-acerca 
+  ✔ [es] "Acerca de" explica qué es FinAgent AI y dice, a la vista, que corre sobre Gemini de Google 
+  ✔ [es] la comparación es con una "IA sin herramientas", reconoce que otras IA también usan herramientas y no dice "mejor que" 
+  ✔ [es] muestra la versión del motor junto a la versión de la app 
+  ✔ [es] aclara que no se modifica el modelo de lenguaje y ya no habla de niveles 
+  ✔ [en] el cuadro de texto del chat dice "Ask FinAgent AI something…" 
+  ✔ sin desborde horizontal en BR-en-pie-respuesta 
+  ✔ [en] las respuestas NO muestran nivel ni nombre de modelo de Google (hay un solo FinAgent AI) 
+  ✔ [en] Ajustes ya no muestra "Nivel de IA" ni nombres de modelo (muestra el plan y las conversaciones) 
+  ✔ sin desborde horizontal en BR-en-estado-fuentes 
+  ✔ [en] el estado de las fuentes incluye el servidor de FinAgent AI, en verde 
+  ✔ [en] y ya no muestra "Google Gemini · modelos" (con servidor la clave la tiene el servidor, no el teléfono) 
+  ✔ sin desborde horizontal en BR-en-planes 
+  ✔ [en] las tarjetas de planes NO muestran niveles ni nombres de modelo, ni prometen "más potente" ni análisis profundo 
+  ✔ [en] lo planeado va aparte bajo "Coming soon (they do not exist yet)" (Plus 3, Pro 5) y lo incluido son 2 puntos por plan (cupo y sin recordatorios) 
+  ✔ [en] las funciones planeadas están en las tarjetas (cartera, PDF) y la tabla comparativa las marca como "Próximamente", no como incluidas 
+  ✔ sin desborde horizontal en BR-en-acerca 
+  ✔ [en] "Acerca de" explica qué es FinAgent AI y dice, a la vista, que corre sobre Gemini de Google 
+  ✔ [en] la comparación es con una "AI without tools", reconoce que otras IA también usan herramientas y no dice "mejor que" 
+  ✔ [en] muestra la versión del motor junto a la versión de la app 
+  ✔ [en] aclara que no se modifica el modelo de lenguaje y ya no habla de niveles 
+  ✔ [en] no quedan textos en español en lo nuevo 
+  ✔ sin desborde horizontal en BR-es-plus-respuesta 
+  ✔ en el plan Plus la respuesta tampoco muestra niveles ni avisos de "no estaba disponible" 
+
+RESULTADO (marca FinAgent AI): 35/35 verificaciones OK
+ERRORES DE PÁGINA: []

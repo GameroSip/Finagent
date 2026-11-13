@@ -1,15 +1,15 @@
   ✔ sin desborde horizontal en S1-mercados 
   ✔ abre directo en la app, sin pedir código ni clave 
   ✔ la cuenta se creó sola (una sola vez) 
-  ✔ el chat explica el plan: "Plan Gratis · Gemini 3.5 Flash-Lite · 3 conversaciones por día" 
-  ✔ ofrece los planes de pago como próximamente (más potentes, más conversaciones) 
+  ✔ el chat explica el plan sin nombres de modelo (y mantiene el aviso de privacidad sobre Gemini): "Plan Gratis · 3 conversaciones por día" 
+  ✔ ofrece los planes de pago como próximamente (más conversaciones por día, sin prometer un modelo más potente) 
   ✔ avisa con honestidad que el nivel gratuito de Gemini puede usar las consultas 
   ✔ el contador del chat muestra el plan y las conversaciones que quedan 
   ✔ sin desborde horizontal en S2-chat-vacio 
   ✔ "Ver planes" abre la pantalla de planes (Plus y Pro) 
   ✔ el multiplicador sale de los límites reales: Plus 3x (10 contra 3) y Pro 10x (30 contra 3) 
-  ✔ Pro ofrece análisis profundo (nivel FinAgent AI Profundo) y Plus no (solo ventajas reales) 
-  ✔ explica por qué pagar: un nivel de IA más potente, respaldo automático y sin recordatorios 
+  ✔ las tarjetas muestran lo que incluyen HOY (cupo de conversaciones) y NO anuncian análisis profundo, niveles ni nombres de modelo 
+  ✔ lo que todavía no existe va aparte, marcado "Próximamente (todavía no existen)": Plus con 3 funciones planeadas y Pro con 5, y no se mezcla con lo incluido 
   ✔ destaca lo que sigue gratis y compara los planes 
   ✔ aclara con honestidad que todavía no se puede contratar ni tiene precio 
   ✔ sin desborde horizontal en S2b-planes 
@@ -34,13 +34,13 @@
   ✔ ofrece "Ver mercados" y "Ver planes" 
   ✔ sin desborde horizontal en S5-limite 
   ✔ "Ver mercados" lleva a Mercados 
-  ✔ Ajustes muestra el plan, el nivel de IA fijo (con nombre de FinAgent) y las conversaciones 
+  ✔ Ajustes muestra el plan y las conversaciones, sin niveles ni nombres de modelo 
   ✔ muestra el aviso del nivel gratuito de Gemini 
   ✔ Ajustes invita a ver los planes (Plus y Pro, próximamente) 
   ✔ NO hay ninguna clave de Gemini en Ajustes 
   ✔ sin desborde horizontal en S6-ajustes-plan 
   ✔ desde Ajustes también se abre la pantalla de planes, y recuerda que ya te anotaste en Plus 
-  ✔ el código desbloquea el plan Plus con su nivel más potente (FinAgent AI Avanzado) 
+  ✔ el código desbloquea el plan Plus (10 conversaciones por día) 
   ✔ y el chat lo refleja: Plan Plus con 7 conversaciones (10 - 3 ya usadas) 
   ✔ sin desborde horizontal en S7-plan-plus 
   ✔ al reabrir entra directo y NO crea otra cuenta 

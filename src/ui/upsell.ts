@@ -20,10 +20,10 @@ export async function maybeUpsellCard(trigger: Trigger, onPlans: () => void): Pr
     const free = plans.find((p) => p.id === 'free'), top = [...plans].filter((p) => p.id !== 'free').sort((a, b) => b.dailyLimit - a.dailyLimit)[0];
     if (free && top) { times = planMultiplier(top, free); model = top.label; }
   } catch { /* sin catálogo: se muestra el texto sin números */ }
-  const more = times >= 2 ? t('{m} tiene {n}x más usos y un modelo más potente.', { m: t(model), n: times }) : t('Los planes de pago tendrán más usos y un modelo más potente.');
+  const more = times >= 2 ? t('{m} tiene {n}x más usos.', { m: t(model), n: times }) : t('Los planes de pago tendrán más usos.');
   const el = h('div', { class: 'upsell-card' });
   el.innerHTML = `<span class="upsell-tag">Sugerencia</span>
-    <div class="upsell-row"><span class="upsell-ic">${icon('gem', 20)}</span><div><b>${esc(t(trigger === 'low-quota' ? 'Te queda 1 conversación hoy' : 'Más usos, un modelo más potente'))}</b>
+    <div class="upsell-row"><span class="upsell-ic">${icon('gem', 20)}</span><div><b>${esc(t(trigger === 'low-quota' ? 'Te queda 1 conversación hoy' : 'Más conversaciones por día'))}</b>
       <p>${esc(more)} ${esc(t('Los gráficos, los mercados y las herramientas siguen gratis.'))}</p></div></div>
     <div class="upsell-actions"><button class="btn btn-primary btn-sm" data-u="plans">Ver planes</button><button class="btn btn-ghost btn-sm" data-u="later">Ahora no</button><button class="link-btn" data-u="never">No mostrar más</button></div>`;
   el.addEventListener('click', (e) => {

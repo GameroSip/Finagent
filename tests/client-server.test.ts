@@ -148,13 +148,13 @@ describe('capacidad: explica qué pasó en vez de "Mucha demanda, reintentando�
 });
 
 describe('planes: lo que ve la persona', () => {
-  it('el catálogo muestra el plan gratis disponible y los de pago como próximamente, con modelo y conversaciones por día', async () => {
+  it('el catálogo muestra el plan gratis disponible y los de pago como próximamente, con conversaciones por día (hoy todos usan el mismo modelo liviano)', async () => {
     const s = await makeServer(); bridge(s);
     const { tier, plans } = await fetchPlans();
     expect(tier).toBe('free');
     expect(plans.find((p) => p.id === 'free')).toMatchObject({ available: true, modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 3 });
     const paid = plans.filter((p) => !p.available);
-    expect(paid.map((p) => [p.id, p.modelLabel, p.dailyLimit])).toEqual([['plus', 'Gemini 3.8 Flash', 10], ['pro', 'Gemini 3.8 Flash', 30]]);
+    expect(paid.map((p) => [p.id, p.modelLabel, p.dailyLimit])).toEqual([['plus', 'Gemini 3.5 Flash-Lite', 10], ['pro', 'Gemini 3.5 Flash-Lite', 30]]);
     expect(paid[1].deepModelLabel).toBe('Gemini 3.1 Pro');
   });
   it('"Avisame" anota el interés en el servidor y lo recuerda en el teléfono', async () => {
@@ -164,11 +164,11 @@ describe('planes: lo que ve la persona', () => {
     expect(getInterests()).toEqual(['plus']);
     expect((await s.call('GET', '/v1/admin/usage', { token: ADMIN })).json.interest).toEqual({ plus: 1 });
   });
-  it('un código de plan desbloquea un plan más potente; los errores se explican', async () => {
+  it('un código de plan desbloquea un plan con más conversaciones; los errores se explican', async () => {
     const s = await makeServer(); bridge(s);
     const [code, code2] = await s.invite('plus', 2, 1);
     const r = await redeemPlanCode(code.toLowerCase());
-    expect(r).toMatchObject({ unchanged: false, plan: { id: 'plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10 } });
+    expect(r).toMatchObject({ unchanged: false, plan: { id: 'plus', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 10 } });
     await settle();
     expect(quotaInfo().plan?.id).toBe('plus');
     expect(quotaInfo().remaining?.day).toBe(10);

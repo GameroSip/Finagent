@@ -20,8 +20,8 @@ check('la cuenta se creó sola (una sola vez)', M.apiState.deviceAuths === 1, St
 // 2) el chat dice qué plan tenés, qué modelo usa y cuántas conversaciones por día
 await tab(p, 'chat'); await sleep(900);
 const banner = await text(p, '#c-plan');
-check('el chat explica el plan: "Plan Gratis · Gemini 3.5 Flash-Lite · 3 conversaciones por día"', /Plan Gratis · Gemini 3\.5 Flash-Lite · 3 conversaciones por día/.test(banner), banner.slice(0, 140));
-check('ofrece los planes de pago como próximamente (más potentes, más conversaciones)', /planes de pago \(próximamente\)/.test(banner) && /modelos más potentes y más conversaciones/.test(banner));
+check('el chat explica el plan sin nombres de modelo (y mantiene el aviso de privacidad sobre Gemini): "Plan Gratis · 3 conversaciones por día"', /Plan Gratis · 3 conversaciones por día/.test(banner) && !/Gemini \d|Flash/.test(banner) && /nivel gratuito de Gemini/.test(banner), banner.slice(0, 140));
+check('ofrece los planes de pago como próximamente (más conversaciones por día, sin prometer un modelo más potente)', /planes de pago \(próximamente\)/.test(banner) && /más conversaciones por día/.test(banner) && !/potente/.test(banner));
 check('avisa con honestidad que el nivel gratuito de Gemini puede usar las consultas', /nivel gratuito de Gemini/.test(banner) && /datos personales/.test(banner));
 check('el contador del chat muestra el plan y las conversaciones que quedan', /^Plan Gratis · te quedan 3 conversaciones hoy$/.test(await chip(p)), await chip(p));
 await shot(p, 'S2-chat-vacio');
@@ -30,8 +30,8 @@ const cards = await p.$$eval('.plan-card', (c) => c.map((x) => ({ n: x.querySele
 const sheetTxt = await text(p, '.plans-sheet');
 check('"Ver planes" abre la pantalla de planes (Plus y Pro)', /Llevá FinAgent al siguiente nivel/.test(sheetTxt) && cards.map((c) => c.n).join() === 'Plus,Pro', JSON.stringify(cards.map((c) => c.n)));
 check('el multiplicador sale de los límites reales: Plus 3x (10 contra 3) y Pro 10x (30 contra 3)', cards[0].m === '3x' && cards[1].m === '10x', JSON.stringify(cards.map((c) => c.m)));
-check('Pro ofrece análisis profundo (nivel FinAgent AI Profundo) y Plus no (solo ventajas reales)', /Análisis profundo \(FinAgent AI Profundo\)/.test(cards[1].t) && !/profundo/.test(cards[0].t));
-check('explica por qué pagar: un nivel de IA más potente, respaldo automático y sin recordatorios', /Un nivel de IA más potente: FinAgent AI Avanzado/.test(cards[0].t) && !/Gemini 3\.\d/.test(cards[0].t) && /Respaldo automático/.test(cards[0].t) && /Sin recordatorios de planes/.test(cards[0].t));
+check('las tarjetas muestran lo que incluyen HOY (cupo de conversaciones) y NO anuncian análisis profundo, niveles ni nombres de modelo', /10 conversaciones con la IA por día/.test(cards[0].t) && /30 conversaciones con la IA por día/.test(cards[1].t) && !/profundo|nivel|modelo|Gemini|Flash|Rápido|Avanzado/i.test(cards[0].t + cards[1].t), cards[0].t.slice(0, 200));
+check('lo que todavía no existe va aparte, marcado "Próximamente (todavía no existen)": Plus con 3 funciones planeadas y Pro con 5, y no se mezcla con lo incluido', /Próximamente \(todavía no existen\)/.test(cards[0].t) && /Mi cartera/.test(cards[0].t) && /Calculadora de escenarios/.test(cards[0].t) && /Informe de un activo en PDF/.test(cards[1].t) && !/Informe de un activo en PDF/.test(cards[0].t) && (await p.$$('.plan-card')).length === 2 && (await p.$$eval('.plan-card', (cs) => cs.map((c) => c.querySelectorAll('.plan-soon li').length))).join() === '3,5' && /Sin recordatorios de planes/.test(cards[0].t));
 check('destaca lo que sigue gratis y compara los planes', /Gratis para siempre/.test(sheetTxt) && /Fibonacci/.test(sheetTxt) && (await p.$('.plans-cmp')) !== null);
 check('aclara con honestidad que todavía no se puede contratar ni tiene precio', /Todavía no se puede contratar ni tiene precio definido/.test(sheetTxt) && /Avisame cuando esté disponible/.test(sheetTxt));
 await shot(p, 'S2b-planes');
@@ -86,7 +86,7 @@ check('"Ver mercados" lleva a Mercados', (await activeTab(p)) === 'market', Stri
 // 6) Ajustes: plan, modelo fijo y planes de pago con "Avisame"
 await tab(p, 'settings'); await sleep(1200);
 let st = await p.evaluate(() => document.body.innerText);
-check('Ajustes muestra el plan, el nivel de IA fijo (con nombre de FinAgent) y las conversaciones', /Plan Gratis/.test(st) && /0 de 3 conversaciones hoy/.test(st) && /FinAgent AI Rápido/.test(st) && /Nivel de IA/.test(st), st.match(/Tu plan[^]{0,200}/)?.[0]);
+check('Ajustes muestra el plan y las conversaciones, sin niveles ni nombres de modelo', /Plan Gratis/.test(st) && /0 de 3 conversaciones hoy/.test(st) && !/Nivel de IA|FinAgent AI (Rápido|Avanzado)|Gemini 3/.test((st.match(/Tu plan[^]{0,260}/) ?? [''])[0]), st.match(/Tu plan[^]{0,200}/)?.[0]);
 check('muestra el aviso del nivel gratuito de Gemini', /Por ahora FinAgent usa el nivel gratuito de Gemini/.test(st));
 check('Ajustes invita a ver los planes (Plus y Pro, próximamente)', /Plus y Pro\s*Próximamente/.test(st) && (await p.$('#s-plans-open')) !== null, st.match(/Planes de pago[^]{0,200}/)?.[0]);
 check('NO hay ninguna clave de Gemini en Ajustes', (await p.$('#s-key')) === null && !/Clave de Gemini/.test(st));
@@ -98,7 +98,7 @@ await p.evaluate(() => document.querySelector('.sheet-back').click()); await sle
 // 7) un código de plan (para testers) desbloquea un plan más potente
 await p.type('#s-code', 'fatest2222'); await p.click('#s-redeem'); await sleep(1500);
 st = await p.evaluate(() => document.body.innerText);
-check('el código desbloquea el plan Plus con su nivel más potente (FinAgent AI Avanzado)', /Plan Plus/.test(st) && /FinAgent AI Avanzado/.test(st), st.match(/Tu plan[^]{0,160}/)?.[0]);
+check('el código desbloquea el plan Plus (10 conversaciones por día)', /Plan Plus/.test(st) && /de 10 conversaciones hoy/.test(st), st.match(/Tu plan[^]{0,160}/)?.[0]);
 await tab(p, 'chat'); await sleep(500);
 check('y el chat lo refleja: Plan Plus con 7 conversaciones (10 - 3 ya usadas)', /^Plan Plus · te quedan 7 conversaciones hoy$/.test(await chip(p)), await chip(p));
 await shot(p, 'S7-plan-plus');
@@ -127,7 +127,7 @@ await p.close();
 const seed = { 'finagent.upsell.v1': JSON.stringify({ answers: 6, lastShown: Date.now() - 9 * 864e5, dismissedUntil: 0, shownAt: [] }) };
 M.resetApi();
 let w = await newPage({ key: '', extra: seed }); await w.waitForSelector('.tabbar', { timeout: 12000 }); await sleep(3500);
-check('en Mercados aparece el recordatorio semanal (plan gratis, ya usó la app, pasó una semana)', (await w.$('#m-upsell .upsell-card')) !== null && /Más usos, un modelo más potente/.test(await text(w, '#m-upsell')), await text(w, '#m-upsell'));
+check('en Mercados aparece el recordatorio semanal (plan gratis, ya usó la app, pasó una semana)', (await w.$('#m-upsell .upsell-card')) !== null && /Más conversaciones por día/.test(await text(w, '#m-upsell')) && !/potente/.test(await text(w, '#m-upsell')), await text(w, '#m-upsell'));
 await shot(w, 'S8-recordatorio-semanal');
 await w.reload({ waitUntil: 'load' }); await w.waitForSelector('.tabbar', { timeout: 12000 }); await sleep(3000);
 check('al volver no se repite (como máximo uno cada 24 horas)', (await w.$('#m-upsell .upsell-card')) === null);

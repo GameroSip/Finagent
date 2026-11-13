@@ -94,11 +94,11 @@ export function geminiReply(url, body) {
 // ------------------------------------------------------------------ servidor de FinAgent simulado (modo beta)
 export const FA_CODE = 'FA-TEST-2222';
 const FREE = { id: 'free', label: 'Gratis', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 3, monthlyLimit: 90, available: true };
-const PLUS = { id: 'plus', label: 'Plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10, monthlyLimit: 200, available: false };
+const PLUS = { id: 'plus', label: 'Plus', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 10, monthlyLimit: 200, available: false };
 const PLAN_LIST = [
-  { ...FREE, blurb: 'Respuestas rápidas con un modelo liviano.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: false },
-  { ...PLUS, blurb: 'Un modelo más potente y más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: true },
-  { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El modelo más potente para análisis profundos y el máximo de conversaciones.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30, hasFallback: true },
+  { ...FREE, blurb: 'Respuestas rápidas, todos los días.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: false },
+  { ...PLUS, blurb: 'Más conversaciones por día.', deepModelLabel: null, deepMonthlyLimit: 0, hasFallback: false },
+  { id: 'pro', label: 'Pro', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 30, monthlyLimit: 600, available: false, blurb: 'El máximo de conversaciones por día.', deepModelLabel: 'Gemini 3.1 Pro', deepMonthlyLimit: 30, hasFallback: false },
 ];
 const fresh = () => ({ used: 0, month: 0, turn: 0, plan: 'free', capacity: null, banned: false, tokens: new Set(), deviceAuths: 0, interest: [], deleted: 0, failDelete: false, consent: null, consentCalls: [], events: [], eventBatches: 0, feedback: [], votes: [], rawBodies: [] });
 export const apiState = fresh();

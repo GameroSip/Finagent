@@ -197,3 +197,8 @@ h1, h2, h3 { letter-spacing: -.01em; }
 /* ---- nivel que respondió */
 .tier-line { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
 .tier-line.fb { color: var(--text-2); }
+
+/* ---- funciones planeadas en las tarjetas de planes ("Próximamente") */
+.plan-soon { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+.plan-soon-h { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.plan-ul.soon li { color: var(--text-2); } .plan-ul.soon li svg { color: var(--muted); }

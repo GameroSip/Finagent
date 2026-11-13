@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FREE_FOREVER, planMultiplier, planPitch } from '../src/planPitch';
+import { existsSync, readFileSync } from 'node:fs';
+import { FREE_FOREVER, SOON_BY_PLAN, planMultiplier, planPitch } from '../src/planPitch';
 import type { PlanEntry } from '../src/server';
 import { DISMISS_HARD, DISMISS_SOFT, EMPTY, MAX_PER_30D, decideUpsell, type UpsellState } from '../src/upsell';
 
@@ -21,12 +22,23 @@ describe('lo que se promete de cada plan sale de sus límites reales', () => {
     expect(planPitch({ ...pro, dailyLimit: 45 }, FREE).headline).toBe('15x más usos que el plan gratuito');
     expect(planPitch({ ...pro, dailyLimit: 3 }, FREE).headline).toBe('Más usos que el plan gratuito');   // sin ventaja real, no promete un número
   });
-  it('solo enumera ventajas que el plan realmente tiene', () => {
-    const plus = entry({ id: 'plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10, hasFallback: true }), pro = entry({ id: 'pro', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 30, deepModelLabel: 'Gemini 3.1 Pro', hasFallback: true });
-    expect(planPitch(plus, FREE).benefits).toEqual(['Un nivel de IA más potente: FinAgent AI Avanzado', 'Respaldo automático si el modelo principal está saturado', 'Sin recordatorios de planes']);
-    expect(planPitch(pro, FREE).benefits).toContain('Análisis profundo (FinAgent AI Profundo)');
-    expect(planPitch(plus, FREE).benefits.join()).not.toMatch(/profundo/);                     // Plus no tiene análisis profundo
-    expect(planPitch({ ...plus, modelLabel: FREE.modelLabel, hasFallback: false }, FREE).benefits.join()).not.toMatch(/más potente|Respaldo/);   // mismo nivel: no dice "más potente"
+  it('solo enumera como incluido lo que el plan realmente tiene HOY (cupo y sin recordatorios), y lo planeado va aparte', () => {
+    const plus = entry({ id: 'plus', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 10 }), pro = entry({ id: 'pro', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 30, deepModelLabel: 'Gemini 3.1 Pro' });
+    expect(planPitch(plus, FREE).benefits).toEqual(['10 conversaciones con la IA por día', 'Sin recordatorios de planes']);
+    expect(planPitch(pro, FREE).benefits).toEqual(['30 conversaciones con la IA por día', 'Sin recordatorios de planes']);
+    for (const p of [plus, pro]) expect(planPitch(p, FREE).benefits.join(' ')).not.toMatch(/nivel|modelo|más potente|profundo|respaldo|Gemini|FinAgent AI (Rápido|Avanzado|Profundo)/i);   // un solo modelo: no se anuncia "mejor IA"
+  });
+  it('las funciones que todavía no existen se muestran APARTE (Próximamente), nunca mezcladas con lo incluido', () => {
+    const plus = planPitch(entry({ id: 'plus', dailyLimit: 10 }), FREE), pro = planPitch(entry({ id: 'pro', dailyLimit: 30 }), FREE), gratis = planPitch(entry({ id: 'free', dailyLimit: 3 }), FREE);
+    expect(plus.soon).toEqual(SOON_BY_PLAN.plus); expect(pro.soon).toEqual(SOON_BY_PLAN.pro); expect(gratis.soon).toEqual([]);
+    expect(plus.soon.length).toBe(3); expect(pro.soon.length).toBe(5); for (const x of plus.soon) expect(pro.soon).toContain(x);            // Pro incluye todo lo planeado de Plus
+    for (const p of [plus, pro]) for (const x of p.soon) expect(p.benefits).not.toContain(x);
+  });
+  it('coherencia con el producto: no se anuncia nada que la app todavía no puede hacer (análisis profundo, cartera, calculadora, PDF, resumen semanal)', () => {
+    const chat = readFileSync('src/views/chat.ts', 'utf8');
+    expect(chat).not.toMatch(/\bdeep\b/);                                                // la app no tiene cómo pedir el análisis profundo: no puede ofrecerse como incluido
+    for (const f of ['portfolio', 'cartera', 'calculadora', 'calculator', 'weekly', 'resumen']) expect(existsSync(`src/views/${f}.ts`), `existe src/views/${f}.ts: si se construyó, pasar la función de "Próximamente" a "incluido"`).toBe(false);
+    const view = readFileSync('src/views/plans.ts', 'utf8'); expect(view).toContain("Próximamente (todavía no existen)"); expect(view).not.toMatch(/Análisis profundo|Nivel de IA|plan-model/);
   });
   it('lo que sigue gratis son funciones que existen hoy', () => {
     expect(FREE_FOREVER.length).toBeGreaterThanOrEqual(5);

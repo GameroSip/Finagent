@@ -5,6 +5,8 @@ import { PRICES } from '../src/pricing';
 
 const P = (o: Partial<EconParams> = {}): EconParams => ({ ...DEFAULT_PARAMS, now: new Date('2026-10-21T12:00:00Z'), ...o });
 
+const LITE = (8475 * 0.30 + 354 * 2.5) / 1e6;     // costo por respuesta del modelo liviano que hoy usan TODOS los planes: USD 0,0034275
+
 describe('costo de una respuesta', () => {
   it('con los tokens medidos y el precio oficial de cada modelo (USD por millón)', () => {
     expect(costPerAnswer('gemini-3.5-flash-lite', P()).usd).toBeCloseTo(8475 * 0.3 / 1e6 + 354 * 2.5 / 1e6, 10);   // 0,0034275
@@ -31,14 +33,14 @@ describe('economía del plan', () => {
     const e = planEconomics(PLANS.plus, P());
     expect(e.answersAvg).toBeCloseTo(10 * 15 * 0.4, 10);        // 60 respuestas
     expect(e.answersMax).toBe(300);
-    expect(e.costAvg).toBeCloseTo(60 * 0.00768375, 8);          // USD 0,461
-    expect(e.costMax).toBeCloseTo(300 * 0.00768375, 8);         // USD 2,305
+    expect(e.costAvg).toBeCloseTo(60 * LITE, 8);                // USD 0,206
+    expect(e.costMax).toBeCloseTo(300 * LITE, 8);               // USD 1,028
     expect(e.netFactor).toBeCloseTo(0.85, 10);
-    expect(e.breakEven).toBeCloseTo(0.461025 / 0.85, 8);
+    expect(e.breakEven).toBeCloseTo((60 * LITE) / 0.85, 8);
     const r499 = e.rows.find((r) => r.price === 4.99)!;
     expect(r499.net).toBeCloseTo(4.99 * 0.85, 10);
-    expect(r499.marginAvg).toBeCloseTo((4.2415 - 0.461025) / 4.2415, 6);
-    expect(r499.marginWorst).toBeCloseTo((4.2415 - 2.305125) / 4.2415, 6);
+    expect(r499.marginAvg).toBeCloseTo((4.2415 - 60 * LITE) / 4.2415, 6);
+    expect(r499.marginWorst).toBeCloseTo((4.2415 - 300 * LITE) / 4.2415, 6);
   });
   it('en el punto de equilibrio no ganás ni perdés, y en el precio recomendado ganás exactamente el margen elegido', () => {
     for (const id of ['plus', 'pro'] as const) {
@@ -58,8 +60,8 @@ describe('economía del plan', () => {
   });
   it('el plan Pro suma el sobrecosto de sus análisis profundos y el Plus no tiene ninguno', () => {
     const pro = planEconomics(PLANS.pro, P(), [1]), noDeep = planEconomics({ ...PLANS.pro, deepModel: undefined, deepMonthlyLimit: 0 }, P(), [1]);
-    expect(pro.costMax - noDeep.costMax).toBeCloseTo(30 * (0.021198 - 0.00768375), 8);
-    expect(pro.costAvg - noDeep.costAvg).toBeCloseTo(30 * 0.4 * (0.021198 - 0.00768375), 8);
+    expect(pro.costMax - noDeep.costMax).toBeCloseTo(30 * (0.021198 - LITE), 8);
+    expect(pro.costAvg - noDeep.costAvg).toBeCloseTo(30 * 0.4 * (0.021198 - LITE), 8);
   });
   it('trae una tabla de precios para comparar y ambos planes de pago', () => {
     const all = allPlansEconomics(P());

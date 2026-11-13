@@ -4,6 +4,7 @@ import { PLANS } from '../src/plans';
 import { SYSTEM_PROMPT } from '../src/prompt';
 import { signToken, verifyToken } from '../server/auth';
 import { NodeSql } from '../server/node-sql';
+import { ModelRouter } from '../server/gemini';
 import { SCHEMA_SQL, SCHEMA_V1, SCHEMA_V2 } from '../server/schema';
 import { ADMIN, makeServer, user } from './helpers/make-server';
 
@@ -78,7 +79,7 @@ describe('cuenta automática: se abre la app y funciona, sin registro ni código
     expect(p.tier).toBe('free');
     expect(p.plans.map((x: any) => [x.id, x.available])).toEqual([['free', true], ['plus', false], ['pro', false]]);
     expect(p.plans[0]).toMatchObject({ modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 3 });
-    expect(p.plans[1]).toMatchObject({ modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10 });
+    expect(p.plans[1]).toMatchObject({ modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 10 });          // hoy todos los planes usan el mismo modelo liviano
     expect(p.plans[2].deepModelLabel).toBe('Gemini 3.1 Pro');
   });
 });
@@ -92,7 +93,7 @@ describe('códigos de plan (para testers): desbloquean un plan, no sirven para e
     const { token } = await s.session();
     const r = await s.call('POST', '/v1/plan/redeem', { token, body: { code: codes[0].toLowerCase() } });   // en minúsculas también anda
     expect(r.status).toBe(200);
-    expect(r.json.plan).toMatchObject({ id: 'plus', modelLabel: 'Gemini 3.8 Flash', dailyLimit: 10 });
+    expect(r.json.plan).toMatchObject({ id: 'plus', modelLabel: 'Gemini 3.5 Flash-Lite', dailyLimit: 10 });
     expect(r.json.remaining.day).toBe(10);
     expect((await s.call('GET', '/v1/me', { token })).json.plan.id).toBe('plus');
   });
@@ -232,7 +233,7 @@ describe('consultas con límites por plan', () => {
     expect((await s.call('GET', '/v1/me', { token })).json.plan.dailyLimit).toBe(3);
     expect((await s.call('POST', '/v1/admin/users', { token: ADMIN, body: { userId, plan: 'plus' } })).json.updated).toBe(1);
     const me = await s.call('GET', '/v1/me', { token });
-    expect(me.json.plan).toMatchObject({ id: 'plus', dailyLimit: 10, modelLabel: 'Gemini 3.8 Flash' });
+    expect(me.json.plan).toMatchObject({ id: 'plus', dailyLimit: 10, modelLabel: 'Gemini 3.5 Flash-Lite' });
     expect(me.json.remaining.day).toBe(10);
   });
   it('una ráfaga de pedidos (más de 20 por minuto) se frena con su propio aviso y no gasta consultas', async () => {
@@ -270,7 +271,7 @@ describe('el servidor pone el prompt, el contexto del plan y las herramientas', 
     const { token } = await s.session('plus');
     await s.ask(token);
     const sys: string = s.seen[0].body.systemInstruction.parts[0].text;
-    expect(sys).toContain('Plan Plus: usa Gemini 3.8 Flash y permite 10 conversaciones por día');
+    expect(sys).toContain('Plan Plus: usa Gemini 3.5 Flash-Lite y permite 10 conversaciones por día');
     expect(sys).not.toContain('todavía no están disponibles');
   });
   it('rechaza pedidos mal formados, con demasiados mensajes o demasiado grandes', async () => {
@@ -315,32 +316,36 @@ describe('un modelo fijo por plan y capacidad explicada (no "reintentando")', ()
     expect(r.json.error).toBe('busy');
     expect(n).toBe(2);
   });
-  it('los planes de pago sí tienen un respaldo: si el principal no tiene cupo, responde el de respaldo y lo informa', async () => {
+  it('los planes de pago usan el mismo modelo liviano que el gratis y NO tienen respaldo: sin cupo de Google, se avisa que no hay capacidad (no se inventa otra respuesta)', async () => {
     const calls: string[] = [];
-    const s = await makeServer({ gemini: async (m) => { calls.push(m); return m === FLASH ? quota('45s') : ok(); } });
+    const s = await makeServer({ gemini: async (m) => { calls.push(m); return quota('45s'); } });
     const { token } = await s.session('plus');
-    const r1 = await s.ask(token);
-    expect(r1.status).toBe(200); expect(r1.json.model).toBe(LITE);
-    await s.ask(token);
-    expect(calls).toEqual([FLASH, LITE, LITE]);
-    s.advance(50_000);
-    await s.ask(token);
-    expect(calls.at(-2)).toBe(FLASH);
+    const r = await s.ask(token);
+    expect(r.status).toBe(503); expect(r.json.error).toBe('capacity'); expect(calls).toEqual([LITE]);
   });
-  it('dentro de una respuesta se sigue con el mismo modelo; si falla, se pasa al de respaldo aplanando las firmas de razonamiento', async () => {
+  it('(para cuando se pague Gemini y un plan tenga más de un modelo) dentro de una respuesta se sigue con el mismo modelo; si falla, se pasa al de respaldo aplanando las firmas de razonamiento', async () => {
     const seen: Array<{ model: string; body: any }> = [];
     let n = 0;
-    const s = await makeServer({ gemini: async (model, body) => { seen.push({ model, body }); n++; return n === 2 ? quota('30s') : ok([{ text: 'ok' }]); } });
-    const { token } = await s.session('plus');
-    const r1 = await s.ask(token);
+    const router = new ModelRouter(async (model, body) => { seen.push({ model, body }); n++; return n === 2 ? quota('30s') : ok([{ text: 'ok' }]); }, () => 1_000_000, async () => {});
+    const chain = [FLASH, LITE];
+    const r1 = await router.generate({ chain, contents: user('¿precio?'), withTools: true });
+    expect(r1.ok && r1.model).toBe(FLASH);
     const contents = [...user('¿precio?'), { role: 'model', parts: [{ functionCall: { name: 'get_quote', args: { ticker: 'AAPL' } }, thoughtSignature: 'firma-del-modelo-1' }] }, { role: 'user', parts: [{ functionResponse: { name: 'get_quote', response: { result: { price: 1 } } } }] }];
-    const r2 = await s.call('POST', '/v1/generate', { token, body: { contents, withTools: true, turn: r1.json.turn } });
-    expect(r2.status).toBe(200); expect(r2.json.model).toBe(LITE);
+    const r2 = await router.generate({ chain, pinned: FLASH, contents, withTools: true });
+    expect(r2.ok && r2.model).toBe(LITE);
     const [, first, second] = seen;
     expect(first.model).toBe(FLASH);
     expect(JSON.stringify(first.body.contents)).toContain('firma-del-modelo-1');
     expect(JSON.stringify(second.body.contents)).not.toContain('thoughtSignature');
     expect(JSON.stringify(second.body.contents)).toContain('[consulté get_quote');
+  });
+  it('(idem) con varios modelos, si el principal no tiene cupo responde el de respaldo, se lo aparta lo que Google diga y se vuelve a probar después', async () => {
+    const calls: string[] = [], clock = { t: 1_000_000 };
+    const router = new ModelRouter(async (m) => { calls.push(m); return m === FLASH ? quota('45s') : ok(); }, () => clock.t, async () => {});
+    const go = () => router.generate({ chain: [FLASH, LITE], contents: user('x'), withTools: true });
+    const r1 = await go(); expect(r1.ok && r1.model).toBe(LITE);
+    await go(); expect(calls).toEqual([FLASH, LITE, LITE]);
+    clock.t += 50_000; await go(); expect(calls.at(-2)).toBe(FLASH);
   });
   it('un modelo retirado se descarta y una clave inválida del servidor es un error de configuración que no cobra', async () => {
     const retired = await makeServer({ gemini: async () => ({ status: 404, text: 'retirado' }) });
@@ -483,7 +488,7 @@ describe('calculadora de precios del panel', () => {
     const s = await makeServer();
     const r = (await s.call('GET', '/v1/admin/pricing', { token: ADMIN })).json;
     expect(r.plans.map((p: any) => p.plan)).toEqual(['plus', 'pro']);
-    expect(r.plans[0]).toMatchObject({ model: 'gemini-3.8-flash', source: 'estimated' });
+    expect(r.plans[0]).toMatchObject({ model: 'gemini-3.5-flash-lite', source: 'estimated' });
     expect(r.plans[0].recommended).toBeGreaterThan(r.plans[0].breakEven);
     expect(r.plans[1].costMax).toBeGreaterThan(r.plans[0].costMax);
     expect(r.measuredModels).toEqual([]);
@@ -491,17 +496,17 @@ describe('calculadora de precios del panel', () => {
   it('con respuestas reales usa el costo MEDIDO del modelo en lugar del estimado', async () => {
     const s = await makeServer();
     const { token } = await s.session('plus');
-    for (let i = 0; i < 6; i++) await s.ask(token);                       // 6 respuestas de Plus (3.8 Flash) quedan registradas
+    for (let i = 0; i < 6; i++) await s.ask(token);                       // 6 respuestas de Plus (modelo liviano) quedan registradas
     const r = (await s.call('GET', '/v1/admin/pricing', { token: ADMIN })).json;
-    expect(r.measuredModels).toContain('gemini-3.8-flash');
+    expect(r.measuredModels).toContain('gemini-3.5-flash-lite');
     expect(r.plans[0].source).toBe('measured');
     expect(r.plans[0].costPerAnswer).toBeGreaterThan(0);
     expect(r.plans[1].source).toBe('measured');                           // Pro usa el mismo modelo base
   });
-  it('el catálogo público de planes avisa cuáles tienen respaldo automático', async () => {
+  it('hoy ningún plan tiene respaldo automático (todos usan un solo modelo) y el catálogo lo dice', async () => {
     const s = await makeServer();
     const p = (await s.call('GET', '/v1/plans')).json.plans;
-    expect(p.map((x: any) => [x.id, x.hasFallback])).toEqual([['free', false], ['plus', true], ['pro', true]]);
+    expect(p.map((x: any) => [x.id, x.hasFallback])).toEqual([['free', false], ['plus', false], ['pro', false]]);
   });
 });
 

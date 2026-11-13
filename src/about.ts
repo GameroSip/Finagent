@@ -20,7 +20,6 @@ export const ABOUT = {
   privacyServer: 'Tus preguntas se procesan en los servidores de FinAgent y se envían a Google (Gemini) para generar la respuesta. FinAgent no guarda el texto de tus consultas en el servidor: solo cuenta cuántas hacés y cuántos tokens usan, para aplicar los límites de tu plan. Tu historial queda en este teléfono.',
   vsNote: 'Algunas IA también usan búsqueda o herramientas. La diferencia de FinAgent es que además verifica cada cifra antes de mostrártela.',
   engine: 'FinAgent AI es el asistente de FinAgent. Está construido sobre modelos Gemini de Google y lo completan herramientas de datos de mercado, un verificador de cifras y modelos de volatilidad propios. FinAgent no entrena ni ajusta el modelo de lenguaje: usa los de Google tal como son.',
-  tiers: 'Los niveles Rápido, Avanzado y Profundo son nombres de FinAgent para modelos Gemini de distinto tamaño. Si el nivel de tu plan no está disponible en ese momento, se usa uno menor.',
   deletion: 'Podés eliminar tu cuenta y todos tus datos del servidor cuando quieras: Ajustes → Eliminar mi cuenta y mis datos.',
   privacyStats: 'Si aceptás ayudar a mejorar la beta, FinAgent también registra qué funciones usás, qué activos abrís y las búsquedas que no encontraron resultado, sin tu nombre ni tu correo. Nunca registra lo que le escribís al asistente, tu plan ni tus favoritos. Los comentarios que decidas enviar sí nos llegan. Podés apagarlo cuando quieras en Ajustes.',
   // Se muestra mientras el servidor use el nivel GRATUITO de Gemini (el servidor informa su nivel): en ese nivel Google puede usar las consultas para mejorar sus productos.
@@ -31,7 +30,7 @@ export const ABOUT = {
 };
 
 /** Todo el texto visible de la presentación, en una lista (para controlarlo). */
-export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyStats, ABOUT.deletion, ABOUT.engine, ABOUT.tiers, ABOUT.vsNote, POWERED_BY, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
+export const aboutTexts = (): string[] => [ABOUT.what, ABOUT.coverage, ...ABOUT.how, ABOUT.limits, ABOUT.privacy, ABOUT.privacyServer, ABOUT.privacyStats, ABOUT.deletion, ABOUT.engine, ABOUT.vsNote, POWERED_BY, ABOUT.privacyGoogle, ABOUT.freeTier, ABOUT.credits];
 
 /** Frases que NO pueden aparecer en la presentación de la app mientras no sean ciertas. */
 export const FORBIDDEN_CLAIMS: Array<[string, RegExp]> = [

@@ -11,7 +11,9 @@ function mk(handler: (c: Call, n: number) => any) {
   return { r, calls, clock };
 }
 const timeoutErr = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
-const inp = (over: Record<string, unknown> = {}) => ({ chain: chainFor(PLANS.plus), contents: [{ role: 'user', parts: [{ text: 'hola' }] }], withTools: false, thinking: 'low' as const, ...over });
+/** Una cadena con modelo potente y respaldo: hoy ningún plan la usa (todos usan Flash-Lite), pero el enrutador está listo para cuando se pague Gemini. */
+const PREMIUM = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+const inp = (over: Record<string, unknown> = {}) => ({ chain: PREMIUM, contents: [{ role: 'user', parts: [{ text: 'hola' }] }], withTools: false, thinking: 'low' as const, ...over });
 const level = (c: Call) => c.body.generationConfig?.thinkingConfig?.thinkingLevel;
 
 describe('razonamiento explícito (la causa de que el modelo potente tarde)', () => {
@@ -24,10 +26,10 @@ describe('razonamiento explícito (la causa de que el modelo potente tarde)', ()
   it('el pedido lleva generationConfig.thinkingConfig.thinkingLevel SOLO cuando corresponde (el nombre exacto que documenta Google)', () => {
     expect(buildBody([], false, undefined, 'low').generationConfig).toEqual({ thinkingConfig: { thinkingLevel: 'low' } }); expect('generationConfig' in buildBody([], false)).toBe(false);
   });
-  it('los planes piden "low" para chat y "medium" solo para el análisis profundo', () => {
-    expect(PLANS.plus.thinking).toBe('low'); expect(PLANS.pro.thinking).toBe('low'); expect(PLANS.pro.deepThinking).toBe('medium'); expect(PLANS.free.thinking).toBe('minimal');
+  it('hoy todos los planes usan el modelo liviano (razonamiento "minimal": no se manda nada) y solo el análisis profundo de Pro pide "medium"', () => {
+    for (const p of [PLANS.free, PLANS.plus, PLANS.pro]) expect(p.thinking).toBe('minimal'); expect(PLANS.pro.deepThinking).toBe('medium');
   });
-  it('Plus: el modelo potente recibe "low" y el respaldo (Flash-Lite) no recibe ajuste', async () => {
+  it('con una cadena potente + respaldo: el modelo potente recibe "low" y el respaldo (Flash-Lite) no recibe ajuste', async () => {
     const { r, calls } = mk((c) => (c.model === 'gemini-3.8-flash' ? { status: 429, text: '{"error":{"message":"quota"}}' } : OK));
     const res = await r.generate(inp()); expect(res.ok).toBe(true);
     expect(calls.map((c) => [c.model, level(c)])).toEqual([['gemini-3.8-flash', 'low'], ['gemini-3.5-flash-lite', undefined]]);
@@ -47,7 +49,7 @@ describe('límite de espera por modelo', () => {
     let m = mk((c) => (c.model === 'gemini-3.8-flash' ? { status: 429, text: '{}' } : OK)); await m.r.generate(inp());
     expect(m.calls.map((c) => c.timeoutMs)).toEqual([ATTEMPT_TIMEOUT_MS.fast, ATTEMPT_TIMEOUT_MS.last]);
     m = mk(() => OK); await m.r.generate(inp({ chain: chainFor(PLANS.free) })); expect(m.calls[0].timeoutMs).toBe(ATTEMPT_TIMEOUT_MS.last);                     // plan gratuito: no hay a dónde pasar
-    m = mk(() => OK); await m.r.generate(inp({ chain: chainFor(PLANS.pro, true), deep: true })); expect(m.calls[0].timeoutMs).toBe(ATTEMPT_TIMEOUT_MS.deep);
+    m = mk(() => OK); await m.r.generate(inp({ chain: ['gemini-3.1-pro-preview', 'gemini-3.5-flash-lite'], deep: true })); expect(m.calls[0].timeoutMs).toBe(ATTEMPT_TIMEOUT_MS.deep);
     expect(ATTEMPT_TIMEOUT_MS.fast).toBeLessThan(ATTEMPT_TIMEOUT_MS.deep); expect(ATTEMPT_TIMEOUT_MS.deep).toBeLessThan(ATTEMPT_TIMEOUT_MS.last);
   });
   it('si el modelo potente se pasa de tiempo, responde el respaldo SIN reintentar el mismo modelo (no se espera dos veces)', async () => {
@@ -91,20 +93,21 @@ import { computeMetrics } from '../server/metrics';
 import { cleanEvent } from '../src/telemetry';
 import { ADMIN, makeServer } from './helpers/make-server';
 
-describe('de punta a punta: el servidor le pasa a Gemini el nivel de razonamiento de cada plan', () => {
-  it('Plus: "low" al modelo potente; Gratis: nada (Flash-Lite); Pro con análisis profundo: "medium" al modelo Pro', async () => {
+describe('de punta a punta: el servidor y el razonamiento', () => {
+  it('Plus y Gratis usan el modelo liviano SIN ajuste de razonamiento (su velocidad no cambia); Pro con análisis profundo pide "medium" al modelo Pro', async () => {
     const s = await makeServer();
     const plus = await s.session('plus', 'tel-plus-00000001'); expect((await s.ask(plus.token)).status).toBe(200);
-    let last = s.seen[s.seen.length - 1]; expect(last.model).toBe('gemini-3.8-flash'); expect(last.body.generationConfig).toEqual({ thinkingConfig: { thinkingLevel: 'low' } });
+    let last = s.seen[s.seen.length - 1]; expect(last.model).toBe('gemini-3.5-flash-lite'); expect(last.body.generationConfig).toBeUndefined();
     const free = await s.session('free', 'tel-free-00000001'); expect((await s.ask(free.token)).status).toBe(200);
     last = s.seen[s.seen.length - 1]; expect(last.model).toBe('gemini-3.5-flash-lite'); expect(last.body.generationConfig).toBeUndefined();
     const pro = await s.session('pro', 'tel-pro-000000001'); expect((await s.ask(pro.token, { deep: true })).status).toBe(200);
     last = s.seen[s.seen.length - 1]; expect(last.model).toBe('gemini-3.1-pro-preview'); expect(last.body.generationConfig).toEqual({ thinkingConfig: { thinkingLevel: 'medium' } });
   });
-  it('si Gemini no responde a tiempo, el usuario Plus recibe igual su respuesta (del nivel Rápido) y el servidor no se cuelga', async () => {
-    const s = await makeServer({ gemini: async (model) => { if (model === 'gemini-3.8-flash') throw Object.assign(new Error('timeout'), { name: 'TimeoutError' }); return { status: 200, text: JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: 'respuesta' }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 } }) }; } });
+  it('si Gemini no responde a tiempo, el usuario recibe "ocupado" enseguida (no se cuelga) y el servidor lo aparta unos segundos', async () => {
+    let calls = 0;
+    const s = await makeServer({ gemini: async () => { calls++; throw Object.assign(new Error('timeout'), { name: 'TimeoutError' }); } });
     const plus = await s.session('plus', 'tel-plus-00000002'); const r = await s.ask(plus.token);
-    expect(r.status).toBe(200); expect(r.json.model).toBe('gemini-3.5-flash-lite');
+    expect(r.status).toBe(503); expect(r.json.error).toBe('busy'); expect(calls).toBe(1);                    // sin reintento al mismo modelo
   });
 });
 

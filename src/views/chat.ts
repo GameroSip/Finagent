@@ -21,7 +21,6 @@ import { renderRich, type Rich } from './cards';
 import { openHistory } from './history';
 import { analyticsOn, track } from '../analytics';
 import { RATE_REASONS, REPORT_REASONS } from '../betaTexts';
-import { answerTier } from '../brand';
 import { tierOf } from '../tiers';
 import { VERSION } from '../version';
 import { AI_TOOLS, lenBucket } from '../telemetry';
@@ -143,8 +142,8 @@ export function createChatView(ctx: Ctx): ChatView {
   function planBannerHtml(): string {
     const q = quotaInfo(), p = q.plan;
     if (!p) return '';
-    return `<div class="plan-banner" id="c-plan"><div><b>${esc(t('Plan {name}', { name: t(p.label) }))}</b> · ${esc(p.modelLabel)} · ${esc(t('{n} conversaciones por día', { n: p.dailyLimit }))}</div>` +
-      (p.id === 'free' ? `<div class="plan-sub">Los planes de pago (próximamente) tendrán modelos más potentes y más conversaciones. <button class="link-btn" data-plans="1">Ver planes</button></div>` : '') +
+    return `<div class="plan-banner" id="c-plan"><div><b>${esc(t('Plan {name}', { name: t(p.label) }))}</b> · ${esc(t('{n} conversaciones por día', { n: p.dailyLimit }))}</div>` +
+      (p.id === 'free' ? `<div class="plan-sub">Los planes de pago (próximamente) tendrán más conversaciones por día. <button class="link-btn" data-plans="1">Ver planes</button></div>` : '') +
       (q.tier === 'free' ? `<div class="plan-sub">${esc(ABOUT.freeTier)}</div>` : '') + `</div>`;
   }
   function refreshPlanBanner() {
@@ -188,7 +187,7 @@ export function createChatView(ctx: Ctx): ChatView {
         <button class="act-btn regen hide" data-act="regen" aria-label="Regenerar respuesta">${icon('rotateCcw', 15)}<span>Regenerar</span></button>
         ${isServerMode() ? (m.reported ? `<span class="muted rep-done">${esc(t('Reportada'))}</span>` : `<button class="act-btn" data-act="report" aria-label="${esc(t('Reportar respuesta'))}">${icon('flag', 15)}<span>${esc(t('Reportar'))}</span></button>`) : ''}
         ${analyticsOn() ? `<span class="rate-box">${m.rated ? `<span class="muted">${esc(t('Gracias por avisar'))}</span>` : `<button class="act-btn" data-act="up" aria-label="${esc(t('Útil'))}">${icon('thumbsUp', 15)}</button><button class="act-btn" data-act="down" aria-label="${esc(t('No útil'))}">${icon('thumbsDown', 15)}</button>`}</span>` : ''}</div>
-      ${traceHtml(m.trace ?? [])}<div class="disc">Contenido informativo. No es asesoramiento financiero.</div>${tierLine(m)}` }));
+      ${traceHtml(m.trace ?? [])}<div class="disc">Contenido informativo. No es asesoramiento financiero.</div>` }));
     return box;
   }
 
@@ -317,7 +316,7 @@ export function createChatView(ctx: Ctx): ChatView {
     if (!chatExists(chatId)) return; // el chat se eliminó mientras se respondía
     const data = dataOf(chatId);
     const am: StoredMsg = {
-      id: newId(), role: 'ai', at: Date.now(), text: res.answer, model: res.model, planModel: isServerMode() ? quotaInfo().plan?.modelLabel : undefined,
+      id: newId(), role: 'ai', at: Date.now(), text: res.answer, model: res.model,
       verification: { checked: res.verification.checked, ok: res.verification.ok, unverified: res.verification.unverified.map((u) => u.text) },
       flags: { ...(res.corrected ? { corrected: true } : {}), ...(res.truncated ? { truncated: true } : {}), ...(res.redacted ? { redacted: res.redacted } : {}) },
       trace: traceOf(res.toolCalls), ui: uiOf(res.toolCalls),
@@ -395,13 +394,6 @@ export function createChatView(ctx: Ctx): ChatView {
     scroll.querySelector(`[data-mid="${last.id}"]`)?.remove();
     saveChat(cur.id, cur.data);
     void send_(asked.prompt ?? asked.text, undefined, { echo: false, src: 'regenerate' });
-  }
-
-  /** Pie de cada respuesta (solo con servidor): qué nivel de FinAgent AI respondió; y si fue un nivel menor que el del plan, lo dice y por qué. */
-  function tierLine(m: StoredMsg): string {
-    const n = isServerMode() && m.model ? answerTier(m.model, m.planModel) : null;
-    if (!n) return '';
-    return `<div class="tier-line${n.fallback ? ' fb' : ''}">${esc(n.fallback ? t('Respondió {n} porque {p} no estaba disponible en ese momento.', { n: n.used, p: n.plan }) : t('Respondió {n}', { n: n.used }))}</div>`;
   }
 
   /** Reportar una respuesta de la IA (siempre disponible con servidor, haya o no aceptado las estadísticas: Google Play lo exige para apps con IA generativa). Se avisa qué se envía: el texto de ESA respuesta y el motivo, no la pregunta. */

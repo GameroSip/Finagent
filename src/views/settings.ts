@@ -21,7 +21,6 @@ import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
 import { t } from '../i18n';
 import { analyticsOn, setAnalytics, track } from '../analytics';
 import { openFeedback, openWishlist } from './feedback';
-import { brandOf } from '../brand';
 
 
 
@@ -34,12 +33,11 @@ export function createSettingsView(ctx: Ctx): View {
   const serverAccountHtml = () => { const q = quotaInfo(), p = q.plan;
     return `<div class="set-group"><div class="set-title">Tu plan</div><div class="card set-card">
         <div class="set-row"><span class="set-ic">${icon('layers', 18)}</span><div style="flex:1"><div class="set-main">${esc(t('Plan {name}', { name: t(p?.label ?? '') }))}</div><div class="set-sub" id="s-quota">${esc(quotaText())}</div></div></div>
-        <div class="set-row"><span class="set-ic">${icon('zap', 18)}</span><div style="flex:1"><div class="set-main">Nivel de IA</div><div class="set-sub">Tu plan usa un nivel fijo</div></div><span class="val" id="s-model">${esc(brandOf(p?.modelLabel))}</span></div>
         ${googleAvailable() ? `<button class="set-row" id="s-google"><span class="set-ic">G</span><div style="flex:1;text-align:left"><div class="set-main">Iniciar sesión con Google</div><div class="set-sub">Guardá tu plan aunque cambies de teléfono</div></div></button>` : ''}
         <div class="set-note" id="s-tiernote" ${q.tier === 'free' ? '' : 'hidden'}>${esc(ABOUT.freeTier)}</div>
       </div></div>
       <div class="set-group"><div class="set-title">Planes de pago</div><div class="card set-card">
-        <div class="set-row"><span class="set-ic">${icon('gem', 18)}</span><div style="flex:1"><div class="set-main">Plus y Pro <span class="chip-soon">Próximamente</span></div><div class="set-sub">Un modelo más potente y muchos más usos. Los gráficos, los mercados y las herramientas siguen gratis.</div></div></div>
+        <div class="set-row"><span class="set-ic">${icon('gem', 18)}</span><div style="flex:1"><div class="set-main">Plus y Pro <span class="chip-soon">Próximamente</span></div><div class="set-sub">Muchas más conversaciones con la IA por día. Los gráficos, los mercados y las herramientas siguen gratis.</div></div></div>
         <button class="btn btn-primary btn-block" id="s-plans-open" style="margin-top:6px">Ver planes</button></div></div>
       <div class="set-group"><div class="set-title">Tengo un código</div><div class="card set-card">
         <div class="set-row" style="gap:8px"><input id="s-code" class="set-input" placeholder="FA-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="14" style="flex:1"><button class="btn btn-ghost btn-sm" id="s-redeem">Canjear</button></div>
@@ -107,7 +105,7 @@ export function createSettingsView(ctx: Ctx): View {
     if (isServerMode()) {
       void fetchMe().then(() => {
         const q = quotaInfo(), set = (sel: string, t: string) => { const n = el.querySelector(sel); if (n) n.textContent = t; };
-        set('#s-quota', quotaText()); set('#s-model', brandOf(q.plan?.modelLabel));
+        set('#s-quota', quotaText());
         const note = el.querySelector<HTMLElement>('#s-tiernote'); if (note) note.hidden = q.tier !== 'free';
       }).catch(() => {});
     }
@@ -175,7 +173,7 @@ export function createSettingsView(ctx: Ctx): View {
       redeemBtn.disabled = true;
       try {
         const r = await redeemPlanCode(code);
-        msg.textContent = r.unchanged ? 'Tu plan ya incluye eso.' : t('¡Listo! Ahora tenés el plan {p} ({m}).', { p: t(r.plan.label), m: r.plan.modelLabel });
+        msg.textContent = r.unchanged ? 'Tu plan ya incluye eso.' : t('¡Listo! Ahora tenés el plan {p}.', { p: t(r.plan.label) });
         input.value = ''; if (!r.unchanged) setTimeout(render, 600);
       } catch (e) { msg.textContent = e instanceof PlanCodeError ? planCodeMessage(e) : 'No pude validar el código.'; }
       finally { redeemBtn.disabled = false; }

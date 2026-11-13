@@ -79,7 +79,7 @@ const fmtLater = (s: number) => (s <= 3600 ? t('en menos de una hora') : s < 6 *
 
 export function limitMessage(e: LimitError, today = new Date()): string {
   const when = resetLabel(e.resetsOn, today), p = e.plan, label = p?.label ? t(p.label) : '';
-  const upsell = p?.id === 'free' ? ` ${t('Los planes de pago (próximamente) tendrán más conversaciones y modelos más potentes: podés anotarte en Ajustes → Tu plan.')}` : '';
+  const upsell = p?.id === 'free' ? ` ${t('Los planes de pago (próximamente) tendrán más conversaciones por día: podés anotarte en Ajustes → Tu plan.')}` : '';
   if (e.reason === 'daily') return `${p?.label ? t('Usaste las {n} conversaciones de hoy de tu plan {p}.', { n: p.dailyLimit, p: label }) : t('Usaste todas las conversaciones de hoy.')} ${t('Se reinician {when}.', { when })} ${t('Mientras tanto podés mirar Mercados, el dólar y los gráficos, que no gastan conversaciones.')}${upsell}`;
   if (e.reason === 'monthly') return `${p?.label ? t('Llegaste al límite mensual de tu plan {p}.', { p: label }) : t('Llegaste al límite mensual.')} ${t('Se reinicia {when}.', { when })}${upsell}`;
   return t('Tu plan actual no incluye esta función.');

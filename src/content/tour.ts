@@ -15,7 +15,7 @@ export const TOUR: TourSlide[] = [
     bullets: ['IA: modelos Gemini de Google, desarrollados por Google DeepMind. FinAgent es independiente de Google.',
       'Datos: Yahoo Finance, DolarAPI, ArgentinaDatos, Google News y alternative.me. Son fuentes públicas y gratuitas, sin acuerdos comerciales: pueden tener demora o errores.',
       'FinAgent es una herramienta educativa: no da asesoramiento de inversión.'] },
-  { id: 'plans', title: 'Empezá gratis', text: 'Tenés conversaciones con IA todos los días y todas las herramientas sin costo. Más adelante habrá planes Plus y Pro con un modelo más potente y más usos.' },
+  { id: 'plans', title: 'Empezá gratis', text: 'Tenés conversaciones con IA todos los días y todas las herramientas sin costo. Más adelante habrá planes Plus y Pro con más conversaciones por día.' },
 ];
 
 /** Fuentes y componentes que aparecen nombrados en la app (los mismos de ABOUT.credits). */

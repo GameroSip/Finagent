@@ -69,7 +69,7 @@ jobs:
           if-no-files-found: ignore
 
       # Herramientas del gráfico (Fibonacci, sesiones, perfil de volumen…) e íconos de los activos, en un Chromium real.
-      - name: Pruebas en navegador real (gráficos e íconos)
+      - name: Pruebas en navegador real (gráficos, íconos, termómetro y cartera)
         continue-on-error: true
         run: |
           mkdir -p e2e-log
@@ -77,7 +77,8 @@ jobs:
           node run-charts.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/graficos.txt; a=${PIPESTATUS[0]}
           node run-icons.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/iconos.txt; b=${PIPESTATUS[0]}
           node run-stress.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/termometro.txt; c=${PIPESTATUS[0]}
-          exit $((a + b + c))
+          node run-portfolio.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/cartera.txt; d=${PIPESTATUS[0]}
+          exit $((a + b + c + d))
 
       - name: Publicar el texto de las pruebas en la rama e2e-reports
         if: always()

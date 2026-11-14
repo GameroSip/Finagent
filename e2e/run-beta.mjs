@@ -69,9 +69,9 @@ await click(p, '#fb-send'); await until(() => M.apiState.feedback.length === 1);
 check('el comentario llega al servidor con su tipo, el texto y la versión', M.apiState.feedback[0]?.kind === 'problema' && /tarda mucho/.test(M.apiState.feedback[0]?.text ?? '') && /^\d+\.\d+\.\d+$/.test(M.apiState.feedback[0]?.version ?? ''), JSON.stringify(M.apiState.feedback[0]));
 await sleep(500);
 await click(p, '#s-wishes'); await p.waitForSelector('.wish', { timeout: 4000 }); await sleep(400); await shot(p, 'B5-funciones');
-check('la lista de funciones aclara que todavía no existen y que algunas pueden requerir permisos o acuerdos', /Todavía no existen/.test(await text(p, '.plan-sheet')) && /permisos o acuerdos/.test(await text(p, '.plan-sheet')) && (await p.$$('.wish')).length === 7);
-await click(p, '.wish[data-f="cartera"] button'); await until(() => M.apiState.votes.includes('cartera')); await sleep(300);
-check('votar "Me interesa" se registra una vez y el botón pasa a "Anotado ✓" (desactivado)', M.apiState.votes.join() === 'cartera' && /Anotado/.test(await text(p, '.wish[data-f="cartera"] button')) && await p.$eval('.wish[data-f="cartera"] button', (b) => b.disabled));
+check('la lista de funciones aclara que todavía no existen y que algunas pueden requerir permisos o acuerdos', /Todavía no existen/.test(await text(p, '.plan-sheet')) && /permisos o acuerdos/.test(await text(p, '.plan-sheet')) && (await p.$$('.wish')).length === 5);
+await click(p, '.wish[data-f="alertas"] button'); await until(() => M.apiState.votes.includes('alertas')); await sleep(300);
+check('votar "Me interesa" se registra una vez y el botón pasa a "Anotado ✓" (desactivado)', M.apiState.votes.join() === 'alertas' && /Anotado/.test(await text(p, '.wish[data-f="alertas"] button')) && await p.$eval('.wish[data-f="alertas"] button', (b) => b.disabled));
 await p.keyboard.press('Escape'); await p.evaluate(() => document.querySelector('.sheet-bg, .scrim, .overlay-bg')?.click()); await sleep(400);
 
 // ---- apagar: se corta todo de inmediato
@@ -169,7 +169,7 @@ for (const [lang, want, wishText] of [['en', [/Help improve the beta/, /Tell us 
   check(`en ${lang} el grupo "Beta" de Ajustes está traducido`, want.every((r) => r.test(st)) && !/[¿¡ñ]|\b(Ayudar|Contanos|Votá|Qué)\b/.test(st), st.slice(0, 80));
   await click(p, '#s-wishes'); await p.waitForSelector('.wish', { timeout: 4000 }); await sleep(300);
   const w = await text(p, '.plan-sheet');
-  check(`en ${lang} la lista de votos está traducida completa`, wishText.test(w) && !/[¿¡ñ]|\b(Mi cartera|Cotizaciones sin|Me interesa|Cargar lo que tengo|Todavía|Votá)\b/.test(w), w.slice(0, 80));   // (solo palabras que en portugués son distintas)
+  check(`en ${lang} la lista de votos está traducida completa`, wishText.test(w) && !/[¿¡ñ]|\b(Avisos en el celular|Cotizaciones sin|Me interesa|Que la app me avise|Todavía|Votá)\b/.test(w), w.slice(0, 80));   // (solo palabras que en portugués son distintas)
   await p.close();
 }
 

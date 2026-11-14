@@ -8,8 +8,8 @@ export const planMultiplier = (p: Pick<PlanEntry, 'dailyLimit'>, free: Pick<Plan
 
 /** Funciones PLANEADAS por plan: todavía no existen en la app. Si una se construye, se mueve a `benefits` (y la prueba de coherencia obliga a revisarlo). */
 export const SOON_BY_PLAN: Record<string, string[]> = {
-  plus: ['Mi cartera: cargá lo que tenés y mirá cuánto hay en cada moneda', 'Calculadora de escenarios de ahorro e inversión', 'Resumen semanal al abrir la app'],
-  pro: ['Mi cartera: cargá lo que tenés y mirá cuánto hay en cada moneda', 'Calculadora de escenarios de ahorro e inversión', 'Resumen semanal al abrir la app', 'Informe de un activo en PDF', 'Acceso anticipado a funciones nuevas'],
+  plus: ['Resumen semanal al abrir la app'],
+  pro: ['Resumen semanal al abrir la app', 'Acceso anticipado a funciones nuevas'],
 };
 
 export interface Pitch { multiplier: number; headline: string; benefits: string[]; soon: string[] }
@@ -25,6 +25,9 @@ export const FREE_FOREVER = [
   'Gráficos con Fibonacci, sesiones de mercado, perfil de volumen, RSI, MACD y más',
   'Termómetro de tensión y movimiento esperado de la semana',
   'Mi plan: lo que vas a hacer cuando haya tensión',
+  'Mi cartera: lo que tenés en cada moneda, solo en tu teléfono',
+  'Calculadora de escenarios y de aportes',
+  'Informes en PDF de un activo y de tu cartera',
   'Búsqueda de cualquier activo, favoritos y estadísticas',
   'Noticias y sentimiento del mercado cripto',
   'Dólar, brecha y riesgo país de Argentina',

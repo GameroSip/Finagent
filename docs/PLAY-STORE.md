@@ -93,7 +93,7 @@ Cifrado en tránsito: **Sí**. Solicitud de eliminación: **Sí** (en la app y e
 ### 3. Ficha de la tienda 👤 (textos listos)
 - **Nombre:** FinAgent
 - **Descripción breve (≤80):** `Mercados, gráficos y asistente de IA con fuentes. Información educativa.`  (72 caracteres)
-- **Descripción completa** (1449 caracteres de 4.000):
+- **Descripción completa** (1458 caracteres de 4.000):
 ```
 FinAgent te ayuda a entender los mercados sin que nada te empuje a operar.
 
@@ -107,7 +107,7 @@ FinAgent te ayuda a entender los mercados sin que nada te empuje a operar.
 
 IMPORTANTE: FinAgent es una herramienta de información con fines educativos. No es asesoramiento de inversión, no recomienda comprar ni vender, no permite operar y no predice precios. Los datos pueden tener demora o errores y la IA puede equivocarse: tomá tus decisiones con criterio propio.
 
-VERSIÓN BETA: estamos probando la aplicación y puede tener errores. Tus consultas al asistente se procesan en nuestro servidor y se envían a Google (Gemini) para generar la respuesta; no guardamos su texto. Tus chats y favoritos quedan en tu teléfono. Podés eliminar tu cuenta y tus datos cuando quieras desde Ajustes.
+VERSIÓN BETA: estamos probando la aplicación y puede tener errores. Tus consultas al asistente se procesan en nuestro servidor y se envían a Google (Gemini) para generar la respuesta; no guardamos su texto. Tus chats, favoritos y cartera quedan en tu teléfono. Podés eliminar tu cuenta y tus datos cuando quieras desde Ajustes.
 ```
 - **Categoría:** Finanzas. **Correo de contacto** (público) y **sitio web**: la página `index.html`.
 - **Gráficos** (carpeta `play-assets/`, generada con `e2e/make-play-assets.mjs`): ícono 512×512, imagen destacada 1024×500 y **capturas de teléfono de hasta 2:1** (acá 1080×2160). 

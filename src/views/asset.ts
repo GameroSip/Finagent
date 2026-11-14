@@ -14,6 +14,7 @@ import { locale, t } from '../i18n';
 import { expectedMove, stressGroup, stressNow } from '../stress';
 import { bindStress, moveHtml, stressHtml } from '../ui/stressCard';
 import { track } from '../analytics';
+import { exportAssetPdf } from './exportPdf';
 
 export interface Overlay { el: HTMLElement; close(): void }
 
@@ -44,6 +45,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
       <button class="icon-btn" id="a-back" aria-label="Volver">${icon('chevronLeft', 22)}</button>
       <div class="ov-title">${assetIcon(sym, { style: 'width:34px;height:34px;border-radius:11px;font-size:11px' })}
         <div style="min-width:0"><div style="font-weight:750;line-height:1.1">${esc(sym)}</div><div class="muted" id="a-name" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div></div></div>
+      <button class="icon-btn" id="a-pdf" aria-label="Informe en PDF">${icon('externalLink', 20)}</button>
       <button class="icon-btn" id="a-star" aria-label="Favorito">${icon('star', 20, isWatched(sym))}</button>
     </div>
     <div class="ov-body">
@@ -241,6 +243,7 @@ export function openAssetOverlay(ctx: Ctx, symbol: string, nameHint?: string, on
     setTimeout(() => { el.remove(); onClose?.(); }, 220);
   };
   q('#a-back').onclick = close;
+  q('#a-pdf').onclick = () => { void exportAssetPdf(sym, name); };
   q('#a-star').onclick = () => {
     const on = toggleWatch(sym);
     track('watch', { op: on ? 'add' : 'remove', group: stressGroup(sym) ?? 'otro' });

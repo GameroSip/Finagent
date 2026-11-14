@@ -31,13 +31,15 @@ describe('lo que se promete de cada plan sale de sus límites reales', () => {
   it('las funciones que todavía no existen se muestran APARTE (Próximamente), nunca mezcladas con lo incluido', () => {
     const plus = planPitch(entry({ id: 'plus', dailyLimit: 10 }), FREE), pro = planPitch(entry({ id: 'pro', dailyLimit: 30 }), FREE), gratis = planPitch(entry({ id: 'free', dailyLimit: 3 }), FREE);
     expect(plus.soon).toEqual(SOON_BY_PLAN.plus); expect(pro.soon).toEqual(SOON_BY_PLAN.pro); expect(gratis.soon).toEqual([]);
-    expect(plus.soon.length).toBe(3); expect(pro.soon.length).toBe(5); for (const x of plus.soon) expect(pro.soon).toContain(x);            // Pro incluye todo lo planeado de Plus
+    expect(plus.soon.length).toBe(1); expect(pro.soon.length).toBe(2); for (const x of plus.soon) expect(pro.soon).toContain(x);            // Pro incluye todo lo planeado de Plus
     for (const p of [plus, pro]) for (const x of p.soon) expect(p.benefits).not.toContain(x);
   });
-  it('coherencia con el producto: no se anuncia nada que la app todavía no puede hacer (análisis profundo, cartera, calculadora, PDF, resumen semanal)', () => {
+  it('coherencia con el producto: no se anuncia nada que la app todavía no puede hacer (análisis profundo, resumen semanal)', () => {
     const chat = readFileSync('src/views/chat.ts', 'utf8');
     expect(chat).not.toMatch(/\bdeep\b/);                                                // la app no tiene cómo pedir el análisis profundo: no puede ofrecerse como incluido
-    for (const f of ['portfolio', 'cartera', 'calculadora', 'calculator', 'weekly', 'resumen']) expect(existsSync(`src/views/${f}.ts`), `existe src/views/${f}.ts: si se construyó, pasar la función de "Próximamente" a "incluido"`).toBe(false);
+    for (const f of ['weekly', 'resumen']) expect(existsSync(`src/views/${f}.ts`), `existe src/views/${f}.ts: si se construyó, pasar la función de "Próximamente" a "incluido"`).toBe(false);
+    for (const f of ['portfolio', 'calculator']) expect(existsSync(`src/views/${f}.ts`), `${f}: ya está construida y figura como incluida y gratis`).toBe(true);
+    for (const p of Object.values(SOON_BY_PLAN)) expect(p.join(' ')).not.toMatch(/cartera|calculadora|PDF/i);
     const view = readFileSync('src/views/plans.ts', 'utf8'); expect(view).toContain("Próximamente (todavía no existen)"); expect(view).not.toMatch(/Análisis profundo|Nivel de IA|plan-model/);
   });
   it('lo que sigue gratis son funciones que existen hoy', () => {

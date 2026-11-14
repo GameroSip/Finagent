@@ -10,6 +10,9 @@ import { esc, h, toast } from '../ui/dom';
 import { icon } from '../ui/icons';
 import { openSheet } from '../ui/sheet';
 
+/** Lo que ya existe en la app no se pone a votar: solo se pide opinión sobre lo que todavía no está. */
+const BUILT: ReadonlyArray<string> = ['cartera', 'calculadora'];
+const VOTABLE = FEATURES.filter((f) => !BUILT.includes(f));
 const read = <T,>(k: string, d: T): T => { try { const v = globalThis.localStorage?.getItem(k); return v ? (JSON.parse(v) as T) : d; } catch { return d; } };
 const write = (k: string, v: unknown) => { try { globalThis.localStorage?.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 
@@ -59,9 +62,9 @@ export function openWishlist(): void {
   const voted = new Set<string>(read<string[]>('finagent.votes.v1', []));
   const el = h('div', { class: 'plan-sheet' });
   el.innerHTML = `<h3 class="plan-h">${esc(t('Qué te gustaría que sumemos'))}</h3><p class="stress-hint" style="margin:0 0 6px">${esc(t('Todavía no existen. Tu voto nos ayuda a elegir qué construir primero. Algunas pueden requerir permisos o acuerdos que hoy no tenemos.'))}</p>
-    <div class="wish-list">${FEATURES.map((f) => `<div class="wish" data-f="${f}"><div class="wish-t"><b>${esc(t(WISHES[f][0]))}</b><span>${esc(t(WISHES[f][1]))}</span></div><button class="btn btn-sm ${voted.has(f) ? 'btn-ghost' : 'btn-primary'}" ${voted.has(f) ? 'disabled' : ''}>${esc(voted.has(f) ? t(VOTE_LABELS.voted) : t(VOTE_LABELS.vote))}</button></div>`).join('')}</div>`;
+    <div class="wish-list">${VOTABLE.map((f) => `<div class="wish" data-f="${f}"><div class="wish-t"><b>${esc(t(WISHES[f][0]))}</b><span>${esc(t(WISHES[f][1]))}</span></div><button class="btn btn-sm ${voted.has(f) ? 'btn-ghost' : 'btn-primary'}" ${voted.has(f) ? 'disabled' : ''}>${esc(voted.has(f) ? t(VOTE_LABELS.voted) : t(VOTE_LABELS.vote))}</button></div>`).join('')}</div>`;
   openSheet(el);
-  for (const f of FEATURES) track('fakedoor', { feature: f, action: 'view' });
+  for (const f of VOTABLE) track('fakedoor', { feature: f, action: 'view' });
   el.querySelectorAll<HTMLElement>('.wish').forEach((row) => {
     const f = row.dataset.f as (typeof FEATURES)[number], b = row.querySelector('button')!;
     b.onclick = async () => {

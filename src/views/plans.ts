@@ -32,7 +32,7 @@ export async function openPlans(): Promise<void> {
     <div class="plans-free"><h3>${icon('badgeCheck', 18)} Gratis para siempre</h3><ul>${FREE_FOREVER.map((t) => `<li>${icon('check', 15)}<span>${esc(t)}</span></li>`).join('')}</ul></div>
     <div style="overflow-x:auto"><table class="plans-cmp"><thead><tr><th></th>${[free, ...paid].map((p) => `<th>${esc(t(p.label))}</th>`).join('')}</tr></thead><tbody>
       ${row('Usos con IA', mult)}${row('Gráficos y herramientas', () => '✓')}${row('Termómetro y movimiento esperado', () => '✓')}${row('Mercados del mundo', () => '✓')}
-      ${row('Mi cartera y calculadora', (p) => (p.id === 'free' ? '—' : t('Próximamente')))}${row('Informe en PDF', (p) => (p.id === 'pro' ? t('Próximamente') : '—'))}
+      ${row('Mi cartera, calculadora e informes en PDF', () => '✓')}
     </tbody></table></div>`;
   el.addEventListener('click', async (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-plan]');

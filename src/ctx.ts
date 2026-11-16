@@ -1,7 +1,7 @@
 import type { ModelManager } from './models';
 import type { Overlay } from './views/asset';
 
-export type TabId = 'market' | 'chat' | 'watch' | 'settings';
+export type TabId = 'market' | 'chat' | 'watch' | 'portfolio' | 'settings';
 
 /** Servicios compartidos entre pantallas. */
 export interface Ctx {

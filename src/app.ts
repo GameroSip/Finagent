@@ -13,11 +13,12 @@ import { createMarketView } from './views/market';
 import { openSearchOverlay } from './views/search';
 import { createSettingsView } from './views/settings';
 import { createWatchView } from './views/watchlist';
+import { createPortfolioView } from './views/portfolio';
 import { track } from './analytics';
 
 const TABS: Array<{ id: TabId; label: string; ic: IconName }> = [
   { id: 'market', label: 'Mercados', ic: 'activity' }, { id: 'chat', label: 'Asistente', ic: 'messageSquare' },
-  { id: 'watch', label: 'Favoritos', ic: 'star' }, { id: 'settings', label: 'Ajustes', ic: 'settings' },
+  { id: 'watch', label: 'Favoritos', ic: 'star' }, { id: 'portfolio', label: 'Cartera', ic: 'landmark' }, { id: 'settings', label: 'Ajustes', ic: 'settings' },
 ];
 
 export function mountApp(root: HTMLElement, models: ModelManager): void {
@@ -46,6 +47,7 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
   chat = createChatView(ctx);
   views.chat = chat;
   views.watch = createWatchView(ctx);
+  views.portfolio = createPortfolioView(ctx);
   views.settings = createSettingsView(ctx);
   (Object.keys(views) as TabId[]).forEach((id) => { views[id].el.classList.add('hide'); viewsEl.append(views[id].el); });
 
@@ -58,7 +60,7 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
 
   function setTab(t: TabId) {
     tab = t;
-    track('screen', { name: ({ market: 'markets', chat: 'assistant', watch: 'watchlist', settings: 'settings' } as const)[t] });
+    track('screen', { name: ({ market: 'markets', chat: 'assistant', watch: 'watchlist', portfolio: 'portfolio', settings: 'settings' } as const)[t] });
     (Object.keys(views) as TabId[]).forEach((id) => views[id].el.classList.toggle('hide', id !== t));
     tabbar.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', (b as HTMLElement).dataset.tab === t));
     views[t].onShow?.();

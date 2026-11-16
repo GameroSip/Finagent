@@ -18,7 +18,7 @@ export const EVENTS: Record<string, Spec> = {
   app_open: { v: VERSION, lang: ['es', 'en', 'pt'], theme: ['auto', 'dark', 'light'], sound: 'bool' },
   intro_step: { step: ['account', 'language', 'consent', 'tour', 'done'], skipped: 'bool' },
   tour_slide: { n: { int: [1, 7] } },
-  screen: { name: ['markets', 'assistant', 'watchlist', 'settings', 'asset', 'search', 'about', 'plans', 'chats', 'feedback'] },
+  screen: { name: ['markets', 'assistant', 'watchlist', 'settings', 'asset', 'search', 'about', 'plans', 'chats', 'feedback', 'portfolio', 'calculator'] },
   asset_open: { sym: SYM, group: GROUPS, from: ['market', 'search', 'watchlist', 'assistant'] },
   search: { found: 'bool' },
   search_miss: { q: QUERY },                                         // solo búsquedas SIN resultado, y solo si parecen un símbolo o un nombre corto (sin espacios ni frases)
@@ -27,6 +27,8 @@ export const EVENTS: Record<string, Spec> = {
   chart_tool: { tool: CHART_TOOLS, on: 'bool' },
   stress_view: { level: LEVELS, group: GROUPS },
   move_view: { group: GROUPS, ok: 'bool' },
+  report_export: { kind: ['asset', 'portfolio', 'scenario'] },       // solo el tipo de informe; nada de su contenido
+  portfolio_op: { op: ['add', 'import', 'remove'] },               // jamás qué activos ni cuánto
   plan_open: {},
   plan_saved: { len: ['corto', 'medio', 'largo'] },                  // el plan en sí NUNCA se envía: solo si es corto, medio o largo
   plan_removed: {},

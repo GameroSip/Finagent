@@ -63,7 +63,7 @@ h1, h2, h3, h4, p { margin: 0; }
 @keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ============ Barra de pestañas ============ */
-.tabbar { position: absolute; left: 12px; right: 12px; bottom: calc(var(--sb) + 10px); height: var(--tabbar-h); z-index: 20; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center;
+.tabbar { position: absolute; left: 12px; right: 12px; bottom: calc(var(--sb) + 10px); height: var(--tabbar-h); z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
   background: var(--glass); backdrop-filter: blur(22px) saturate(1.6); -webkit-backdrop-filter: blur(22px) saturate(1.6); border: 1px solid var(--line-2); border-radius: 26px; box-shadow: var(--shadow); padding: 6px; }
 .tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 100%; border-radius: 20px; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: .01em; transition: color .2s, transform .15s; }
 .tab:active { transform: scale(.94); }

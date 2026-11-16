@@ -1,0 +1,28 @@
+  ✔ hay 5 pestañas, con "Cartera" 
+  ✔ sin desborde horizontal en P1-cartera-vacia 
+  ✔ vacía: explica que queda solo en el teléfono y ofrece cargar a mano, importar CSV y la calculadora de aportes 
+  ✔ se guardan en el teléfono (AAPL activo con costo, USD y ARS como efectivo) con el símbolo en mayúsculas y los miles bien leídos 
+  ✔ muestra el total por moneda (USD y ARS), las 3 tenencias y el reparto 
+  ✔ propone el dólar MEP como tipo de cambio (editable) 
+  ✔ sin desborde horizontal en P2-cartera 
+  ✔ lo que cargó NO sale del teléfono: ninguna petición lleva datos de la cartera 
+  ✔ escenario: calcula "Hoy" y "Con tus supuestos" y cambia al mover los supuestos 
+  ✔ aclara que no es una predicción 
+  ✔ sin desborde horizontal en P3-escenario 
+  ✔ el escenario se guarda en un PDF válido 
+  ✔ aportes: con 0% de rentabilidad y 1 año, 1.000 + 12×200 = 3.400 
+  ✔ sin desborde horizontal en P4-aportes 
+  ✔ el informe de la cartera se genera como PDF válido 
+  ✔ importar CSV: pide confirmar, cuenta 2 posiciones y avisa que saltea 1 fila 
+  ✔ tras importar hay 5 posiciones, MSFT con su costo decimal a la argentina 
+  ✔ al reabrir la app la cartera sigue ahí 
+  ✔ quitar una posición la saca de la lista y de lo guardado 
+  ✔ desde un activo se guarda su informe en PDF válido, con el símbolo en el nombre 
+  ✔ sin desborde horizontal en P5-activo 
+  ✔ [en] la pantalla de la cartera está traducida 
+  ✔ [en] la calculadora está traducida 
+  ✔ [pt] la pantalla de la cartera está traducida 
+  ✔ [pt] la calculadora está traducida 
+
+RESULTADO (cartera): 25/25 verificaciones OK
+ERRORES DE PÁGINA: []

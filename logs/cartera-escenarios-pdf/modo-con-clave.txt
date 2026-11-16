@@ -1,0 +1,37 @@
+  ✔ sin desborde horizontal en 01-onboarding 
+  ✔ sin desborde horizontal en 02-mercados 
+  ✔ el gráfico del activo se dibuja (canvas con tamaño real) 
+  ✔ sin desborde horizontal en 03-detalle 
+  ✔ sin desborde horizontal en 04-chat-vacio 
+  ✔ en el chat vacío ninguna sugerencia está tapada por otro elemento 
+  ✔ el chat vacío no tiene logos grandes sueltos ni destellos de IA 
+  ✔ sin desborde horizontal en 05-chat-trabajando 
+  ✔ sin desborde horizontal en 06-chat-respuesta-fin 
+  ✔ respuesta con datos correctos: no pierde cifras (incluidas las negativas) 
+  ✔ muestra "cifras verificadas con datos" 
+  ✔ el gráfico técnico del chat se dibuja 
+  ✔ el título automático reemplazó al provisorio 
+  ✔ sin desborde horizontal en 06b-chat-respuesta-inicio 
+  ✔ sin desborde horizontal en 07-chat-cifra-inventada 
+  ✔ una cifra inventada NO aparece en pantalla 
+  ✔ se avisa cuántas cifras se quitaron 
+  ✔ sin desborde horizontal en 08-historial 
+  ✔ el buscador del historial tiene tamaño normal (no se estira) 
+  ✔ el historial lista los chats guardados 
+  ✔ sin desborde horizontal en 09-ajustes 
+  ✔ sin desborde horizontal en 10-claro-mercados 
+  ✔ sin desborde horizontal en 11-claro-chat 
+
+RESULTADO: 23/23 verificaciones OK
+
+ERRORES DE PÁGINA: []
+ERRORES DE CONSOLA: [
+ "404 https://fc.yahoo.com/",
+ "Failed to load resource: the server responded with a status of 404 (Not Found)",
+ "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+ "404 https://www.google.com/s2/favicons?domain=supermicro.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=palantir.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=rivian.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=sofi.com&sz=128",
+ "404 https://www.google.com/s2/favicons?domain=robinhood.com&sz=128"
+]

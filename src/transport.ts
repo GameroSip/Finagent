@@ -1,5 +1,5 @@
 // Cómo el agente le pide una "vuelta" al modelo: directo a Gemini con la clave del usuario (modo desarrollo) o a través del servidor de FinAgent (beta).
-export interface GenerateArgs { contents: any[]; withTools: boolean; turn?: string }
+export interface GenerateArgs { contents: any[]; withTools: boolean; turn?: string; task?: import('./tasks').Task }
 export interface GenerateResult { data: any; model: string; turn?: string }
 export interface Transport {
   generate(a: GenerateArgs): Promise<GenerateResult>;

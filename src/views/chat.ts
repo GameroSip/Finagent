@@ -1,6 +1,7 @@
 // Asistente: chats guardados como en ChatGPT/Claude/Gemini. Cada chat tiene su historial, su título automático y su
 // propio contexto; una respuesta en curso sigue aunque cambies de chat o de pestaña.
-import { canRecord, canSpeak, isSpeaking, pickFile, prepareFile, speak, startRecording, stopSpeaking, wrapAttachment, AttachError, type Attachment, type Recorder } from '../attach';
+import { canSpeak, isSpeaking, pickFile, prepareFile, speak, stopSpeaking, wrapAttachment, AttachError, type Attachment } from '../attach';
+import { canDictate, nativeVoice, startDictation, type Dictation, type DictationResult } from '../voice';
 import { AbortedError, FinancialAgent, GeminiError, type AgentResult } from '../agent';
 import { ABOUT } from '../about';
 import { maybeUpsellCard } from '../ui/upsell';
@@ -89,6 +90,7 @@ export function createChatView(ctx: Ctx): ChatView {
     </div>
     <div class="chat-scroll" id="c-scroll"></div>
     <div class="attach-chip hide" id="c-chip"></div>
+    <div class="dict hide" id="c-dict" role="status" aria-live="polite"></div>
     <form class="composer" id="c-form" autocomplete="off">
       <button class="tool" id="c-clip" type="button" aria-label="Adjuntar un archivo o una captura">${icon('paperclip', 20)}</button>
       <textarea id="c-in" rows="1" placeholder="Preguntale algo a FinAgent AI…" enterkeyhint="send"></textarea>
@@ -99,9 +101,10 @@ export function createChatView(ctx: Ctx): ChatView {
   const titleBtn = $('#c-title', el), titleText = $('#c-title-t', el);
   const clip = $<HTMLButtonElement>('#c-clip', el), mic = $<HTMLButtonElement>('#c-mic', el), chip = $('#c-chip', el);
   let attach: Attachment | null = null;
-  let recorder: Recorder | null = null;
+  let dict: Dictation | null = null, finishing = false, dictCancelled = false, dictTimer = 0;
+  const dictEl = $('#c-dict', el);
   let draftAgent: FinancialAgent | null = null;       // agente de un chat que todavía no existe (para dictar antes de enviar la primera pregunta)
-  if (!canRecord()) mic.classList.add('hide');
+  if (!canDictate()) mic.classList.add('hide');
   function paintChip() {
     chip.classList.toggle('hide', !attach);
     chip.innerHTML = attach ? `${icon('paperclip', 14)}<span class="n" data-notrans>${esc(attach.name)}</span><button type="button" aria-label="${esc(t('Quitar adjunto'))}" id="c-chip-x">${icon('x', 14)}</button>` : '';
@@ -504,35 +507,85 @@ export function createChatView(ctx: Ctx): ChatView {
       attach = a; paintChip(); input.focus();
     } catch (e) { toast(e instanceof AttachError ? e.message : t('No se pudo leer el archivo')); }
   });
+  // ------------------------------------------------------------ dictado: barra con onda, tiempo y texto en vivo
+  const setLevel = (v: number) => dictEl.style.setProperty('--l', v.toFixed(2));
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  function paintDict(state: 'listen' | 'busy', engine: string) {
+    dictEl.classList.toggle('busy', state === 'busy');
+    dictEl.innerHTML = `<button type="button" class="d-x" aria-label="${esc(t('Cancelar dictado'))}">${icon('x', 20)}</button>
+      <div class="d-mid"><div class="d-top"><div class="d-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <b class="d-state">${esc(state === 'busy' ? t('Pasando tu voz a texto…') : t('Escuchando…'))}</b><span class="d-time" data-notrans>0:00</span></div>
+        <div class="d-live" data-notrans>${state === 'busy' ? '' : `<span class="hint">${esc(engine === 'record' ? t('Hablá con calma, podés hacer pausas. Al terminar, tu voz se pasa a texto.') : t('Hablá con calma, podés hacer pausas. Tocá ✓ cuando termines.'))}</span>`}</div></div>
+      <button type="button" class="d-ok" aria-label="${esc(t('Terminar'))}" ${state === 'busy' ? 'disabled' : ''}>${icon('check', 22)}</button>`;
+    dictEl.querySelector('.d-x')!.addEventListener('click', () => cancelDictation());
+    dictEl.querySelector('.d-ok')!.addEventListener('click', () => void finishDictation());
+  }
+  function showLive(text: string) {
+    const live = dictEl.querySelector<HTMLElement>('.d-live'); if (!live) return;
+    live.textContent = text; live.classList.add('has'); live.scrollTop = live.scrollHeight;
+  }
+  function closeDict() {
+    clearInterval(dictTimer); dict = null;
+    el.classList.remove('dictating'); dictEl.classList.add('hide'); dictEl.innerHTML = ''; mic.disabled = false;
+  }
+  function cancelDictation() {
+    if (!dict) return;
+    dictCancelled = true;
+    if (!finishing) { dict.cancel(); closeDict(); }
+    else { closeDict(); }                                   // transcribiendo: se ignora el resultado cuando llegue
+  }
+  const agentForVoice = () => (cur.id ? agentFor(cur.id) : (draftAgent ??= new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models, transport: isServerMode() ? transport : undefined })));
+
   mic.addEventListener('click', async () => {
-    if (running()) return;
-    if (recorder) { await finishRecording(); return; }
-    if (!isServerMode() && !getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
-    if (!(await mediaConsent())) return;
+    if (running() || dict) return;
+    const needsGemini = !nativeVoice() && !((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition);
+    if (needsGemini) {
+      if (!isServerMode() && !getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
+      if (!(await mediaConsent())) return;
+    }
+    mic.disabled = true; dictCancelled = false;
     try {
-      recorder = await startRecording(() => void finishRecording());
-      mic.classList.add('rec'); mic.setAttribute('aria-label', t('Terminar de grabar')); toast(t('Grabando… tocá de nuevo para terminar'));
-    } catch (e) { recorder = null; toast(e instanceof AttachError ? e.message : t('No se pudo grabar')); }
+      dict = await startDictation(locale(), {
+        onText: (txt) => { showLive(txt); setLevel(0.75); setTimeout(() => setLevel(0.25), 160); },
+        onLevel: setLevel,
+        onAutoEnd: (r) => void finishDictation(r),
+      });
+    } catch (e) { dict = null; mic.disabled = false; toast(e instanceof AttachError ? e.message : t('No se pudo grabar')); return; }
+    if (dict.engine === 'record' && !needsGemini && !(await mediaConsent())) { dict.cancel(); dict = null; mic.disabled = false; return; }
+    const t0 = Date.now();
+    el.classList.add('dictating'); dictEl.classList.remove('hide'); paintDict('listen', dict.engine);
+    dictTimer = window.setInterval(() => { const tm = dictEl.querySelector('.d-time'); if (tm) tm.textContent = clock(Math.round((Date.now() - t0) / 1000)); }, 250);
   });
-  async function finishRecording() {
-    const r = recorder; recorder = null;
-    mic.classList.remove('rec'); mic.setAttribute('aria-label', t('Dictar con la voz'));
-    if (!r) return;
+  async function finishDictation(auto?: DictationResult) {
+    const d = dict;
+    if (!d || finishing) return;
+    finishing = true;
     try {
-      const rec = await r.stop();
-      if (!rec.data) return;
-      mic.disabled = true; toast(t('Pasando tu voz a texto…'));
-      const agent = cur.id ? agentFor(cur.id) : (draftAgent ??= new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models, transport: isServerMode() ? transport : undefined }));
-      const text = await agent.transcribe(rec, {});
+      const needsAi = d.engine === 'record';
+      if (needsAi) { paintDict('busy', d.engine); clearInterval(dictTimer); }
+      const res = auto ?? await d.finish();
+      let text = res.text ?? '';
+      if (res.rec) {
+        if (!res.rec.data) throw new AttachError(t('No se escuchó nada'));
+        const agent = agentForVoice();
+        text = await agent.transcribe(res.rec, {});
+        if (dictCancelled) { agent.releasePending(); return; }
+      }
+      if (dictCancelled) return;
       track('media_use', { kind: 'voice' });
+      closeDict();
+      text = text.trim();
       if (!text) { toast(t('No se entendió nada. Probá de nuevo.')); return; }
       input.value = (input.value ? input.value.trimEnd() + ' ' : '') + text;
       input.dispatchEvent(new Event('input')); input.focus();
-      toast(t('Revisá el texto antes de enviar'));
+      toast(t('Listo: revisá el texto y tocá enviar'));
     } catch (e) {
-      trackAiError(e);
-      toast(e instanceof LimitError ? limitMessage(e) : e instanceof AttachError ? e.message : e instanceof ServerBusyError ? busyMessage(e) : t('No se pudo pasar la voz a texto'));
-    } finally { mic.disabled = false; }
+      if (!dictCancelled) {
+        trackAiError(e);
+        toast(e instanceof LimitError ? limitMessage(e) : e instanceof AttachError ? e.message : e instanceof ServerBusyError ? busyMessage(e) : t('No se pudo pasar la voz a texto'));
+      }
+      if (dict) { d.cancel(); closeDict(); }
+    } finally { finishing = false; if (!dict) mic.disabled = false; }
   }
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
   const app = () => document.querySelector('.app');

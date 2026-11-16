@@ -188,3 +188,35 @@
 .attach-chip { flex: none; display: flex; align-items: center; gap: 8px; margin: 4px 18px -2px; padding: 7px 10px 7px 12px; border-radius: 12px; background: var(--surface-3); color: var(--text); font-size: 13px; }
 .attach-chip .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attach-chip button { flex: none; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; width: 24px; height: 24px; cursor: pointer; }
+
+/* Dictado: barra con onda, tiempo y texto en vivo (reemplaza al cuadro de texto mientras se habla) */
+.dictating .composer, .dictating .attach-chip { display: none; }
+.dict { flex: none; display: flex; align-items: center; gap: 10px; margin: 6px 14px calc(var(--tabbar-h) + var(--sb) + 22px); padding: 10px; background: var(--glass); backdrop-filter: blur(18px); border: 1px solid var(--brand); border-radius: 26px; box-shadow: 0 0 0 4px rgba(124,108,255,.16), var(--shadow); --l: .2; }
+.kb-open .dict { margin-bottom: 10px; }
+.dict .d-x, .dict .d-ok { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.dict .d-x { background: var(--surface-3); color: var(--muted); }
+.dict .d-ok { background: var(--brand); color: #fff; } .dict .d-ok:disabled { opacity: .45; }
+.dict .d-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.dict .d-top { display: flex; align-items: center; gap: 10px; }
+.dict .d-state { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; }
+.dict .d-time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.dict .d-bars { flex: none; display: flex; align-items: center; gap: 3px; height: 28px; }
+.dict .d-bars i { width: 4px; border-radius: 3px; background: var(--down, #e5484d); height: calc(5px + var(--l) * 22px * var(--k, 1)); transition: height .09s linear; }
+.dict .d-bars i:nth-child(1) { --k: .45; } .dict .d-bars i:nth-child(2) { --k: .8; } .dict .d-bars i:nth-child(3) { --k: .6; } .dict .d-bars i:nth-child(4) { --k: 1; } .dict .d-bars i:nth-child(5) { --k: .65; } .dict .d-bars i:nth-child(6) { --k: .85; } .dict .d-bars i:nth-child(7) { --k: .5; }
+.dict.busy .d-bars i { background: var(--brand); animation: dict-wave 1s ease-in-out infinite; height: 16px; } .dict.busy .d-bars i:nth-child(2n) { animation-delay: .15s; } .dict.busy .d-bars i:nth-child(3n) { animation-delay: .3s; }
+@keyframes dict-wave { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1.1); } }
+.dict .d-live { font-size: 14.5px; line-height: 1.35; max-height: 4.1em; overflow-y: auto; color: var(--text); word-break: break-word; }
+.dict .d-live .hint { color: var(--muted); font-size: 12.5px; }
+.dict.busy .d-live { display: none; }
+@media (prefers-reduced-motion: reduce) { .dict .d-bars i { transition: none; } .dict.busy .d-bars i { animation: none; } }
+
+/* Revisión de la cartera leída de una captura */
+.rv-wait { display: flex; align-items: center; gap: 14px; margin-top: 12px; } .rv-wait .spin { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--surface-3); border-top-color: var(--brand); animation: rv-spin .8s linear infinite; }
+@keyframes rv-spin { to { transform: rotate(360deg); } } @media (prefers-reduced-motion: reduce) { .rv-wait .spin { animation-duration: 2.4s; } }
+.rv-head, .rv-row { display: grid; grid-template-columns: 26px 1.15fr 1fr 1fr; gap: 6px; align-items: center; }
+.rv-head { margin-top: 10px; font-size: 11px; color: var(--muted); padding: 0 2px; }
+.rv-list { max-height: 44vh; overflow: auto; margin-top: 4px; }
+.rv-row { padding: 7px 0; border-top: 1px solid var(--line); } .rv-row.bad input { border-color: var(--down, #e5484d); }
+.rv-row input:not([type=checkbox]) { min-width: 0; width: 100%; padding: 8px 9px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2, var(--surface-3)); color: var(--text); font: inherit; font-size: 14px; }
+.rv-ck input { width: 18px; height: 18px; accent-color: var(--brand); }
+.rv-st { grid-column: 2 / -1; font-size: 11.5px; color: var(--muted); line-height: 1.35; } .rv-st.ok { color: var(--up, #2ea043); } .rv-st.warn { color: var(--down, #e5484d); }

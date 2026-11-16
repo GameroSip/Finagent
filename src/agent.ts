@@ -18,6 +18,7 @@ const MAX_KNOWN_NUMBERS = 3000; // cifras de herramientas que se recuerdan por c
 
 export { SYSTEM_PROMPT } from './prompt';
 import { SYSTEM_PROMPT } from './prompt';
+import { TASKS, type Task } from './tasks';
 
 export interface ToolCallRecord { name: string; args: Record<string, any>; result: ToolResult; ui?: any }
 /** Métricas de una respuesta (para evaluar al modelo; la app no las muestra). */
@@ -58,9 +59,8 @@ export class AbortedError extends Error {
 }
 
 
-export const TRANSCRIBE_PROMPT = 'Transcribí literalmente lo que se dice en este audio, en el idioma en que está hablado. Respondé SOLO con la transcripción, sin comillas ni comentarios. Si no hay voz inteligible, respondé exactamente SIN_VOZ.';
+export const TRANSCRIBE_PROMPT = 'Transcribí este audio en el idioma en que está hablado (lo más probable es español rioplatense). Es una persona dictándole una consulta a una app: puede haber pausas, dudas, muletillas ("eh", "mmm", "este"), repeticiones, voz baja o ruido de fondo. Ignorá las muletillas y los silencios, pero conservá TODAS las palabras con contenido, sin resumir ni recortar nada. Transcribí aunque el audio sea muy corto (una o dos palabras). Usá puntuación normal, escribí los nombres de empresas y activos como se escriben (Apple, GGAL, Bitcoin, S&P 500, MercadoLibre) y las cifras con dígitos. No respondas lo que dice la persona ni agregues comentarios ni comillas. Solo si no hay ninguna voz humana en el audio, respondé exactamente SIN_VOZ.';
 export const READ_FILE_PROMPT = 'Transcribí de forma fiel y completa el texto y las cifras que se ven en este archivo, en texto plano (las tablas, una fila por línea con las columnas separadas por " | "). No resumas, no interpretes, no agregues datos ni consejos. Lo que no se lea, escribilo como [ilegible]. Máximo 5000 caracteres.';
-export const PORTFOLIO_PROMPT = 'De este archivo, listá las posiciones de una cartera de inversión (activos con su cantidad). Respondé SOLO con líneas "SÍMBOLO;CANTIDAD;PRECIO_PROMEDIO" (precio vacío si no figura). Usá el símbolo de Yahoo Finance solo si lo sabés con certeza (AAPL, GGAL.BA, BTC-USD); si no, el que figure en el archivo. El efectivo va como "MONEDA;monto" (ARS, USD). No inventes nada ni sumes datos que no estén. Si no hay posiciones, respondé exactamente SIN_DATOS.';
 const userMsg = (text: string) => ({ role: 'user', parts: [{ text }] });
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -95,9 +95,11 @@ export class FinancialAgent {
   abort() { this.aborted = true; }
   private check() { if (this.aborted) throw new AbortedError(); }
 
-  private async request(model: string, withTools: boolean, hooks: Hooks): Promise<any> {
-    const body: Record<string, unknown> = { systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: this.contents };
-    if (withTools) body.tools = [{ functionDeclarations: DECLARATIONS }];
+  private async request(model: string, withTools: boolean, hooks: Hooks, task?: Task): Promise<any> {
+    const body: Record<string, unknown> = task
+      ? { systemInstruction: { parts: [{ text: TASKS[task].system }] }, contents: this.contents, generationConfig: TASKS[task].config }
+      : { systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: this.contents };
+    if (withTools && !task) body.tools = [{ functionDeclarations: DECLARATIONS }];
     let delay = this.o.retryDelayMs;
     for (let attempt = 0; ; attempt++) {
       this.check();
@@ -138,9 +140,9 @@ export class FinancialAgent {
 
   /** Prueba los modelos en orden de preferencia; los no disponibles o saturados se saltean (y se recuerdan). */
   /** Modo servidor: una vuelta del modelo a través del servidor de FinAgent (que pone la clave, el prompt y elige el modelo). */
-  private async generateViaTransport(withTools: boolean): Promise<any> {
+  private async generateViaTransport(withTools: boolean, task?: Task): Promise<any> {
     this.check();
-    const r = await this.o.transport!.generate({ contents: this.contents, withTools, turn: this.turn });
+    const r = await this.o.transport!.generate({ contents: this.contents, withTools, turn: this.turn, ...(task ? { task } : {}) });
     this.turn = r.turn ?? this.turn;
     this.activeModel = r.model;
     this.o.models.active = r.model;
@@ -150,8 +152,8 @@ export class FinancialAgent {
     return r.data;
   }
 
-  private async generate(withTools: boolean, hooks: Hooks): Promise<any> {
-    if (this.o.transport) return this.generateViaTransport(withTools);
+  private async generate(withTools: boolean, hooks: Hooks, task?: Task): Promise<any> {
+    if (this.o.transport) return this.generateViaTransport(withTools, task);
     const tried = new Set<string>();
     let last: GeminiError | null = null;
     for (;;) {
@@ -167,7 +169,7 @@ export class FinancialAgent {
         hooks.onStatus?.(`Cambiando a ${modelLabel(model)}…`);
       }
       try {
-        const data = await this.request(model, withTools, hooks);
+        const data = await this.request(model, withTools, hooks, task);
         this.activeModel = model;
         this.o.models.active = model;
         this.modelCalls++;
@@ -244,29 +246,29 @@ export class FinancialAgent {
   hasPending(): boolean { return !!this.pending && Date.now() - this.pending.at < 8 * 60_000; }
 
   /** Una vuelta suelta con un archivo o un audio: sin herramientas y sin tocar la conversación. */
-  private async oneShot(parts: any[], instruction: string, hooks: Hooks): Promise<string> {
+  private async oneShot(parts: any[], instruction: string, hooks: Hooks, task: Task): Promise<string> {
     const saved = this.contents;
     this.contents = [{ role: 'user', parts: [...parts, { text: instruction }] }];
     try {
-      const data = await this.generate(false, hooks);
+      const data = await this.generate(false, hooks, task);
       return ((data?.candidates?.[0]?.content?.parts ?? []) as any[]).filter((p) => typeof p.text === 'string' && !p.thought).map((p) => p.text).join('').trim();
     } finally { this.contents = saved; }
   }
   private async readFile(att: Attachment, instruction: string, hooks: Hooks): Promise<string> {
     if (att.kind === 'text') return att.text ?? '';
-    return this.oneShot([{ inlineData: { mimeType: att.mime, data: att.data } }], instruction, hooks);
+    return this.oneShot([{ inlineData: { mimeType: att.mime, data: att.data } }], instruction, hooks, 'read');
   }
-  /** Lee una imagen o un PDF suelto (p. ej. para importar la cartera): cuenta como una consulta. */
-  async extractFile(att: Attachment, instruction: string, hooks: Hooks = {}): Promise<string> {
+  /** Lee una o varias capturas (o un PDF) de una cartera y devuelve el JSON crudo del modelo. Cuenta como UNA consulta. */
+  async extractPortfolio(atts: Attachment[], instruction: string, hooks: Hooks = {}): Promise<string> {
     this.aborted = false; this.modelCalls = 0; this.tokens = NO_TOKENS(); this.turn = undefined;
-    try { return await this.readFile(att, instruction, hooks); }
+    try { return await this.oneShot(atts.map((a) => ({ inlineData: { mimeType: a.mime, data: a.data } })), instruction, hooks, 'portfolio'); }
     catch (e) { if (this.turn && !(e instanceof AbortedError)) void this.o.transport?.abandon?.(this.turn); throw e; }
   }
   /** Pasa a texto un audio. En modo servidor la consulta queda descontada para la pregunta que se envíe después. */
   async transcribe(rec: Recording, hooks: Hooks = {}): Promise<string> {
     this.releasePending(); this.aborted = false; this.modelCalls = 0; this.tokens = NO_TOKENS(); this.turn = undefined;
     let text: string;
-    try { text = await this.oneShot([{ inlineData: { mimeType: rec.mime, data: rec.data } }], TRANSCRIBE_PROMPT, hooks); }
+    try { text = await this.oneShot([{ inlineData: { mimeType: rec.mime, data: rec.data } }], TRANSCRIBE_PROMPT, hooks, 'transcribe'); }
     catch (e) { if (this.turn && !(e instanceof AbortedError)) void this.o.transport?.abandon?.(this.turn); throw e; }
     text = text.replace(/^["“«]+|["”»]+$/g, '').trim();
     if (!text || /^SIN_VOZ\b/.test(text)) { if (this.turn) void this.o.transport?.abandon?.(this.turn); return ''; }

@@ -18,9 +18,10 @@ describe('servidor: validación de adjuntos (partsOk)', () => {
     expect(partsOk([{ inlineData: { mimeType: 'image/png', data: b64(1_400_001) } }])).toBe(false);
     expect(partsOk([{ inlineData: { mimeType: 'image/png' } }])).toBe(false);
   });
-  it('rechaza más de un adjunto por mensaje y las referencias a archivos de otros', () => {
+  it('rechaza más de 3 adjuntos por mensaje y las referencias a archivos de otros', () => {
     const one = { inlineData: { mimeType: 'image/png', data: b64(10) } };
-    expect(partsOk([one, one])).toBe(false);
+    expect(partsOk([one, one, one])).toBe(true);
+    expect(partsOk([one, one, one, one])).toBe(false);
     expect(partsOk([{ fileData: { fileUri: 'https://x/y', mimeType: 'image/png' } }])).toBe(false);
     expect(partsOk([{ file_data: {} }])).toBe(false);
     expect(partsOk([{ inline_data: {} }])).toBe(false);
@@ -81,5 +82,33 @@ describe('servidor: /v1/generate con audio o archivos', () => {
     const b = await s.call('POST', '/v1/generate', { token: se.token, body: { contents: user('Cómo viene el dólar hoy'), withTools: false, turn: a.json.turn } });
     expect(b.status).toBe(200);
     expect(b.json.remaining.day).toBe(a.json.remaining.day);
+  });
+});
+
+describe('servidor: tareas sueltas (voz, archivo, cartera)', () => {
+  const one = (data = 'A'.repeat(1000)) => ({ inlineData: { mimeType: 'image/jpeg', data } });
+  it('usan su propia instrucción y no el prompt del analista financiero, sin herramientas', async () => {
+    const s = await makeServer(); const se = await s.session();
+    const r = await s.call('POST', '/v1/generate', { token: se.token, body: { contents: [{ role: 'user', parts: [one(), { text: 'leé' }] }], withTools: true, task: 'portfolio' } });
+    expect(r.status).toBe(200);
+    const sent = s.seen.at(-1)!.body;
+    expect(sent.systemInstruction.parts[0].text).toMatch(/extractor de datos/);
+    expect(sent.systemInstruction.parts[0].text).not.toMatch(/verific/i);
+    expect(sent.tools).toBeUndefined();
+    expect(sent.generationConfig.responseMimeType).toBe('application/json');
+    expect(sent.generationConfig.temperature).toBe(0);
+  });
+  it('una tarea desconocida se ignora (no abre el servidor como proxy genérico)', async () => {
+    const s = await makeServer(); const se = await s.session();
+    await s.call('POST', '/v1/generate', { token: se.token, body: { contents: user('hola'), withTools: false, task: 'cualquier-cosa' } });
+    expect(JSON.stringify(s.seen.at(-1)!.body.systemInstruction)).not.toMatch(/extractor|transcriptor/);
+  });
+  it('hasta 3 capturas juntas en una tarea; sin tarea, solo 1; y con tope de tamaño total', async () => {
+    const s = await makeServer(); const se = await s.session();
+    const three = [{ role: 'user', parts: [one(), one(), one(), { text: 'x' }] }];
+    expect((await s.call('POST', '/v1/generate', { token: se.token, body: { contents: three, withTools: false, task: 'portfolio' } })).status).toBe(200);
+    expect((await s.call('POST', '/v1/generate', { token: se.token, body: { contents: three, withTools: false } })).status).toBe(400);
+    const big = [{ role: 'user', parts: [one('A'.repeat(1_000_000)), one('A'.repeat(1_000_000)), one('A'.repeat(900_000)), { text: 'x' }] }];
+    expect((await s.call('POST', '/v1/generate', { token: se.token, body: { contents: big, withTools: false, task: 'portfolio' } })).status).toBe(400);
   });
 });

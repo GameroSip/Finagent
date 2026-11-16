@@ -1,5 +1,6 @@
 // Servidor de FinAgent: cuentas automáticas (sin registro), planes con un modelo fijo y límites, y puente con Gemini.
 // Es una función (Request → Response) sin dependencias de la plataforma: corre en Cloudflare Workers, en Node o en cualquier otro lado.
+import { isTask } from '../src/tasks';
 import { DEFAULT_PARAMS, allPlansEconomics } from '../src/economics';
 import { estimateCostUSD } from '../src/pricing';
 import { consume, localDates, PLAN_RANK, PLANS, planNote, refund, type Plan, type PlanId, type Ticket } from '../src/plans';
@@ -28,7 +29,7 @@ const TOKEN_TTL_SEC = 90 * 24 * 3600;     // la sesión dura 90 días
 const TURN_TTL_MS = 10 * 60_000;          // una respuesta tiene 10 minutos para completarse
 const MAX_CALLS_PER_TURN = 12;
 const MAX_BODY_BYTES = 120_000;
-const MAX_MEDIA_BODY_BYTES = 1_800_000;   // una consulta con un archivo, una captura o un audio adjunto (el teléfono los reduce antes)
+const MAX_MEDIA_BODY_BYTES = 3_400_000;   // una consulta con un archivo, una captura o un audio adjunto (el teléfono los reduce antes)
 const MEDIA_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/aac']);
 /** Las partes de un mensaje: texto, llamadas de herramientas o UN adjunto en línea de un tipo conocido. Nada de enlaces a archivos ajenos. */
 export function partsOk(parts: any[]): boolean {
@@ -37,7 +38,7 @@ export function partsOk(parts: any[]): boolean {
     if (!p || typeof p !== 'object') return false;
     if (p.inlineData !== undefined) {
       const d = p.inlineData;
-      if (!d || typeof d.data !== 'string' || !MEDIA_MIMES.has(String(d.mimeType)) || d.data.length > 1_400_000 || !/^[A-Za-z0-9+/=]+$/.test(d.data) || ++media > 1) return false;
+      if (!d || typeof d.data !== 'string' || !MEDIA_MIMES.has(String(d.mimeType)) || d.data.length > 1_400_000 || !/^[A-Za-z0-9+/=]+$/.test(d.data) || ++media > 3) return false;
     } else if (p.fileData !== undefined || p.file_data !== undefined || p.inline_data !== undefined) return false;
   }
   return true;
@@ -251,7 +252,9 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
     const b = await readJson(req, MAX_MEDIA_BODY_BYTES);
     const contents = b.contents;
     if (!Array.isArray(contents) || !contents.length || contents.length > MAX_MESSAGES || contents.some((c) => !c || (c.role !== 'user' && c.role !== 'model') || !Array.isArray(c.parts) || !partsOk(c.parts))) return json(400, { error: 'bad_request' });
-    if (contents.reduce((n, c) => n + c.parts.filter((p: any) => p.inlineData).length, 0) > 1) return json(400, { error: 'bad_request' });
+    const task = isTask(b.task) ? b.task : undefined;
+    const media = contents.flatMap((c) => c.parts.filter((p: any) => p.inlineData));
+    if (media.length > (task ? 3 : 1) || media.reduce((n: number, p: any) => n + p.inlineData.data.length, 0) > 2_500_000) return json(400, { error: 'bad_request' });
     const hasMedia = contents.some((c) => c.parts.some((p: any) => p.inlineData));
     if (JSON.stringify(contents).length > MAX_BODY_BYTES && !hasMedia) return json(413, { error: 'too_large' });
 
@@ -282,7 +285,7 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
       ticket = c.ticket; remaining = c.remaining;
     }
 
-    const r = await router.generate({ chain: chainFor(plan, !!b.deep), pinned, contents, withTools: !!b.withTools, note: planNote(plan), thinking: b.deep ? (plan.deepThinking ?? plan.thinking) : plan.thinking, deep: !!b.deep });
+    const r = await router.generate({ chain: chainFor(plan, !!b.deep), pinned, contents, withTools: task ? false : !!b.withTools, note: planNote(plan), thinking: b.deep ? (plan.deepThinking ?? plan.thinking) : plan.thinking, deep: !!b.deep, task });
     if (!r.ok) {
       if (ticket) await refund(store, ticket);                                                       // no se entregó nada: no se cobra la consulta
       if (r.error === 'capacity') { await stat('429'); return capacity(r.scope, r.retryAfterSec); }  // el cupo de Gemini se agotó: se explica, no es una falla

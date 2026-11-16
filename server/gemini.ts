@@ -1,6 +1,7 @@
 // Enrutador de modelos del servidor: llama a Gemini con la clave del negocio, aplica el prompt y las herramientas de FinAgent,
 // y respeta el modelo FIJO de cada plan (el gratis usa solo el suyo; los de pago pueden tener un respaldo).
 // Distingue "sin capacidad" (el cupo de Gemini se agotó: no es un error, es un límite) de una falla real, para poder explicárselo al usuario.
+import { TASKS, type Task } from '../src/tasks';
 import { flattenContents } from '../src/contents';
 import { modelFor, type Plan, type Thinking } from '../src/plans';
 import { SYSTEM_PROMPT } from '../src/prompt';
@@ -18,6 +19,7 @@ export interface RouteInput {
   note?: string;            // contexto real de la cuenta para el modelo (plan, modelo, límites)
   thinking?: Thinking;      // nivel de razonamiento que pide el plan (para el análisis profundo, el del análisis profundo)
   deep?: boolean;           // análisis profundo: se acepta esperar más
+  task?: Task;              // tarea suelta (voz, archivo, cartera): instrucción propia, sin herramientas
 }
 export type RouteResult =
   | { ok: true; model: string; data: any; switched: boolean }
@@ -27,7 +29,8 @@ export type RouteResult =
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
 
 /** El prompt y las herramientas los pone el SERVIDOR: el cliente solo manda la conversación (así la app no sirve de proxy genérico). */
-export function buildBody(contents: unknown[], withTools: boolean, note?: string, thinking?: Thinking): Record<string, unknown> {
+export function buildBody(contents: unknown[], withTools: boolean, note?: string, thinking?: Thinking, task?: Task): Record<string, unknown> {
+  if (task) return { systemInstruction: { parts: [{ text: TASKS[task].system }] }, contents, generationConfig: TASKS[task].config };
   return {
     systemInstruction: { parts: [{ text: note ? `${SYSTEM_PROMPT}\n\nCONTEXTO DE LA CUENTA (dato real; usalo solo si preguntan por su plan, su modelo o sus límites): ${note}` : SYSTEM_PROMPT }] },
     contents,
@@ -70,7 +73,7 @@ export class ModelRouter {
       if (cd && cd.until > this.now()) { note(cd.scope, cd.until - this.now()); continue; }
       const switched = !!i.pinned && model !== i.pinned;
       let thinking = this.noThinking.has(model) ? undefined : thinkingFor(model, i.thinking);
-      const mk = (th?: Thinking) => buildBody(switched ? flattenContents(i.contents as any[]) : i.contents, i.withTools, i.note, th);
+      const mk = (th?: Thinking) => buildBody(switched ? flattenContents(i.contents as any[]) : i.contents, i.withTools, i.note, th, i.task);
       let body = mk(thinking);
       const isLast = !order.slice(idx + 1).some((m) => !((this.cooldown.get(m)?.until ?? 0) > this.now()));
       const timeoutMs = isLast ? ATTEMPT_TIMEOUT_MS.last : i.deep ? ATTEMPT_TIMEOUT_MS.deep : ATTEMPT_TIMEOUT_MS.fast;

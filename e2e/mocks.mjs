@@ -68,7 +68,11 @@ export function geminiReply(url, body) {
     const mime = body.contents.flatMap((c) => c.parts ?? []).find((p) => p.inlineData).inlineData.mimeType;
     const ut = userTexts(body);
     if (mime.startsWith('audio/')) return text('Cómo viene el dólar hoy');
-    if (ut.includes('SÍMBOLO;CANTIDAD')) return text('```\nAAPL;10;150,5\nUSD;300\n```');
+    if (ut.includes('Leé la o las capturas')) return text(JSON.stringify({ broker: 'InvertirOnline (IOL)', positions: [
+      { symbol: 'GGAL', name: 'Grupo Financiero Galicia', asset_type: 'accion_ar', quantity: 100, avg_cost: 5230.5, last_price: 6140, market_value: 614000, currency: 'ARS' },
+      { symbol: 'AAPL', name: 'Apple Inc.', asset_type: 'cedear', quantity: 10, avg_cost: 18500, last_price: 20100, market_value: 201000, currency: 'ARS' },
+      { symbol: 'AL30', name: 'Bonar 2030', asset_type: 'bono_ar', quantity: 500, last_price: 61000, market_value: 99999999, currency: 'ARS' }],
+      cash: [{ currency: 'ARS', amount: 15000.5 }], notes: '' }));
     return text('Resumen de cuenta | Saldo | 1.234,50 USD');
   }
   const q = userTexts(body).toLowerCase();

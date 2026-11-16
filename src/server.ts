@@ -219,7 +219,7 @@ export async function sendInterest(plan: string): Promise<void> {
 
 export class ServerTransport implements Transport {
   async generate(a: GenerateArgs): Promise<GenerateResult> {
-    const { status, json } = await authed('POST', '/v1/generate', { contents: a.contents, withTools: a.withTools, ...(a.turn ? { turn: a.turn } : {}) });
+    const { status, json } = await authed('POST', '/v1/generate', { contents: a.contents, withTools: a.withTools, ...(a.turn ? { turn: a.turn } : {}), ...(a.task ? { task: a.task } : {}) });
     if (status === 200 && json?.data) {
       if (json.remaining) setQuota({ remaining: json.remaining, plan: json.plan, tier: json.tier });
       return { data: json.data, model: json.model, turn: json.turn };

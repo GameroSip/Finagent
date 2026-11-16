@@ -12,9 +12,10 @@ import { $, esc, h, toast } from '../ui/dom';
 import { dirClass, fmtNum, fmtPct } from '../ui/format';
 import { icon } from '../ui/icons';
 import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
-import { FinancialAgent, PORTFOLIO_PROMPT } from '../agent';
-import { AttachError, pickFile, prepareFile } from '../attach';
-import { isServerMode, transport } from '../server';
+import { FinancialAgent } from '../agent';
+import { AttachError, pickFiles, prepareFile, prepareImages, type Attachment } from '../attach';
+import { buildPortfolioPrompt, parseShotJson, resolveSymbols, shotToItems, type Proposed } from '../importers';
+import { busyMessage, isServerMode, limitMessage, LimitError, ServerBusyError, transport } from '../server';
 import { getSettings } from '../store';
 import { mediaConsent } from './mediaConsent';
 import { openCalculator } from './calculator';
@@ -171,36 +172,101 @@ export function createPortfolioView(ctx: Ctx): View {
     inp.click();
   }
 
-  /** Lee una captura o un PDF del broker con la IA y deja revisar lo que entendió antes de agregarlo: nada entra sin que la persona lo confirme. */
+  /** Lee capturas (hasta 3) o un PDF del broker con la IA y deja revisar y corregir lo que entendió: nada entra sin que la persona lo confirme. */
   async function importShot() {
     if (!isServerMode() && !getSettings().apiKey) { toast(t('Primero cargá tu clave de Gemini en Ajustes')); return; }
     if (!(await mediaConsent())) return;
-    const f = await pickFile('image/*,application/pdf');
-    if (!f) return;
+    const files = await pickFiles('image/*,application/pdf', true);
+    if (!files.length) return;
+    let cancelled = false;
+    const wait = h('div');
+    wait.innerHTML = `<h3 class="sheet-title">${esc(t('Leyendo tu cartera…'))}</h3><div class="rv-wait"><span class="spin"></span><p class="muted" style="font-size:13px;line-height:1.5">${esc(t('Estoy leyendo cada fila de tu captura. Puede tardar unos segundos; no cierres la app.'))}</p></div>`;
+    const closeWait = openSheet(wait, () => { cancelled = true; });
     try {
-      const att = await prepareFile(f);
-      if (att.kind === 'text') { toast(t('Para un CSV usá "Importar CSV"')); return; }
-      toast(t('Leyendo tu captura…'));
+      let atts: Attachment[];
+      const pdf = files.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+      if (pdf) atts = [await prepareFile(pdf)];
+      else if (files.some((f) => f.type.startsWith('image/'))) atts = await prepareImages(files);
+      else { closeWait(); toast(t('Para un CSV usá "Importar CSV"')); return; }
       const agent = new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models, transport: isServerMode() ? transport : undefined });
-      const raw = (await agent.extractFile(att, PORTFOLIO_PROMPT)).replace(/```[a-z]*/gi, '');
+      const raw = await agent.extractPortfolio(atts, buildPortfolioPrompt());
       track('media_use', { kind: 'portfolio_shot' });
-      const r = /SIN_DATOS/.test(raw) ? { rows: [], skipped: [] } : parseCsv(raw);
-      if (!r.rows.length) { toast(t('No encontré posiciones en esa imagen')); return; }
-      reviewRows(r.rows);
-    } catch (e) { toast(e instanceof AttachError ? e.message : t('No se pudo leer la captura. Probá de nuevo.')); }
+      if (cancelled) return;
+      closeWait();
+      const shot = parseShotJson(raw);
+      const res = shot ? shotToItems([shot]) : null;
+      if (!res || !res.items.length) { explainEmpty(res?.notes ?? ''); return; }
+      reviewShot(res.items, res.brokerName, res.notes);
+    } catch (e) {
+      if (!cancelled) closeWait();
+      if (cancelled) return;
+      toast(e instanceof AttachError ? e.message : e instanceof LimitError ? limitMessage(e) : e instanceof ServerBusyError ? busyMessage(e) : t('No se pudo leer la captura. Probá de nuevo.'));
+    }
   }
-  function reviewRows(rows: Array<Omit<Holding, 'id'>>) {
+  function explainEmpty(notes: string) {
     const c = h('div');
-    c.innerHTML = `<h3 class="sheet-title">${esc(t('Revisá lo que leí'))}</h3>
-      <p class="muted" style="font-size:12.5px;line-height:1.5">${esc(t('La lectura automática puede equivocarse en símbolos o cantidades. Controlá cada fila con tu captura; podés corregirlas después.'))}</p>
-      <div style="max-height:46vh;overflow:auto;margin-top:8px">${rows.map((x) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><b>${esc(x.symbol)}</b><span class="num">${fmtNum(x.qty, 6)}${x.cost !== null ? ` · ${fmtNum(x.cost)}` : ''}</span></div>`).join('')}</div>
-      <div class="sheet-actions"><button class="btn btn-ghost" data-r="0">${esc(t('Cancelar'))}</button><button class="btn btn-primary" data-r="1">${esc(t('Agregar {n}', { n: rows.length }))}</button></div>`;
+    c.innerHTML = `<h3 class="sheet-title">${esc(t('No encontré posiciones'))}</h3>
+      <p class="muted" style="font-size:13px;line-height:1.55">${esc(t('Probá con una captura de la pantalla de tu cartera completa (con los nombres de los activos y las cantidades), sin recortar y con buena luz. Si tu lista es larga, mandá hasta 3 capturas juntas.'))}</p>
+      ${notes ? `<p class="muted" style="font-size:12.5px;margin-top:8px" data-notrans>${esc(notes.slice(0, 240))}</p>` : ''}
+      <div class="sheet-actions"><button class="btn btn-ghost" data-r="0">${esc(t('Cerrar'))}</button><button class="btn btn-primary" data-r="1">${esc(t('Cargar a mano'))}</button></div>`;
     const close = openSheet(c);
+    c.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-r]'); if (!b) return; close(); if (b.dataset.r === '1') openAdd(); });
+  }
+  /** Pantalla de revisión: cada fila se puede corregir o descartar; los símbolos se comprueban contra Yahoo Finance mientras se mira. */
+  function reviewShot(items: Proposed[], broker: string, notes: string) {
+    const c = h('div');
+    const rows = items.map((x, i) => `<div class="rv-row" data-i="${i}">
+        <label class="rv-ck"><input type="checkbox" checked aria-label="${esc(t('Incluir'))}"/></label>
+        <input class="rv-sym" value="${esc(x.symbol)}" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="${esc(t('Símbolo'))}" ${x.kind === 'cash' ? 'readonly' : ''}/>
+        <input class="rv-qty" inputmode="decimal" value="${esc(String(x.qty))}" aria-label="${esc(t('Cantidad'))}"/>
+        ${x.kind === 'cash' ? '<span></span>' : `<input class="rv-cost" inputmode="decimal" value="${x.cost !== null ? esc(String(x.cost)) : ''}" placeholder="${esc(t('Costo'))}" aria-label="${esc(t('Precio promedio de compra'))}"/>`}
+        <div class="rv-st" data-notrans>${x.kind === 'cash' ? esc(t('Efectivo')) : x.name ? esc(x.name.slice(0, 40)) : ''}</div></div>`).join('');
+    c.innerHTML = `<h3 class="sheet-title">${esc(t('Revisá lo que leí'))}</h3>
+      <p class="muted" style="font-size:12.5px;line-height:1.5">${esc(broker ? t('Leí {n} posiciones de {b}. Controlá cada fila con tu captura: podés corregir símbolo, cantidad y costo, o destildar lo que no quieras.', { n: items.length, b: broker }) : t('Leí {n} posiciones. Controlá cada fila con tu captura: podés corregir símbolo, cantidad y costo, o destildar lo que no quieras.', { n: items.length }))}</p>
+      <div class="rv-head"><span></span><span>${esc(t('Símbolo'))}</span><span>${esc(t('Cantidad'))}</span><span>${esc(t('Costo'))}</span></div>
+      <div class="rv-list">${rows}</div>
+      ${notes ? `<p class="muted" style="font-size:12px;margin-top:8px" data-notrans>${esc(notes.slice(0, 240))}</p>` : ''}
+      <div class="sheet-actions"><button class="btn btn-ghost" data-r="0">${esc(t('Cancelar'))}</button><button class="btn btn-primary" data-r="1" id="rv-go"></button></div>`;
+    const go = $<HTMLButtonElement>('#rv-go', c);
+    const rowEls = [...c.querySelectorAll<HTMLElement>('.rv-row')];
+    const included = () => rowEls.filter((r) => r.querySelector<HTMLInputElement>('.rv-ck input')!.checked);
+    const count = () => { const n = included().length; go.textContent = t('Agregar {n}', { n }); go.disabled = n === 0; };
+    count();
+    c.addEventListener('change', (e) => { if ((e.target as HTMLElement).closest('.rv-ck')) count(); });
+    // avisos de cada fila y comprobación de símbolos
+    const setStatus = (r: HTMLElement, msg: string, cls: 'ok' | 'warn') => { const st = r.querySelector<HTMLElement>('.rv-st')!; st.textContent = msg; st.className = `rv-st ${cls}`; };
+    rowEls.forEach((r, i) => { if (items[i].flags.includes('value')) setStatus(r, t('⚠ La cantidad por el precio no coincide con la valuación: revisá la cantidad'), 'warn'); if (items[i].flags.includes('dup')) setStatus(r, t('⚠ Aparece dos veces con distinta cantidad'), 'warn'); });
+    let alive = true;
+    void resolveSymbols(items, async (s) => { const q = await fetchQuoteCard(s); return { price: q.price, currency: q.currency }; }).then((res) => {
+      if (!alive) return;
+      res.forEach((x, i) => {
+        const r = rowEls[i]; if (!r || items[i].kind === 'cash') return;
+        const inp = r.querySelector<HTMLInputElement>('.rv-sym')!;
+        if (x.found) { if (inp.value.toUpperCase() === items[i].symbol) inp.value = x.symbol; if (!items[i].flags.length) setStatus(r, t('✓ Cotiza: {p} {c}', { p: fmtNum(x.price ?? 0), c: x.currency ?? '' }), 'ok'); }
+        else if (!items[i].flags.length) setStatus(r, t('⚠ No encontré cotización: revisá el símbolo (se guarda igual)'), 'warn');
+      });
+    });
+    const close = openSheet(c, () => { alive = false; });
     c.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-r]');
       if (!b) return;
-      close();
-      if (b.dataset.r === '1') { for (const row of rows) list = addHolding(list, row); track('portfolio_op', { op: 'import' }); save(); }
+      if (b.dataset.r === '1') {
+        let added = 0, bad = 0;
+        for (const r of included()) {
+          const i = Number(r.dataset.i), it = items[i];
+          const sym = r.querySelector<HTMLInputElement>('.rv-sym')!.value.trim().toUpperCase();
+          // lo que no se tocó se conserva tal cual (0.125 no debe leerse como "ciento veinticinco"); lo que se escribió a mano, con las reglas de siempre
+          const edited = (raw: string, orig: number | null) => (orig !== null && raw.trim() === String(orig) ? orig : raw.trim() ? parseNum(raw) : null);
+          const qty = edited(r.querySelector<HTMLInputElement>('.rv-qty')!.value, it.qty);
+          const cost = it.kind === 'cash' ? null : edited(r.querySelector<HTMLInputElement>('.rv-cost')?.value ?? '', it.cost);
+          if (!/^[A-Z0-9.^=\-]{1,20}$/.test(sym) || qty === null || qty <= 0) { bad++; r.classList.add('bad'); continue; }
+          list = addHolding(list, { kind: it.kind, symbol: sym, qty, cost: cost !== null && cost > 0 ? cost : null });
+          added++;
+        }
+        if (bad) { toast(t('Revisá las filas marcadas: el símbolo o la cantidad no son válidos')); return; }
+        alive = false; close();
+        if (added) { track('portfolio_op', { op: 'import' }); save(); }
+      } else { alive = false; close(); }
     });
   }
 

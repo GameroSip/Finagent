@@ -1,0 +1,26 @@
+  ✔ el chat tiene clip y micrófono 
+  ✔ el archivo queda como chip con su nombre 
+  ✔ un texto o CSV no pide el aviso (va como texto, como cualquier mensaje) 
+  ✔ sin desborde horizontal en MD1-chip 
+  ✔ se puede quitar el adjunto 
+  ✔ la imagen pide el aviso de que va a Google 
+  ✔ sin desborde horizontal en MD1b-aviso 
+  ✔ el aviso se guardó para no repetirse 
+  ✔ la imagen queda como chip 
+  ✔ el mensaje muestra el adjunto 
+  ✔ sin desborde horizontal en MD2-adjunto-enviado 
+  ✔ mientras graba, el botón lo indica 
+  ✔ lo dictado queda en el cuadro, sin enviarse 
+  ✔ se mandó audio a Gemini 
+  ✔ sin desborde horizontal en MD3-dictado 
+  ✔ "Escuchar" lee la respuesta con la voz del teléfono, en español 
+  ✔ lo que se lee no trae símbolos de markdown 
+  ✔ muestra lo leído para confirmar (AAPL 10 y USD 300) 
+  ✔ avisa que la lectura puede equivocarse 
+  ✔ sin desborde horizontal en MD4-revision 
+  ✔ al confirmar se agregan las posiciones 
+  ✔ [en] botones de adjuntar y dictar traducidos 
+  ✔ [pt] botones de adjuntar y dictar traducidos 
+
+RESULTADO (voz y adjuntos): 23/23 verificaciones OK
+ERRORES DE PÁGINA: []

@@ -27,6 +27,7 @@ export const EVENTS: Record<string, Spec> = {
   chart_tool: { tool: CHART_TOOLS, on: 'bool' },
   stress_view: { level: LEVELS, group: GROUPS },
   move_view: { group: GROUPS, ok: 'bool' },
+  media_use: { kind: ['voice', 'image', 'pdf', 'file', 'tts', 'portfolio_shot'] },   // solo el tipo; nunca el contenido
   report_export: { kind: ['asset', 'portfolio', 'scenario'] },       // solo el tipo de informe; nada de su contenido
   portfolio_op: { op: ['add', 'import', 'remove'] },               // jamás qué activos ni cuánto
   plan_open: {},

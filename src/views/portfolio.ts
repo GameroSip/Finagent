@@ -12,6 +12,11 @@ import { $, esc, h, toast } from '../ui/dom';
 import { dirClass, fmtNum, fmtPct } from '../ui/format';
 import { icon } from '../ui/icons';
 import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
+import { FinancialAgent, PORTFOLIO_PROMPT } from '../agent';
+import { AttachError, pickFile, prepareFile } from '../attach';
+import { isServerMode, transport } from '../server';
+import { getSettings } from '../store';
+import { mediaConsent } from './mediaConsent';
 import { openCalculator } from './calculator';
 import { exportPortfolioPdf } from './exportPdf';
 
@@ -59,8 +64,8 @@ export function createPortfolioView(ctx: Ctx): View {
       body.innerHTML = `<div class="empty-note" style="margin-top:30px"><div class="empty-orb">${icon('landmark', 30)}</div>
         <div style="font-weight:700;font-size:17px">Todavía no cargaste nada</div>
         <div class="muted" style="max-width:290px">Cargá lo que tenés (acciones, cripto, dólares, pesos) y mirá cuánto hay en cada moneda. Queda solo en tu teléfono: FinAgent no lo envía a ningún lado.</div>
-        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center"><button class="btn btn-primary" id="p-add2">${icon('plus', 17)} Cargar a mano</button><button class="btn btn-ghost" id="p-csv">Importar un CSV</button><button class="btn btn-ghost" id="p-calc0">Calculadora de aportes</button></div></div>`;
-      $('#p-add2', body).onclick = () => openAdd(); $('#p-csv', body).onclick = () => pickCsv(); $('#p-calc0', body).onclick = () => ctx.layer((done) => openCalculator(ctx, null, done));
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center"><button class="btn btn-primary" id="p-add2">${icon('plus', 17)} Cargar a mano</button><button class="btn btn-ghost" id="p-csv">Importar un CSV</button><button class="btn btn-ghost" id="p-shot0">Desde una captura o PDF</button><button class="btn btn-ghost" id="p-calc0">Calculadora de aportes</button></div></div>`;
+      $('#p-add2', body).onclick = () => openAdd(); $('#p-csv', body).onclick = () => pickCsv(); $('#p-shot0', body).onclick = () => void importShot(); $('#p-calc0', body).onclick = () => ctx.layer((done) => openCalculator(ctx, null, done));
       return;
     }
     const rate = prefs.rate ?? 0;
@@ -85,7 +90,7 @@ export function createPortfolioView(ctx: Ctx): View {
       </div>
       <div class="section-head" style="margin-top:20px"><h2>Tenencias</h2></div>
       <div class="card" style="padding:4px 14px" id="p-rows"></div>
-      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" id="p-calc">${icon('sliders', 16)} Calculadora de escenarios</button><button class="btn btn-ghost btn-sm" id="p-pdf">${icon('externalLink', 16)} Informe en PDF</button><button class="btn btn-ghost btn-sm" id="p-csv">Importar CSV</button></div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" id="p-calc">${icon('sliders', 16)} Calculadora de escenarios</button><button class="btn btn-ghost btn-sm" id="p-pdf">${icon('externalLink', 16)} Informe en PDF</button><button class="btn btn-ghost btn-sm" id="p-csv">Importar CSV</button><button class="btn btn-ghost btn-sm" id="p-shot">Desde una captura</button></div>
       <p class="muted" style="font-size:11.5px;line-height:1.5;margin-top:16px">Los precios vienen de Yahoo Finance, con demora. Es información, no asesoramiento financiero ni una recomendación.</p>`;
     const rows = $('#p-rows', body);
     valued.forEach((x, i) => {
@@ -102,6 +107,7 @@ export function createPortfolioView(ctx: Ctx): View {
     $('#p-calc', body).onclick = () => { if (!prefs.rate) { toast(t('Primero indicá el valor del dólar en pesos')); return; } ctx.layer((done) => openCalculator(ctx, { valued, base: prefs.base, rate: prefs.rate! }, done)); };
     $('#p-pdf', body).onclick = () => { if (!prefs.rate) { toast(t('Primero indicá el valor del dólar en pesos')); return; } void exportPortfolioPdf(valued, prefs.base, prefs.rate); };
     $('#p-csv', body).onclick = () => pickCsv();
+    $('#p-shot', body).onclick = () => void importShot();
   }
 
   function rowMenu(x: Holding) {
@@ -163,6 +169,39 @@ export function createPortfolioView(ctx: Ctx): View {
       }
     };
     inp.click();
+  }
+
+  /** Lee una captura o un PDF del broker con la IA y deja revisar lo que entendió antes de agregarlo: nada entra sin que la persona lo confirme. */
+  async function importShot() {
+    if (!isServerMode() && !getSettings().apiKey) { toast(t('Primero cargá tu clave de Gemini en Ajustes')); return; }
+    if (!(await mediaConsent())) return;
+    const f = await pickFile('image/*,application/pdf');
+    if (!f) return;
+    try {
+      const att = await prepareFile(f);
+      if (att.kind === 'text') { toast(t('Para un CSV usá "Importar CSV"')); return; }
+      toast(t('Leyendo tu captura…'));
+      const agent = new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models, transport: isServerMode() ? transport : undefined });
+      const raw = (await agent.extractFile(att, PORTFOLIO_PROMPT)).replace(/```[a-z]*/gi, '');
+      track('media_use', { kind: 'portfolio_shot' });
+      const r = /SIN_DATOS/.test(raw) ? { rows: [], skipped: [] } : parseCsv(raw);
+      if (!r.rows.length) { toast(t('No encontré posiciones en esa imagen')); return; }
+      reviewRows(r.rows);
+    } catch (e) { toast(e instanceof AttachError ? e.message : t('No se pudo leer la captura. Probá de nuevo.')); }
+  }
+  function reviewRows(rows: Array<Omit<Holding, 'id'>>) {
+    const c = h('div');
+    c.innerHTML = `<h3 class="sheet-title">${esc(t('Revisá lo que leí'))}</h3>
+      <p class="muted" style="font-size:12.5px;line-height:1.5">${esc(t('La lectura automática puede equivocarse en símbolos o cantidades. Controlá cada fila con tu captura; podés corregirlas después.'))}</p>
+      <div style="max-height:46vh;overflow:auto;margin-top:8px">${rows.map((x) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><b>${esc(x.symbol)}</b><span class="num">${fmtNum(x.qty, 6)}${x.cost !== null ? ` · ${fmtNum(x.cost)}` : ''}</span></div>`).join('')}</div>
+      <div class="sheet-actions"><button class="btn btn-ghost" data-r="0">${esc(t('Cancelar'))}</button><button class="btn btn-primary" data-r="1">${esc(t('Agregar {n}', { n: rows.length }))}</button></div>`;
+    const close = openSheet(c);
+    c.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-r]');
+      if (!b) return;
+      close();
+      if (b.dataset.r === '1') { for (const row of rows) list = addHolding(list, row); track('portfolio_op', { op: 'import' }); save(); }
+    });
   }
 
   render();

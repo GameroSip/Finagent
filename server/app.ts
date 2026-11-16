@@ -28,6 +28,20 @@ const TOKEN_TTL_SEC = 90 * 24 * 3600;     // la sesión dura 90 días
 const TURN_TTL_MS = 10 * 60_000;          // una respuesta tiene 10 minutos para completarse
 const MAX_CALLS_PER_TURN = 12;
 const MAX_BODY_BYTES = 120_000;
+const MAX_MEDIA_BODY_BYTES = 1_800_000;   // una consulta con un archivo, una captura o un audio adjunto (el teléfono los reduce antes)
+const MEDIA_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/aac']);
+/** Las partes de un mensaje: texto, llamadas de herramientas o UN adjunto en línea de un tipo conocido. Nada de enlaces a archivos ajenos. */
+export function partsOk(parts: any[]): boolean {
+  let media = 0;
+  for (const p of parts) {
+    if (!p || typeof p !== 'object') return false;
+    if (p.inlineData !== undefined) {
+      const d = p.inlineData;
+      if (!d || typeof d.data !== 'string' || !MEDIA_MIMES.has(String(d.mimeType)) || d.data.length > 1_400_000 || !/^[A-Za-z0-9+/=]+$/.test(d.data) || ++media > 1) return false;
+    } else if (p.fileData !== undefined || p.file_data !== undefined || p.inline_data !== undefined) return false;
+  }
+  return true;
+}
 const MAX_MESSAGES = 60;
 const GENERATE_PER_MINUTE = 20;           // ráfaga por usuario
 const DEVICE_AUTH_PER_HOUR = 30;          // intentos de crear/recuperar cuenta por dirección y hora
@@ -60,11 +74,11 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
   const num = (v: string | undefined, dflt: number) => { const n = Number(v); return v !== undefined && v !== '' && Number.isFinite(n) ? n : dflt; };
   const stat = (name: string) => store.incr(`stat:${name}:${localDates(now(), tz).day}`, 1);
 
-  async function readJson(req: Request): Promise<any> {
+  async function readJson(req: Request, max = MAX_BODY_BYTES): Promise<any> {
     const len = Number(req.headers.get('content-length') ?? 0);
-    if (len > MAX_BODY_BYTES) throw new HttpError(413, { error: 'too_large' });
+    if (len > max) throw new HttpError(413, { error: 'too_large' });
     const text = await req.text();
-    if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) throw new HttpError(413, { error: 'too_large' });
+    if (new TextEncoder().encode(text).length > max) throw new HttpError(413, { error: 'too_large' });
     try { return JSON.parse(text || '{}'); } catch { throw new HttpError(400, { error: 'bad_json' }); }
   }
 
@@ -234,9 +248,12 @@ export function createApp(d: Deps): (req: Request) => Promise<Response> {
   async function generate(req: Request): Promise<Response> {
     if (env.KILL_SWITCH === '1') return json(503, { error: 'maintenance' });
     const { user, plan } = await authUser(req);
-    const b = await readJson(req);
+    const b = await readJson(req, MAX_MEDIA_BODY_BYTES);
     const contents = b.contents;
-    if (!Array.isArray(contents) || !contents.length || contents.length > MAX_MESSAGES || contents.some((c) => !c || (c.role !== 'user' && c.role !== 'model') || !Array.isArray(c.parts))) return json(400, { error: 'bad_request' });
+    if (!Array.isArray(contents) || !contents.length || contents.length > MAX_MESSAGES || contents.some((c) => !c || (c.role !== 'user' && c.role !== 'model') || !Array.isArray(c.parts) || !partsOk(c.parts))) return json(400, { error: 'bad_request' });
+    if (contents.reduce((n, c) => n + c.parts.filter((p: any) => p.inlineData).length, 0) > 1) return json(400, { error: 'bad_request' });
+    const hasMedia = contents.some((c) => c.parts.some((p: any) => p.inlineData));
+    if (JSON.stringify(contents).length > MAX_BODY_BYTES && !hasMedia) return json(413, { error: 'too_large' });
 
     const t = now().getTime(), dt = localDates(now(), tz);
     if (await store.incr(`rl:gen:${user.id}:${Math.floor(t / 60_000)}`, 1) > GENERATE_PER_MINUTE) return json(429, { error: 'rate', retryAfterSec: 30 }); // ráfaga: no cuenta como consulta

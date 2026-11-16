@@ -52,6 +52,8 @@ import sliders from 'lucide-static/icons/sliders-horizontal.svg?raw';
 import crown from 'lucide-static/icons/crown.svg?raw';
 import gem from 'lucide-static/icons/gem.svg?raw';
 import badgeCheck from 'lucide-static/icons/badge-check.svg?raw';
+import paperclip from 'lucide-static/icons/paperclip.svg?raw';
+import mic from 'lucide-static/icons/mic.svg?raw';
 import volume2 from 'lucide-static/icons/volume-2.svg?raw';
 import thumbsUp from 'lucide-static/icons/thumbs-up.svg?raw';
 import flag from 'lucide-static/icons/flag.svg?raw';
@@ -60,7 +62,7 @@ import thumbsDown from 'lucide-static/icons/thumbs-down.svg?raw';
 const ICONS = { activity, arrowDown, arrowUp, arrowUpRight, bitcoin, candles, lineChart, check, checkCircle, chevronLeft, clock, dollar,
   externalLink, flame, gauge, globe, house, info, keyRound, landmark, layers, lock, monitor, moon, newspaper, plus, refresh, scale,
   search, send, settings, shield, sparkles, star, sun, trash, trendDown, trendUp, warn, x, zap,
-  copy, ellipsis, menu, messageSquare, pencil, rotateCcw, square, squarePen, sliders, crown, gem, badgeCheck, volume2, thumbsUp, thumbsDown, flag } as const;
+  copy, ellipsis, menu, messageSquare, pencil, rotateCcw, square, squarePen, sliders, crown, gem, badgeCheck, volume2, paperclip, mic, thumbsUp, thumbsDown, flag } as const;
 export type IconName = keyof typeof ICONS;
 
 /** Devuelve el HTML de un icono (hereda el color del texto). `fill` rellena la forma (ej. estrella activa). */

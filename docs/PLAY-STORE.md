@@ -83,6 +83,7 @@ En `wrangler.toml` ya está `NEW_ACCOUNTS_PER_IP_DAY = "30"` (las operadoras mó
 | ID de dispositivo u otros ID | Sí (identificador aleatorio) | No | Obligatorio para la cuenta anónima |
 | Actividad en la app (interacciones) | Sí, **opcional** | No | Solo si la persona acepta las estadísticas |
 | Contenido generado por el usuario (consultas al asistente) | Sí (se transmite) | **Sí, con Google (Gemini)** | Se procesa de forma efímera: no se guarda en el servidor |
+| Audio y fotos o archivos | Sí, **solo cuando la persona los envía** (micrófono o adjuntar) | **Sí, con Google (Gemini)** | Se procesan de forma efímera, sin guardarse; hay un aviso previo. Permiso RECORD_AUDIO solo al tocar el micrófono |
 | Contenido generado por el usuario (comentarios y reportes) | Sí, opcional | No | Los envía la persona a propósito |
 Cifrado en tránsito: **Sí**. Solicitud de eliminación: **Sí** (en la app y en la web). No se vende ningún dato. Revisalo con tu abogado: Google compara esto con lo que la app hace realmente.
 

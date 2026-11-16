@@ -69,7 +69,7 @@ jobs:
           if-no-files-found: ignore
 
       # Herramientas del gráfico (Fibonacci, sesiones, perfil de volumen…) e íconos de los activos, en un Chromium real.
-      - name: Pruebas en navegador real (gráficos, íconos, termómetro y cartera)
+      - name: Pruebas en navegador real (gráficos, íconos, termómetro, cartera y voz)
         continue-on-error: true
         run: |
           mkdir -p e2e-log
@@ -78,7 +78,8 @@ jobs:
           node run-icons.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/iconos.txt; b=${PIPESTATUS[0]}
           node run-stress.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/termometro.txt; c=${PIPESTATUS[0]}
           node run-portfolio.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/cartera.txt; d=${PIPESTATUS[0]}
-          exit $((a + b + c + d))
+          node run-media.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/voz.txt; e=${PIPESTATUS[0]}
+          exit $((a + b + c + d + e))
 
       - name: Publicar el texto de las pruebas en la rama e2e-reports
         if: always()
@@ -111,6 +112,9 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+          M=android/app/src/main/AndroidManifest.xml
+          for P in RECORD_AUDIO MODIFY_AUDIO_SETTINGS; do grep -q "android.permission.$P" $M || sed -i "s#<uses-permission android:name=\"android.permission.INTERNET\" />#&\n    <uses-permission android:name=\"android.permission.$P\" />#" $M; done
+          grep -c "RECORD_AUDIO" $M | grep -q 1 || { echo "Falta el permiso del micrófono en el manifiesto"; cat $M; exit 1; }
 
       - name: Ícono y pantalla de inicio
         continue-on-error: true   # si fallara, el APK se compila igual con el ícono por defecto

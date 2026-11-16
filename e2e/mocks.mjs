@@ -63,6 +63,14 @@ export function geminiReply(url, body) {
   if (url.includes('/models?')) return models();
   const sys = body.systemInstruction?.parts?.[0]?.text ?? '';
   if (sys.startsWith('Generás títulos')) return text('Análisis técnico de AAPL');
+  const hasMedia = body.contents.some((c) => (c.parts ?? []).some((p) => p.inlineData));
+  if (hasMedia) {                                 // adjuntos: audio -> transcripción, captura -> posiciones, archivo -> texto con cifras
+    const mime = body.contents.flatMap((c) => c.parts ?? []).find((p) => p.inlineData).inlineData.mimeType;
+    const ut = userTexts(body);
+    if (mime.startsWith('audio/')) return text('Cómo viene el dólar hoy');
+    if (ut.includes('SÍMBOLO;CANTIDAD')) return text('```\nAAPL;10;150,5\nUSD;300\n```');
+    return text('Resumen de cuenta | Saldo | 1.234,50 USD');
+  }
   const q = userTexts(body).toLowerCase();
   const last = body.contents.at(-1), hasResults = (last.parts ?? []).some((p) => p.functionResponse);
   if (q.includes('inventá') && !hasResults) return text('Rinde 24.572% anual con una volatilidad de 21.512% y un ratio de 0.775.');

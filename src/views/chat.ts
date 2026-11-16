@@ -1,5 +1,6 @@
 // Asistente: chats guardados como en ChatGPT/Claude/Gemini. Cada chat tiene su historial, su título automático y su
 // propio contexto; una respuesta en curso sigue aunque cambies de chat o de pestaña.
+import { canRecord, canSpeak, isSpeaking, pickFile, prepareFile, speak, startRecording, stopSpeaking, wrapAttachment, AttachError, type Attachment, type Recorder } from '../attach';
 import { AbortedError, FinancialAgent, GeminiError, type AgentResult } from '../agent';
 import { ABOUT } from '../about';
 import { maybeUpsellCard } from '../ui/upsell';
@@ -17,6 +18,7 @@ import { $, esc, h, openUrl, toast } from '../ui/dom';
 import { markSvg } from '../ui/logo';
 import { icon, type IconName } from '../ui/icons';
 import { actionSheet, openSheet, promptSheet } from '../ui/sheet';
+import { mediaConsent } from './mediaConsent';
 import { renderRich, type Rich } from './cards';
 import { openHistory } from './history';
 import { analyticsOn, track } from '../analytics';
@@ -24,7 +26,7 @@ import { RATE_REASONS, REPORT_REASONS } from '../betaTexts';
 import { tierOf } from '../tiers';
 import { VERSION } from '../version';
 import { AI_TOOLS, lenBucket } from '../telemetry';
-import { t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
+import { locale, t, t as tx } from '../i18n'; // tx: dentro de algunos manejadores la letra t es otra cosa (el elemento tocado o un paso de herramienta)
 
 export interface ChatView extends View { ask(prompt: string, label?: string, src?: 'asset' | 'market'): void }
 
@@ -86,12 +88,26 @@ export function createChatView(ctx: Ctx): ChatView {
       <button class="icon-btn" id="c-new" aria-label="Nuevo chat">${icon('squarePen', 20)}</button>
     </div>
     <div class="chat-scroll" id="c-scroll"></div>
+    <div class="attach-chip hide" id="c-chip"></div>
     <form class="composer" id="c-form" autocomplete="off">
+      <button class="tool" id="c-clip" type="button" aria-label="Adjuntar un archivo o una captura">${icon('paperclip', 20)}</button>
       <textarea id="c-in" rows="1" placeholder="Preguntale algo a FinAgent AI…" enterkeyhint="send"></textarea>
+      <button class="tool" id="c-mic" type="button" aria-label="Dictar con la voz">${icon('mic', 20)}</button>
       <button class="send" id="c-send" type="submit" aria-label="Enviar" disabled>${icon('arrowUp', 20)}</button>
     </form>`;
   const scroll = $('#c-scroll', el), input = $<HTMLTextAreaElement>('#c-in', el), send = $<HTMLButtonElement>('#c-send', el), form = $<HTMLFormElement>('#c-form', el);
   const titleBtn = $('#c-title', el), titleText = $('#c-title-t', el);
+  const clip = $<HTMLButtonElement>('#c-clip', el), mic = $<HTMLButtonElement>('#c-mic', el), chip = $('#c-chip', el);
+  let attach: Attachment | null = null;
+  let recorder: Recorder | null = null;
+  let draftAgent: FinancialAgent | null = null;       // agente de un chat que todavía no existe (para dictar antes de enviar la primera pregunta)
+  if (!canRecord()) mic.classList.add('hide');
+  function paintChip() {
+    chip.classList.toggle('hide', !attach);
+    chip.innerHTML = attach ? `${icon('paperclip', 14)}<span class="n" data-notrans>${esc(attach.name)}</span><button type="button" aria-label="${esc(t('Quitar adjunto'))}" id="c-chip-x">${icon('x', 14)}</button>` : '';
+    chip.querySelector('#c-chip-x')?.addEventListener('click', () => { attach = null; paintChip(); updateSend(); });
+    updateSend();
+  }
 
   const fresh = (): Session => ({ id: null, meta: null, data: emptyData() });
   let cur: Session = fresh();
@@ -110,7 +126,7 @@ export function createChatView(ctx: Ctx): ChatView {
     send.classList.toggle('stop', r);
     send.setAttribute('aria-label', r ? 'Detener' : 'Enviar');
     send.innerHTML = icon(r ? 'square' : 'arrowUp', r ? 16 : 20, r);
-    send.disabled = !r && !input.value.trim();
+    send.disabled = !r && !input.value.trim() && !attach;
   }
   const setModelChip = () => {
     if (isServerMode()) { const q = quotaInfo(), r = q.remaining, label = q.plan?.label ? t('Plan {name}', { name: t(q.plan.label) }) : 'FinAgent'; $('#c-model .t', el).textContent = r ? `${label} · ${r.day === 1 ? t('te queda 1 conversación hoy') : t('te quedan {n} conversaciones hoy', { n: r.day })}` : label; refreshPlanBanner(); return; }
@@ -184,6 +200,7 @@ export function createChatView(ctx: Ctx): ChatView {
     if (m.flags?.truncated) pills += `<span class="vpill warn">${icon('clock', 13)} respuesta parcial</span>`;
     body.append(h('div', { class: 'ai-foot', html: `<div class="vrow">${pills}</div>
       <div class="msg-actions"><button class="act-btn" data-act="copy" aria-label="Copiar respuesta">${icon('copy', 15)}<span>Copiar</span></button>
+        ${canSpeak() ? `<button class="act-btn" data-act="speak" aria-label="${esc(t('Escuchar la respuesta'))}">${icon('volume2', 15)}<span>${esc(t('Escuchar'))}</span></button>` : ''}
         <button class="act-btn regen hide" data-act="regen" aria-label="Regenerar respuesta">${icon('rotateCcw', 15)}<span>Regenerar</span></button>
         ${isServerMode() ? (m.reported ? `<span class="muted rep-done">${esc(t('Reportada'))}</span>` : `<button class="act-btn" data-act="report" aria-label="${esc(t('Reportar respuesta'))}">${icon('flag', 15)}<span>${esc(t('Reportar'))}</span></button>`) : ''}
         ${analyticsOn() ? `<span class="rate-box">${m.rated ? `<span class="muted">${esc(t('Gracias por avisar'))}</span>` : `<button class="act-btn" data-act="up" aria-label="${esc(t('Útil'))}">${icon('thumbsUp', 15)}</button><button class="act-btn" data-act="down" aria-label="${esc(t('No útil'))}">${icon('thumbsDown', 15)}</button>`}</span>` : ''}</div>
@@ -266,19 +283,23 @@ export function createChatView(ctx: Ctx): ChatView {
   }
 
   // ------------------------------------------------------------ enviar
-  async function send_(text: string, label?: string, opts: { echo?: boolean; src?: 'typed' | 'suggestion' | 'asset' | 'market' | 'regenerate' } = {}): Promise<void> {
-    const prompt = text.trim();
+  async function send_(text: string, label?: string, opts: { echo?: boolean; src?: 'typed' | 'suggestion' | 'asset' | 'market' | 'regenerate'; attach?: Attachment | null } = {}): Promise<void> {
+    const att = opts.attach ?? null;
+    const prompt = text.trim() || (att ? t('Mirá este adjunto y contame qué ves: datos, cifras y qué te llama la atención. No des recomendaciones de compra ni de venta.') : '');
     if (!prompt) return;
     if (!isServerMode() && !getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
     if (running()) return;
 
     const chatId = ensureChat(prompt);
+    if (draftAgent && !agents.has(chatId)) { const d = dataOf(chatId); draftAgent.restore(d.history, d.numbers); agents.set(chatId, draftAgent); }  // lo dictado antes de que existiera el chat
+    draftAgent = null;
     const agent = agentFor(chatId);
     // Estadísticas (si la persona las aceptó): solo de dónde vino la consulta y cuánto escribió en tres escalones. El texto NUNCA se envía.
+    if (att) track('media_use', { kind: att.kind === 'image' ? 'image' : att.kind === 'pdf' ? 'pdf' : 'file' });
     track('ai_send', { src: opts.src ?? 'typed', chat: cur.data.messages.some((m) => m.role === 'ai') ? 'follow' : 'new', len: lenBucket(prompt.length) });
     const t0 = Date.now();
     if (opts.echo !== false) {
-      const um: StoredMsg = { id: newId(), role: 'user', at: Date.now(), text: label ?? prompt, ...(label && label !== prompt ? { prompt } : {}) };
+      const um: StoredMsg = { id: newId(), role: 'user', at: Date.now(), text: (label ?? prompt) + (att ? `\n📎 ${att.name}` : ''), ...(att || (label && label !== prompt) ? { prompt } : {}) };
       cur.data.messages.push(um);
       if (!saveChat(chatId, cur.data)) toast('No hay espacio para guardar este chat');
       appendMsg(um);
@@ -292,7 +313,11 @@ export function createChatView(ctx: Ctx): ChatView {
         onToolStart: (n, a) => { run.steps.push({ key: n + JSON.stringify(a), label: labelFor(n, a), state: 'run' }); paintWorking(run); },
         onTool: (n, a, r) => { const s = run.steps.find((x) => x.key === n + JSON.stringify(a) && x.state === 'run'); if (s) s.state = r.ok ? 'ok' : 'bad'; paintWorking(run); },
         onStatus: (m) => { run.status = m; paintWorking(run); },
-      });
+      }, att ?? undefined);
+      if (res.attachment) {                                                      // para poder regenerar: el chat guarda lo que se leyó, no el archivo
+        const um2 = dataOf(chatId).messages.find((m) => m.role === 'user' && m.prompt === prompt && m.at >= t0 - 5000);
+        if (um2) um2.prompt = wrapAttachment(res.attachment.name, res.attachment.text) + prompt;
+      }
       track('ai_done', { tools: [...new Set(res.toolCalls.map((c) => c.name))].filter((n) => (AI_TOOLS as readonly string[]).includes(n)).join(','), ms: Math.min(Date.now() - t0, 600000), steps: Math.min(res.toolCalls.length, 40), checked: Math.min(res.verification.checked, 99), unverified: Math.min(res.redacted ?? 0, 99), fixed: !!res.corrected, ...(tierOf(res.model) ? { tier: tierOf(res.model)! } : {}) });
       finishOk(run, prompt, res);
     } catch (e) {
@@ -444,6 +469,10 @@ export function createChatView(ctx: Ctx): ChatView {
     if (t.closest('[data-retry]') && msgEl) { retry(msgEl.dataset.mid!); return; }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'copy' && msgEl) { const m = cur.data.messages.find((x) => x.id === msgEl.dataset.mid); if (m) void copyText(m.text); }
+    if (act === 'speak' && msgEl) {
+      const m = cur.data.messages.find((x) => x.id === msgEl.dataset.mid);
+      if (m) { if (isSpeaking()) stopSpeaking(); else { speak(m.text, locale()); track('media_use', { kind: 'tts' }); } }
+    }
     if (act === 'regen') regenerate();
     if ((act === 'up' || act === 'down') && msgEl) rate(msgEl.dataset.mid!, act);
     if (act === 'report' && msgEl) report(msgEl.dataset.mid!);
@@ -453,8 +482,9 @@ export function createChatView(ctx: Ctx): ChatView {
     e.preventDefault();
     if (running()) return;
     const t = input.value;
-    input.value = ''; input.style.height = 'auto'; updateSend();
-    void send_(t, undefined, { src: 'typed' });
+    const a = attach;
+    input.value = ''; input.style.height = 'auto'; attach = null; paintChip();
+    void send_(t, undefined, { src: 'typed', attach: a });
   });
   send.addEventListener('click', (e) => { // con una respuesta en curso, el botón detiene
     const run = cur.id ? runs.get(cur.id) : undefined;
@@ -463,6 +493,47 @@ export function createChatView(ctx: Ctx): ChatView {
     run.agent.abort(); run.status = 'Deteniendo…'; paintWorking(run);
   });
   input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 130) + 'px'; updateSend(); });
+  input.addEventListener('input', () => { if (!input.value.trim()) (cur.id ? agents.get(cur.id) : draftAgent)?.releasePending(); }); // borró lo dictado: se devuelve la consulta
+  clip.addEventListener('click', async () => {
+    if (running()) return;
+    const f = await pickFile('image/*,application/pdf,.csv,.txt,text/csv,text/plain');
+    if (!f) return;
+    try {
+      const a = await prepareFile(f);
+      if (a.kind !== 'text' && !(await mediaConsent())) return;
+      attach = a; paintChip(); input.focus();
+    } catch (e) { toast(e instanceof AttachError ? e.message : t('No se pudo leer el archivo')); }
+  });
+  mic.addEventListener('click', async () => {
+    if (running()) return;
+    if (recorder) { await finishRecording(); return; }
+    if (!isServerMode() && !getSettings().apiKey) { toast('Primero cargá tu clave de Gemini en Ajustes'); ctx.go('settings'); return; }
+    if (!(await mediaConsent())) return;
+    try {
+      recorder = await startRecording(() => void finishRecording());
+      mic.classList.add('rec'); mic.setAttribute('aria-label', t('Terminar de grabar')); toast(t('Grabando… tocá de nuevo para terminar'));
+    } catch (e) { recorder = null; toast(e instanceof AttachError ? e.message : t('No se pudo grabar')); }
+  });
+  async function finishRecording() {
+    const r = recorder; recorder = null;
+    mic.classList.remove('rec'); mic.setAttribute('aria-label', t('Dictar con la voz'));
+    if (!r) return;
+    try {
+      const rec = await r.stop();
+      if (!rec.data) return;
+      mic.disabled = true; toast(t('Pasando tu voz a texto…'));
+      const agent = cur.id ? agentFor(cur.id) : (draftAgent ??= new FinancialAgent({ apiKey: getSettings().apiKey, models: ctx.models, transport: isServerMode() ? transport : undefined }));
+      const text = await agent.transcribe(rec, {});
+      track('media_use', { kind: 'voice' });
+      if (!text) { toast(t('No se entendió nada. Probá de nuevo.')); return; }
+      input.value = (input.value ? input.value.trimEnd() + ' ' : '') + text;
+      input.dispatchEvent(new Event('input')); input.focus();
+      toast(t('Revisá el texto antes de enviar'));
+    } catch (e) {
+      trackAiError(e);
+      toast(e instanceof LimitError ? limitMessage(e) : e instanceof AttachError ? e.message : e instanceof ServerBusyError ? busyMessage(e) : t('No se pudo pasar la voz a texto'));
+    } finally { mic.disabled = false; }
+  }
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
   const app = () => document.querySelector('.app');
   input.addEventListener('focus', () => { app()?.classList.add('kb-open'); setTimeout(toBottom, 250); });

@@ -1,6 +1,7 @@
 // Agente: Gemini decide qué herramientas llamar; el código las ejecuta; un verificador revisa las cifras.
 // Modelo y límites son AUTOMÁTICOS: no hay nada que configurar.
 import { http } from './http';
+import { wrapAttachment, type Attachment, type Recording } from './attach';
 import { flattenContents, historyToContents, type Turn } from './contents';
 import { languageHint } from './lang';
 import { NO_TOKENS, type Tokens } from './pricing';
@@ -30,6 +31,8 @@ export interface AskStats {
   rewritten: boolean;          // hizo falta la reescritura sin herramientas
 }
 export interface AgentResult {
+  /** Si la consulta llevaba un archivo: lo que se leyó de él (para guardarlo en el chat y poder regenerar). */
+  attachment?: { name: string; text: string };
   answer: string;
   toolCalls: ToolCallRecord[];
   verification: Verification;
@@ -55,6 +58,9 @@ export class AbortedError extends Error {
 }
 
 
+export const TRANSCRIBE_PROMPT = 'Transcribí literalmente lo que se dice en este audio, en el idioma en que está hablado. Respondé SOLO con la transcripción, sin comillas ni comentarios. Si no hay voz inteligible, respondé exactamente SIN_VOZ.';
+export const READ_FILE_PROMPT = 'Transcribí de forma fiel y completa el texto y las cifras que se ven en este archivo, en texto plano (las tablas, una fila por línea con las columnas separadas por " | "). No resumas, no interpretes, no agregues datos ni consejos. Lo que no se lea, escribilo como [ilegible]. Máximo 5000 caracteres.';
+export const PORTFOLIO_PROMPT = 'De este archivo, listá las posiciones de una cartera de inversión (activos con su cantidad). Respondé SOLO con líneas "SÍMBOLO;CANTIDAD;PRECIO_PROMEDIO" (precio vacío si no figura). Usá el símbolo de Yahoo Finance solo si lo sabés con certeza (AAPL, GGAL.BA, BTC-USD); si no, el que figure en el archivo. El efectivo va como "MONEDA;monto" (ARS, USD). No inventes nada ni sumes datos que no estén. Si no hay posiciones, respondé exactamente SIN_DATOS.';
 const userMsg = (text: string) => ({ role: 'user', parts: [{ text }] });
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -67,6 +73,8 @@ export class FinancialAgent {
   priorNumbers: number[] = [];
   private aborted = false;
   private modelCalls = 0;
+  /** Una transcripción de voz ya descontó una consulta: la pregunta que sigue la usa en lugar de descontar otra. */
+  private pending: { turn: string; at: number } | null = null;
   private turn: string | undefined; // modo servidor: la respuesta en curso (el servidor la cuenta como UNA consulta)
   private tokens: Tokens = NO_TOKENS();
   private activeModel: string | null = null;
@@ -227,13 +235,59 @@ export class FinancialAgent {
     return text || null;
   }
 
-  async ask(question: string, hooks: Hooks = {}): Promise<AgentResult> {
+  private takePending(): string | undefined {
+    const p = this.pending; this.pending = null;
+    return p && Date.now() - p.at < 8 * 60_000 ? p.turn : undefined;
+  }
+  /** La persona descartó lo que había dictado: la consulta que se había descontado se devuelve. */
+  releasePending() { const p = this.pending; this.pending = null; if (p) void this.o.transport?.abandon?.(p.turn); }
+  hasPending(): boolean { return !!this.pending && Date.now() - this.pending.at < 8 * 60_000; }
+
+  /** Una vuelta suelta con un archivo o un audio: sin herramientas y sin tocar la conversación. */
+  private async oneShot(parts: any[], instruction: string, hooks: Hooks): Promise<string> {
+    const saved = this.contents;
+    this.contents = [{ role: 'user', parts: [...parts, { text: instruction }] }];
+    try {
+      const data = await this.generate(false, hooks);
+      return ((data?.candidates?.[0]?.content?.parts ?? []) as any[]).filter((p) => typeof p.text === 'string' && !p.thought).map((p) => p.text).join('').trim();
+    } finally { this.contents = saved; }
+  }
+  private async readFile(att: Attachment, instruction: string, hooks: Hooks): Promise<string> {
+    if (att.kind === 'text') return att.text ?? '';
+    return this.oneShot([{ inlineData: { mimeType: att.mime, data: att.data } }], instruction, hooks);
+  }
+  /** Lee una imagen o un PDF suelto (p. ej. para importar la cartera): cuenta como una consulta. */
+  async extractFile(att: Attachment, instruction: string, hooks: Hooks = {}): Promise<string> {
+    this.aborted = false; this.modelCalls = 0; this.tokens = NO_TOKENS(); this.turn = undefined;
+    try { return await this.readFile(att, instruction, hooks); }
+    catch (e) { if (this.turn && !(e instanceof AbortedError)) void this.o.transport?.abandon?.(this.turn); throw e; }
+  }
+  /** Pasa a texto un audio. En modo servidor la consulta queda descontada para la pregunta que se envíe después. */
+  async transcribe(rec: Recording, hooks: Hooks = {}): Promise<string> {
+    this.releasePending(); this.aborted = false; this.modelCalls = 0; this.tokens = NO_TOKENS(); this.turn = undefined;
+    let text: string;
+    try { text = await this.oneShot([{ inlineData: { mimeType: rec.mime, data: rec.data } }], TRANSCRIBE_PROMPT, hooks); }
+    catch (e) { if (this.turn && !(e instanceof AbortedError)) void this.o.transport?.abandon?.(this.turn); throw e; }
+    text = text.replace(/^["“«]+|["”»]+$/g, '').trim();
+    if (!text || /^SIN_VOZ\b/.test(text)) { if (this.turn) void this.o.transport?.abandon?.(this.turn); return ''; }
+    if (this.turn) this.pending = { turn: this.turn, at: Date.now() };
+    return text.slice(0, 1500);
+  }
+
+  async ask(question: string, hooks: Hooks = {}, attach?: Attachment): Promise<AgentResult> {
     this.aborted = false;
     this.modelCalls = 0;
-    this.turn = undefined;
+    this.turn = this.takePending();
     this.tokens = NO_TOKENS();
+    const asked = question;
+    let attached: { name: string; text: string } | undefined;
+    if (attach) {
+      try { attached = { name: attach.name, text: (await this.readFile(attach, READ_FILE_PROMPT, hooks)).slice(0, 6000) }; }
+      catch (e) { if (this.turn && !(e instanceof AbortedError)) void this.o.transport?.abandon?.(this.turn); throw e; }
+      question = wrapAttachment(attach.name, attached.text, attach.truncated) + asked;
+    }
     this.contents = historyToContents(this.history);
-    const hint = languageHint(question); // si el usuario escribe en inglés, se le recuerda al modelo en cada turno (el historial guarda solo la pregunta)
+    const hint = languageHint(asked); // si el usuario escribe en inglés, se le recuerda al modelo en cada turno (el historial guarda solo la pregunta)
     this.contents.push(userMsg(question + hint));
     const calls: ToolCallRecord[] = [];
     try {
@@ -280,7 +334,7 @@ export class FinancialAgent {
       const numbers = [...new Set(collectNumbers(calls.map((c) => c.result)))];
       this.priorNumbers = [...new Set([...this.priorNumbers, ...numbers])].slice(-MAX_KNOWN_NUMBERS);
       const stats: AskStats = { modelCalls: this.modelCalls, toolSteps: calls.length, draftChecked: draft.checked, draftUnverified: draft.unverified, tokens: { ...this.tokens }, corrected, rewritten };
-      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, redacted, stats, numbers };
+      return { answer, toolCalls: calls, verification, model: this.model, truncated, corrected, redacted, stats, numbers, ...(attached ? { attachment: attached } : {}) };
     } catch (e) {
       this.contents = historyToContents(this.history); // se descarta el turno incompleto
       // Modo servidor: si la respuesta falló (no si la detuvo el usuario) después de haber descontado la consulta, se devuelve.

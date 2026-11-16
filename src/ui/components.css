@@ -177,3 +177,14 @@
 .upsell-row { display: flex; gap: 11px; align-items: flex-start; } .upsell-ic { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 13px; background: linear-gradient(135deg, #7C6CFF, #22D3EE); color: #fff; }
 .upsell-row b { font-size: 14.5px; } .upsell-row p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
 .upsell-actions { display: flex; align-items: center; gap: 8px; margin-top: 11px; } .upsell-actions .link-btn { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+
+/* adjuntos y voz en el compositor */
+.composer .tool { flex: none; width: 36px; height: 36px; margin-bottom: 2px; border: 0; border-radius: 50%; display: grid; place-items: center; background: transparent; color: var(--muted); cursor: pointer; }
+.composer .tool:active { background: var(--surface-3); }
+.composer .tool:disabled { opacity: .45; }
+.composer .tool.rec { color: #fff; background: var(--down, #e5484d); animation: rec-pulse 1.1s ease-in-out infinite; }
+@keyframes rec-pulse { 50% { box-shadow: 0 0 0 7px rgba(229,72,77,.18); } }
+.composer { padding-left: 6px; }
+.attach-chip { flex: none; display: flex; align-items: center; gap: 8px; margin: 4px 18px -2px; padding: 7px 10px 7px 12px; border-radius: 12px; background: var(--surface-3); color: var(--text); font-size: 13px; }
+.attach-chip .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-chip button { flex: none; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; width: 24px; height: 24px; cursor: pointer; }

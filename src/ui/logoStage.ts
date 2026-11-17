@@ -50,7 +50,7 @@ function webglStage(host: HTMLElement, renderer: WebGLRenderer): LogoStage {
   shape.closePath();
   const geo = new ExtrudeGeometry(shape, { depth: 15, bevelEnabled: true, bevelThickness: 3.4, bevelSize: 2.8, bevelSegments: 9, steps: 1 });
   geo.center();
-  const mat = new MeshPhysicalMaterial({ color: 0xB98F3E, metalness: 1, roughness: 0.46, clearcoat: 0.2, clearcoatRoughness: 0.4, envMapIntensity: 0.34 });   // latón satinado: refleja el estudio sin quemarse de frente
+  const mat = new MeshPhysicalMaterial({ color: 0xD8D4CB, metalness: 1, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.18, envMapIntensity: 0.62 });   // oro blanco / platino pulido: refleja el estudio sin quemarse de frente
   const logo = new Mesh(geo, mat);
   scene.add(logo);
 

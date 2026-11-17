@@ -10,6 +10,7 @@ import './ui/design.css';
 import './ui/intro.css';
 import './ui/premium.css';
 import { autoLowFx } from './ui/perf';
+import { installScenes } from './ui/scenes';
 import { mountApp } from './app';
 import { ModelManager } from './models';
 import { startDomTranslation } from './i18n';
@@ -45,6 +46,7 @@ subscribe(applyTheme);
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
 root.append(h('div', { class: 'aurora' }));
 autoLowFx();
+installScenes();
 
 function start() {
   mountApp(root, models);
@@ -62,7 +64,7 @@ function afterEnter() {
   window.addEventListener('unhandledrejection', () => { if (crashes++ < 5) track('error', { kind: 'other' }); });
   if (isServerMode()) setTimeout(() => { if (!hasDecided()) openConsentSheet(); else maybeAskNps(); }, 3000);
 }
-const enter = () => { start(); root.querySelector('.app')?.classList.add('screen-in'); afterEnter(); };
+const enter = () => { start(); root.querySelector('.app')?.classList.add('screen-in', 'spring'); afterEnter(); };
 if (!introDone()) {
   mountIntro(root, { server: isServerMode(), onDone: enter, keyStep: !isServerMode() && !getSettings().apiKey ? (done) => mountOnboarding(root, models, done) : undefined });
 } else if (isServerMode() || getSettings().apiKey) {

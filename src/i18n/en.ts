@@ -878,4 +878,8 @@ export const EN: Record<string, string> = {
   "Partículas y animaciones. \"Ahorro\" las apaga.": "Particles and animations. \"Saving\" turns them off.",
   "Completo": "Full",
   "Ahorro": "Saving",
+  "Finanzas reales, sin ruido.": "Real finance, no noise.",
+  "Tus datos de cartera se quedan en tu teléfono": "Your portfolio data stays on your phone",
+  "Cifra verificada": "Verified figure",
+  "calculado con herramientas": "calculated with tools",
 };

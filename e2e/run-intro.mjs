@@ -23,11 +23,11 @@ const step = async (ms) => { await p.evaluate((m) => { window.__t += m; }, ms); 
 const phase = () => p.evaluate(() => document.querySelector('.launch')?.className ?? 'ninguna');
 await sleep(500); await shot(p, 'T1-carga');
 check('muestra la pantalla de carga con el logo 3D (WebGL), la palabra FINAGENT y una línea de progreso', await p.evaluate(() => { const c = document.querySelector('.stage-canvas'); return !!c && c.clientWidth > 200 && c.clientHeight > 300 && /FINAGENT/.test(document.querySelector('.launch-word')?.textContent ?? '') && !!document.querySelector('.launch-line i'); }));
-{ // se mira una captura real: en el centro tiene que haber un objeto dorado (no un lienzo vacío) y no puede estar quemado a blanco
+{ // se mira una captura real: en el centro tiene que haber un objeto de metal claro (platino, no un lienzo vacío) y no puede estar quemado a blanco
   const box = await p.evaluate(() => { const r = document.querySelector('.stage-canvas').getBoundingClientRect(); return { x: r.width * 0.25, y: r.height * 0.3, width: r.width * 0.5, height: r.height * 0.3 }; });
   const png = await p.screenshot({ clip: box }); const { data } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  let gold = 0, white = 0, total = data.length / 3; for (let i = 0; i < data.length; i += 3) { const [r, g, b] = [data[i], data[i + 1], data[i + 2]]; if (r > 90 && r > b * 1.35 && g > b) gold++; if (r > 235 && g > 235 && b > 225) white++; }
-  check('el logo 3D se dibuja de verdad: hay metal dorado en el centro y no está quemado a blanco', gold / total > 0.04 && white / total < 0.02, `dorado ${(100 * gold / total).toFixed(1)} %, blanco ${(100 * white / total).toFixed(1)} %`); }
+  let gold = 0, white = 0, total = data.length / 3; for (let i = 0; i < data.length; i += 3) { const [r, g, b] = [data[i], data[i + 1], data[i + 2]]; if (r > 120 && r < 236 && Math.abs(r - b) < 45 && Math.abs(r - g) < 30) gold++; if (r > 235 && g > 235 && b > 225) white++; }
+  check('el logo 3D se dibuja de verdad: hay metal platino en el centro y no está quemado a blanco', gold / total > 0.04 && white / total < 0.02, `dorado ${(100 * gold / total).toFixed(1)} %, blanco ${(100 * white / total).toFixed(1)} %`); }
 check('usa el idioma del dispositivo (inglés) sin preguntar', (await p.evaluate(() => document.documentElement.lang)) === 'en');
 await p.waitForFunction(() => document.querySelector('.launch.going'), { timeout: 20000, polling: 40 });
 check('al terminar la carga suena UN efecto de sonido (una sola vez)', (await p.evaluate(() => window.__ac)) === 1, String(await p.evaluate(() => window.__ac)));

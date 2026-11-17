@@ -23,8 +23,8 @@ const STEPS = ['Conectando con los mercados', 'Cargando herramientas de análisi
 
 export function mountLaunch(root: HTMLElement, o: LaunchOpts): void {
   const el = h('div', { class: 'launch' });
-  el.innerHTML = `<div class="launch-bg"></div><div class="launch-stage"></div>
-    <div class="launch-ui"><div class="launch-word">FINAGENT</div>
+  el.innerHTML = `<div class="launch-bg"><div class="launch-photo"></div></div><div class="launch-stage"></div>
+    <div class="launch-ui"><div class="launch-word">FINAGENT</div><div class="launch-tag">${esc(t('Finanzas reales, sin ruido.'))}</div>
       <div class="launch-line"><i id="l-bar"></i></div><div class="launch-status" id="l-msg">${esc(t(STEPS[0]))}</div>
       <div id="l-err" class="launch-err hide"></div><button class="btn btn-ghost hide" id="l-retry">${esc(t('Reintentar'))}</button></div>`;
   root.append(el);

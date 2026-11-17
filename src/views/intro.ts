@@ -21,6 +21,9 @@ export function startupFailure(e: unknown): { text: string; retry: boolean } {
   return { text: t('No pude preparar tu cuenta. Revisá tu conexión e intentá de nuevo.'), retry: true };
 }
 
+const SCENE_OF: Record<SlideId, string> = { welcome: 'columns', world: 'towers', verified: 'glass', better: 'metal', charts: 'towers', backing: 'columns', plans: 'glass' };
+const notif = (sym: string, line: string) => `<div class="notif"><span class="nf-ic">${icon('check', 15)}</span><div><b>${esc(t('Cifra verificada'))}</b><small><span data-notrans>${esc(sym)}</span> · ${esc(line)}</small></div></div>`;
+
 /** Ilustración de cada diapositiva: líneas finas y un solo color, sin adornos. */
 function art(id: SlideId): string {
   const rows = (items: Array<[string, string, string?]>) => items.map(([a, b, c]) => `<div class="a-row"><b data-notrans>${esc(a)}</b><span data-notrans>${esc(b)}</span>${c ? `<em>${c}</em>` : ''}</div>`).join('');
@@ -28,8 +31,8 @@ function art(id: SlideId): string {
     case 'welcome': return `<div class="art art-welcome">${markSvg(84)}<div class="a-rule"></div></div>`;
     case 'world': return `<div class="art"><div class="a-strip" data-notrans>${['NYSE', 'NASDAQ', 'BCBA', 'LSE', 'XETRA', 'TSE', 'B3', 'HKEX'].map((x) => `<span>${x}</span>`).join('')}</div>
       <div class="a-strip dim" data-notrans>${['FX', 'CRIPTO', 'ÍNDICES', 'ORO', 'PETRÓLEO', 'ETF'].map((x) => `<span>${x}</span>`).join('')}</div></div>`;
-    case 'verified': return `<div class="art"><div class="a-table">${rows([['AAPL', '+2,41%', icon('check', 14)], ['BTC-USD', '+0,87%', icon('check', 14)], ['^GSPC', '-0,32%', icon('check', 14)]])}</div><div class="a-cap">${esc(t('Cifras verificadas'))} · ${esc(t('Ejemplo'))}</div></div>`;
-    case 'better': return `<div class="art"><div class="a-vs"><div><small>${esc(t('IA sin herramientas'))}</small><p class="strike">${esc(t('"Creo que subió un 12%…"'))}</p><small>${esc(t('Sin fuente'))}</small></div>
+    case 'verified': return `<div class="art">${notif('AAPL', t('Fuente y fecha'))}<div class="a-table">${rows([['AAPL', '+2,41%', icon('check', 14)], ['BTC-USD', '+0,87%', icon('check', 14)], ['^GSPC', '-0,32%', icon('check', 14)]])}</div><div class="a-cap">${esc(t('Cifras verificadas'))} · ${esc(t('Ejemplo'))}</div></div>`;
+    case 'better': return `<div class="art">${notif('+12,3%', t('calculado con herramientas'))}<div class="a-vs"><div><small>${esc(t('IA sin herramientas'))}</small><p class="strike">${esc(t('"Creo que subió un 12%…"'))}</p><small>${esc(t('Sin fuente'))}</small></div>
       <div class="on"><small data-notrans>FinAgent</small><p>${esc(t('+12,3% (calculado)'))}</p><small>${icon('check', 12)} ${esc(t('Fuente y fecha'))}</small></div></div></div>`;
     case 'charts': return `<div class="art"><svg viewBox="0 0 280 120" width="100%" aria-hidden="true">${[[18, 70, 96, 82, 1], [40, 78, 102, 88, 0], [62, 58, 88, 66, 1], [84, 48, 74, 56, 1], [106, 54, 80, 62, 0], [128, 40, 64, 46, 1], [150, 30, 56, 36, 1], [172, 36, 62, 52, 0], [194, 24, 46, 32, 1]]
       .map(([x, hi, lo, c, up]) => `<line x1="${x}" x2="${x}" y1="${hi}" y2="${lo}" stroke="currentColor" stroke-width="1" opacity=".7"/><rect x="${x - 5}" y="${Math.min(hi + 8, c)}" width="10" height="${Math.abs(c - hi - 8) + 12}" fill="${up ? 'var(--up)' : 'var(--down)'}"/>`).join('')}
@@ -63,13 +66,14 @@ export function mountIntro(root: HTMLElement, o: IntroOpts): void {
   function account() {
     if (!o.server) return language();
     void fetchServerFlags().then(() => { const b = el.querySelector<HTMLButtonElement>('#a-google'); if (b && googleAvailable()) { b.disabled = false; b.querySelector('em')?.remove(); } });
-    el.innerHTML = `<div class="screen screen-in">${top()}<div class="s-main"><h1>${esc(t('Entrá a FinAgent'))}</h1><p class="s-lead">${esc(t('Tu cuenta guarda tu plan y tus límites diarios.'))}</p>
-      <button class="auth-btn" id="a-google" ${googleAvailable() ? '' : 'disabled'}><span class="auth-ic">G</span><span class="auth-t">${esc(t('Continuar con Google'))}</span>${googleAvailable() ? '' : `<em>${esc(t('Próximamente'))}</em>`}</button>
-      <button class="auth-btn" disabled><span class="auth-ic">${icon('send', 15)}</span><span class="auth-t">${esc(t('Continuar con correo'))}</span><em>${esc(t('Próximamente'))}</em></button>
+    el.innerHTML = `<div class="screen screen-in">${top()}<div class="s-main"><h1 class="s-giant">${esc(t('Entrá a FinAgent'))}</h1><p class="s-lead">${esc(t('Tu cuenta guarda tu plan y tus límites diarios.'))}</p>
+      <div id="a-err" class="error-box hide" style="margin:20px 0 0"></div>
+      <button class="pill-main" id="a-guest">${esc(t('Entrar como invitado'))}</button>
+      <p class="s-note">${esc(t('Como invitado, tu cuenta queda en este teléfono: si desinstalás la app, perdés tu plan.'))}</p>
       <div class="s-or"><span>${esc(t('o'))}</span></div>
-      <div id="a-err" class="error-box hide" style="margin-bottom:12px"></div>
-      <button class="btn btn-primary btn-block" id="a-guest">${esc(t('Entrar como invitado'))}</button>
-      <p class="s-note">${esc(t('Como invitado, tu cuenta queda en este teléfono: si desinstalás la app, perdés tu plan.'))}</p></div></div>`;
+      <div class="s-links"><button class="link-soft" id="a-google" ${googleAvailable() ? '' : 'disabled'}><span class="auth-t">${esc(t('Continuar con Google'))}</span>${googleAvailable() ? '' : `<em>${esc(t('Próximamente'))}</em>`}</button>
+      <button class="link-soft" disabled><span class="auth-t">${esc(t('Continuar con correo'))}</span><em>${esc(t('Próximamente'))}</em></button></div>
+      <p class="s-trust">${icon('lock', 13)} ${esc(t('Tus datos de cartera se quedan en tu teléfono'))}</p></div></div>`;
     const err = $('#a-err', el), showErr = (m: string) => { err.innerHTML = `${icon('warn', 18)}<span>${esc(m)}</span>`; err.classList.remove('hide'); };
     $('#a-guest', el).onclick = () => show(language);
     $('#a-google', el).onclick = async () => {
@@ -105,7 +109,7 @@ export function mountIntro(root: HTMLElement, o: IntroOpts): void {
     let i = start;
     const n = TOUR.length;
     el.innerHTML = `<div class="tour screen screen-in"><div class="tour-top"><div class="tour-dots" id="t-dots">${TOUR.map((_, k) => `<i data-k="${k}"></i>`).join('')}</div><button class="tour-skip" id="t-skip">${esc(t('Omitir'))}</button></div>
-      <div class="tour-view"><div class="tour-track" id="t-track">${TOUR.map((s, k) => `<section class="slide"><div class="slide-art">${art(s.id)}</div><div class="slide-n" data-notrans>${String(k + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}</div><h2>${esc(t(s.title))}</h2><p>${esc(t(s.text))}</p>
+      <div class="tour-view"><div class="tour-track" id="t-track">${TOUR.map((s, k) => `<section class="slide" data-scene="${SCENE_OF[s.id]}"><div class="slide-art">${art(s.id)}</div><div class="slide-n" data-notrans>${String(k + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}</div><h2>${esc(t(s.title))}</h2><p>${esc(t(s.text))}</p>
         ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${icon('check', 15)}<span>${esc(t(b))}</span></li>`).join('')}</ul>` : ''}</section>`).join('')}</div></div>
       <div class="tour-nav"><button class="btn btn-ghost" id="t-back">${esc(t('Atrás'))}</button><button class="btn btn-primary" id="t-next"></button></div></div>`;
     const trackEl = $('#t-track', el), next = $('#t-next', el), back = $<HTMLButtonElement>('#t-back', el);

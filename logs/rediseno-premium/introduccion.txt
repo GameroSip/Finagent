@@ -1,6 +1,6 @@
   ✔ sin desborde horizontal en T1-carga 
   ✔ muestra la pantalla de carga con el logo 3D (WebGL), la palabra FINAGENT y una línea de progreso 
-  ✔ el logo 3D se dibuja de verdad: hay metal dorado en el centro y no está quemado a blanco 
+  ✔ el logo 3D se dibuja de verdad: hay metal platino en el centro y no está quemado a blanco 
   ✔ usa el idioma del dispositivo (inglés) sin preguntar 
   ✔ al terminar la carga suena UN efecto de sonido (una sola vez) 
   ✔ la cuenta se creó de verdad durante la carga 

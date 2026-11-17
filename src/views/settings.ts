@@ -1,4 +1,5 @@
 // Ajustes: lo mínimo. El modelo y los límites son automáticos; acá solo hay cuenta, tema, diagnóstico y datos.
+import { getFx, setFx, type Fx } from '../ui/perf';
 import { ABOUT } from '../about';
 import { getLang, LANGS, setLang } from '../i18n';
 import { VERSION } from '../version';
@@ -79,6 +80,8 @@ export function createSettingsView(ctx: Ctx): View {
         <label class="set-row" id="s-sound"><span class="set-ic">${icon('volume2', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Sonidos</div><div class="set-sub">Efecto de sonido al abrir la app</div></div><input type="checkbox" class="tgl" id="s-sound-t" ${soundOn() ? 'checked' : ''}></label>
         <div class="set-row"><span class="set-ic">${icon('moon', 18)}</span><div class="set-main" style="flex:1">Tema</div>
           <div class="seg" id="s-theme">${(['auto', 'dark', 'light'] as Theme[]).map((t) => `<button data-t="${t}" class="${s.theme === t ? 'on' : ''}">${{ auto: 'Auto', dark: 'Oscuro', light: 'Claro' }[t]}</button>`).join('')}</div></div>
+        <div class="set-row"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Efectos visuales</div><div class="set-sub">Partículas y animaciones. "Ahorro" las apaga.</div></div>
+          <div class="seg" id="s-fx">${(['auto', 'full', 'low'] as Fx[]).map((v) => `<button data-fx="${v}" class="${getFx() === v ? 'on' : ''}">${{ auto: 'Auto', full: 'Completo', low: 'Ahorro' }[v]}</button>`).join('')}</div></div>
       </div></div>
 
       <div class="set-group"><div class="set-title" style="display:flex;justify-content:space-between;align-items:center">Estado de las fuentes <button class="link-btn" id="s-probe">Verificar</button></div>
@@ -182,6 +185,11 @@ export function createSettingsView(ctx: Ctx): View {
       const b = (e.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;
       saveSettings({ theme: b.dataset.t as Theme }); track('setting', { key: 'theme', value: b.dataset.t as Theme });
       $('#s-theme', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    });
+    $('#s-fx', el).addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;
+      setFx(b.dataset.fx as Fx);
+      $('#s-fx', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     });
     $('#s-probe', el).onclick = () => void probeAll();
     $('#s-clear-chats', el).onclick = async () => {

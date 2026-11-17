@@ -30,7 +30,7 @@
   --glass-blur: 14px;
   --glass-shadow: 0 1px 2px rgba(0,0,0,.35), 0 14px 32px -14px rgba(0,0,0,.6);
   --shadow: 0 14px 34px -12px rgba(0,0,0,.6);
-  --glass: rgba(14,20,27,.82);
+  --glass: rgba(13,19,26,.97);
 }
 :root[data-theme='light'] {
   --bg: #F3F1EC; --bg-2: #ECE9E2;
@@ -40,15 +40,17 @@
   --glass-bd: rgba(20,18,12,.08);
   --glass-hi: inset 0 1px 0 rgba(255,255,255,.9);
   --glass-shadow: 0 1px 2px rgba(30,25,10,.06), 0 14px 30px -16px rgba(30,25,10,.28);
-  --glass: rgba(250,248,244,.9);
+  --glass: rgba(250,248,244,.97);
 }
 
 /* Fondo con profundidad: la capa .aurora ya existe, solo le damos color (estática, gratis para la GPU) */
-.aurora { display: block; height: 85%; filter: none;
-  background:
-    radial-gradient(46% 42% at 16% 12%, var(--aurora-a), transparent 72%),
-    radial-gradient(40% 36% at 92% 6%, var(--aurora-b), transparent 70%),
-    radial-gradient(60% 40% at 70% 70%, var(--aurora-c), transparent 75%); }
+/* La atmósfera va pintada en el fondo de #root (una sola capa estática), NO en un elemento fijo aparte:
+   una capa fija bajo listas que scrollean, más backdrop-filter, producía cuadros duplicados en algunos WebView de Android. */
+.aurora { display: none; }
+#root { background:
+    radial-gradient(46% 38% at 16% 6%, var(--aurora-a), transparent 72%),
+    radial-gradient(40% 30% at 92% 4%, var(--aurora-b), transparent 70%),
+    radial-gradient(60% 36% at 75% 60%, var(--aurora-c), transparent 75%), var(--bg); }
 
 /* ---------- 2. Tipografía ---------- */
 .chat-empty h2, .about-hero h2, .view h1, .headline-q .big { font-family: var(--f-display); }
@@ -64,6 +66,7 @@
 }
 .mini-idx { border-radius: 18px; }
 .composer { background: var(--glass); border: 1px solid var(--glass-bd); box-shadow: var(--glass-hi), var(--shadow); }
+.composer, .tabbar, .card.glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
 .tabbar { background: var(--glass); border: 1px solid var(--glass-bd); box-shadow: var(--glass-hi), var(--shadow); }
 
 /* ---------- 4. PILOTO A — Ficha de activo (hero) ---------- */
@@ -118,7 +121,6 @@
 
 @media (prefers-reduced-motion: reduce) { .m-ai, .m-user { animation: none; } }
 /* Modo ahorro: se apaga el vidrio en equipos lentos (clase .lowfx en <html>) */
-.lowfx .composer, .lowfx .tabbar { -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* ---------- 7. Termómetro de tensión: dial ---------- */
 .stress-meter.dial { position: relative; display: block; width: 88px; height: 50px; }
@@ -130,3 +132,36 @@
 .dl-hub { fill: var(--text); }
 @keyframes needle { from { transform: rotate(-90deg); } }
 @media (prefers-reduced-motion: reduce) { .dl-needle { animation: none; } }
+
+/* ---------- 8. Efectos (todos contenidos en su bloque; "Ahorro" los apaga) ---------- */
+.fx-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.chat-empty, #m-hero { position: relative; }
+.chat-empty > :not(.fx-particles), #m-hero > :not(.fx-particles) { position: relative; z-index: 1; }
+.hero-q > :not(.fx-particles) { position: relative; z-index: 1; }
+
+/* Borde con brillo que recorre la ficha de activo (solo en esa tarjeta) */
+.hero-q::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--ang, 0deg), transparent 0 70%, rgba(214,178,106,.7) 85%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: spin-border 6s linear infinite; }
+@property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes spin-border { to { --ang: 360deg; } }
+
+/* Entrada escalonada de filas */
+.qrow2 { animation: rise .4s cubic-bezier(.2,.8,.2,1) both; }
+.qrow2:nth-child(2) { animation-delay: .04s; } .qrow2:nth-child(3) { animation-delay: .08s; } .qrow2:nth-child(4) { animation-delay: .12s; }
+.qrow2:nth-child(5) { animation-delay: .16s; } .qrow2:nth-child(6) { animation-delay: .2s; } .qrow2:nth-child(n+7) { animation-delay: .24s; }
+
+/* Pulso suave del indicador de variación y brillo al tocar */
+.pill.up, .pill.down { position: relative; }
+.hero-q .pill { animation: pulse 3.2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 14px 0 var(--up-bg); } }
+.hero-q.down .pill { animation-name: pulse-d; }
+@keyframes pulse-d { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 14px 0 var(--down-bg); } }
+.qrow2:active, .tab:active, .sug:active { background: var(--glass-bg); }
+.send:not(:disabled) { animation: glow 2.8s ease-in-out infinite; }
+@keyframes glow { 0%, 100% { box-shadow: 0 6px 18px rgba(214,178,106,.25); } 50% { box-shadow: 0 6px 26px rgba(214,178,106,.5); } }
+
+.lowfx .hero-q::after, .lowfx .hero-q .pill, .lowfx .qrow2, .lowfx .send { animation: none; }
+.lowfx .fx-particles { display: none; }
+@media (prefers-reduced-motion: reduce) { .hero-q::after, .hero-q .pill, .qrow2, .send { animation: none; } }

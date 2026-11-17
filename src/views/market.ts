@@ -12,6 +12,7 @@ import { isServerMode } from '../server';
 import { openPlans } from './plans';
 import { dirClass, fmtDate, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon } from '../ui/icons';
+import { mountParticles } from '../ui/particles';
 import { sparkSvg } from '../ui/spark';
 import { locale, t } from '../i18n';
 
@@ -74,6 +75,7 @@ export function createMarketView(ctx: Ctx): View {
   const q = <T extends HTMLElement>(id: string) => $<T>(`#${id}`, el);
 
   // ------------------------------------------------------------ render por sección
+  let stopHeroFx = () => {};
   function renderHero(list: QuoteCard[]) {
     const sp = list.find((i) => i.symbol === '^GSPC' && i.price !== null) ?? list.find((i) => i.price !== null);
     if (!sp) { q('m-hero').innerHTML = ''; return; }
@@ -83,6 +85,7 @@ export function createMarketView(ctx: Ctx): View {
         <div class="big"><span class="num">${fmtNum(sp.price)}</span><span class="pill ${cls}" style="font-size:15px">${fmtPct(sp.changePct)}</span></div>
         <div style="margin:10px -2px 0;height:56px">${sparkSvg(sp.spark, { w: 340, h: 56, stroke: 1.6 })}</div></div>
       <button class="link-row" id="m-ai"><span>Resumen del día con IA</span>${icon('arrowUpRight', 16)}</button>`;
+    stopHeroFx(); stopHeroFx = mountParticles(q('m-hero'), { count: 26, rgb: (sp.changePct ?? 0) < 0 ? '226,101,90' : '61,180,136' });
     $('#m-ai', el).onclick = () => ctx.askAI(t('Hacé un resumen de cómo está el mercado hoy: índices, qué se mueve más, el contexto de Argentina y la narrativa de los medios. Terminá con 3 puntos a vigilar.'), t('Resumen del día'), 'market');
   }
 

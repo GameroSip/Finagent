@@ -5,6 +5,7 @@ import { mountCompareChart, mountPriceChart, PALETTE, type ChartHandle } from '.
 import { esc, h, openUrl } from '../ui/dom';
 import { dirClass, fmtCompact, fmtNum, fmtPct, fmtPrice, timeAgo } from '../ui/format';
 import { icon, type IconName } from '../ui/icons';
+import { mountParticles } from '../ui/particles';
 import { countUp } from '../ui/perf';
 import { sparkSvg } from '../ui/spark';
 import { t } from '../i18n';
@@ -68,7 +69,8 @@ function heroQuote(i: any, ctx: Ctx, title?: string): Rich {
     <div class="hq-px num">${fmtPrice(i.price, i.currency ?? 'USD')}</div>
     ${i.spark?.length > 1 ? `<div class="hq-spark">${sparkSvg(i.spark, { w: 300, h: 44 })}</div>` : ''}`;
   el.onclick = () => ctx.openAsset(i.symbol, i.name, 'assistant');
-  return { el, mount: () => { const px = el.querySelector<HTMLElement>('.hq-px'); if (px && typeof i.price === 'number') countUp(px, i.price, (n) => fmtPrice(n, i.currency ?? 'USD')); } };
+  let stopFx = () => {};
+  return { el, destroy: () => stopFx(), mount: () => { stopFx = mountParticles(el, { count: 16, rgb: i.changePct < 0 ? '226,101,90' : '61,180,136' }); const px = el.querySelector<HTMLElement>('.hq-px'); if (px && typeof i.price === 'number') countUp(px, i.price, (n) => fmtPrice(n, i.currency ?? 'USD')); } };
 }
 
 function quotesCard(ui: any, ctx: Ctx): Rich {

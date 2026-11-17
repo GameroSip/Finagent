@@ -874,4 +874,8 @@ export const PT: Record<string, string> = {
   "⚠ La cantidad por el precio no coincide con la valuación: revisá la cantidad": "⚠ A quantidade vezes o preço não confere com a valorização: revise a quantidade",
   "⚠ No encontré cotización: revisá el símbolo (se guarda igual)": "⚠ Cotação não encontrada: revise o símbolo (é salvo mesmo assim)",
   "✓ Cotiza: {p} {c}": "✓ Cotado: {p} {c}",
+  "Efectos visuales": "Efeitos visuais",
+  "Partículas y animaciones. \"Ahorro\" las apaga.": "Partículas e animações. \"Economia\" as desliga.",
+  "Completo": "Completo",
+  "Ahorro": "Economia",
 };

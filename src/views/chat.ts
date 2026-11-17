@@ -11,6 +11,7 @@ import { AccessDeniedError, busyMessage, fetchMe, isServerMode, sendFeedback, Li
 import { chatExists, createChat, emptyData, getMeta, loadChat, newId, renameChat, saveChat, setAutoTitle, setUnread, subscribeChats,
   traceOf, uiOf, type ChatData, type ChatMeta, type StoredMsg, type TraceItem } from '../chats';
 import type { Ctx, TabId, View } from '../ctx';
+import { mountParticles } from '../ui/particles';
 import { decorateFigures } from '../ui/figures';
 import { renderMarkdown } from '../markdown';
 import { modelLabel } from '../models';
@@ -183,6 +184,7 @@ export function createChatView(ctx: Ctx): ChatView {
       ${isServerMode() ? planBannerHtml() : ''}
       <div class="sugg">${SUGGESTIONS.map((s, i) => `<button class="sug" data-i="${i}"><span style="flex:1;text-align:left"><b>${esc(s.title)}</b><span class="muted">${esc(s.sub)}</span></span>${icon('arrowUpRight', 15)}</button>`).join('')}</div>`;
     scroll.append(e);
+    mountParticles(e, { link: true, count: 38 });
   }
 
   const userEl = (m: StoredMsg) => h('div', { class: 'm-user', attrs: { 'data-mid': m.id } }, h('div', { class: 'bubble', text: m.text }));

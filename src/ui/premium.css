@@ -17,13 +17,14 @@
 
   /* Atmósfera: azul medianoche → verde petróleo, con latón cálido arriba */
   --bg: #080C11; --bg-2: #0B1218;
-  --surface: rgba(255,255,255,.045); --surface-2: rgba(255,255,255,.065); --surface-3: rgba(255,255,255,.1);
+  /* superficies OPACAS: hojas, menús y pantallas apiladas no deben dejar ver lo de abajo */
+  --surface: #111820; --surface-2: #16202A; --surface-3: #1F2B38;
   --aurora-a: rgba(24,86,96,.55);      /* petróleo */
   --aurora-b: rgba(214,178,106,.16);   /* latón */
   --aurora-c: rgba(30,48,110,.5);      /* medianoche */
 
   /* Vidrio */
-  --glass-bg: linear-gradient(155deg, rgba(255,255,255,.075), rgba(255,255,255,.03));
+  --glass-bg: linear-gradient(155deg, #18222D, #101820);
   --glass-bd: rgba(255,255,255,.08);
   --glass-hi: inset 0 1px 0 rgba(255,255,255,.09);   /* brillo del borde superior */
   --glass-blur: 14px;
@@ -33,9 +34,9 @@
 }
 :root[data-theme='light'] {
   --bg: #F3F1EC; --bg-2: #ECE9E2;
-  --surface: rgba(255,255,255,.7); --surface-2: rgba(255,255,255,.85); --surface-3: rgba(20,18,12,.06);
+  --surface: #FFFFFF; --surface-2: #FAF9F6; --surface-3: #EEEBE4;
   --aurora-a: rgba(120,170,170,.28); --aurora-b: rgba(214,178,106,.25); --aurora-c: rgba(120,140,200,.2);
-  --glass-bg: linear-gradient(155deg, rgba(255,255,255,.9), rgba(255,255,255,.62));
+  --glass-bg: linear-gradient(155deg, #FFFFFF, #F6F4EF);
   --glass-bd: rgba(20,18,12,.08);
   --glass-hi: inset 0 1px 0 rgba(255,255,255,.9);
   --glass-shadow: 0 1px 2px rgba(30,25,10,.06), 0 14px 30px -16px rgba(30,25,10,.28);
@@ -61,9 +62,7 @@
   background: var(--glass-bg); border: 1px solid var(--glass-bd); border-radius: var(--r-card);
   box-shadow: var(--glass-hi), var(--glass-shadow);
 }
-.rich { -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur)); }
 .mini-idx { border-radius: 18px; }
-@supports not (backdrop-filter: blur(1px)) { .rich { background: var(--bg-2); } }
 .composer { background: var(--glass); border: 1px solid var(--glass-bd); box-shadow: var(--glass-hi), var(--shadow); }
 .tabbar { background: var(--glass); border: 1px solid var(--glass-bd); box-shadow: var(--glass-hi), var(--shadow); }
 
@@ -116,14 +115,10 @@
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 /* Pulso del indicador "pensando": un solo elemento, opacity */
 .dots i { animation-duration: 1.3s; }
-/* Respiración de la atmósfera: opacity de una capa estática (sin repintar blur) */
-.aurora { animation: breathe 14s ease-in-out infinite alternate; will-change: opacity; }
-@keyframes breathe { from { opacity: .82; } to { opacity: 1; } }
 
-@media (prefers-reduced-motion: reduce) { .aurora, .m-ai, .m-user { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .m-ai, .m-user { animation: none; } }
 /* Modo ahorro: se apaga el vidrio en equipos lentos (clase .lowfx en <html>) */
-.lowfx .rich, .lowfx .composer, .lowfx .tabbar { -webkit-backdrop-filter: none; backdrop-filter: none; }
-.lowfx .aurora { animation: none; }
+.lowfx .composer, .lowfx .tabbar { -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* ---------- 7. Termómetro de tensión: dial ---------- */
 .stress-meter.dial { position: relative; display: block; width: 88px; height: 50px; }

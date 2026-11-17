@@ -9,6 +9,7 @@ import './ui/components.css';
 import './ui/design.css';
 import './ui/intro.css';
 import './ui/premium.css';
+import { autoLowFx } from './ui/perf';
 import { mountApp } from './app';
 import { ModelManager } from './models';
 import { startDomTranslation } from './i18n';
@@ -43,6 +44,7 @@ applyTheme();
 subscribe(applyTheme);
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
 root.append(h('div', { class: 'aurora' }));
+autoLowFx();
 
 function start() {
   mountApp(root, models);

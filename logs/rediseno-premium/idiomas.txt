@@ -1,0 +1,5 @@
+  ✔ en inglés no queda ningún texto en español en las pantallas principales 
+  ✔ en portugués no queda ningún texto en español en las pantallas principales 
+
+RESULTADO (idiomas): 2/2 verificaciones OK
+ERRORES DE PÁGINA: []

@@ -1,0 +1,39 @@
+  ✔ el chat tiene clip y micrófono 
+  ✔ el archivo queda como chip con su nombre 
+  ✔ un texto o CSV no pide el aviso (va como texto, como cualquier mensaje) 
+  ✔ sin desborde horizontal en MD1-chip 
+  ✔ se puede quitar el adjunto 
+  ✔ la imagen pide el aviso de que va a Google 
+  ✔ sin desborde horizontal en MD1b-aviso 
+  ✔ el aviso se guardó para no repetirse 
+  ✔ la imagen queda como chip 
+  ✔ el mensaje muestra el adjunto 
+  ✔ sin desborde horizontal en MD2-adjunto-enviado 
+  ✔ al dictar aparece la barra "Escuchando…" con su tiempo 
+  ✔ mientras se dicta, el cuadro de texto se reemplaza por la barra 
+  ✔ el texto se ve EN VIVO mientras se habla 
+  ✔ sin desborde horizontal en MD3-dictado 
+  ✔ al terminar, el texto queda en el cuadro para revisarlo (no se envía solo) 
+  ✔ con el reconocedor del dispositivo no se manda audio a Gemini ni se gasta una consulta 
+  ✔ cancelar cierra la barra y no deja texto 
+  ✔ después de cancelar se puede volver a dictar 
+  ✔ "Escuchar" lee la respuesta con la voz del teléfono, en español 
+  ✔ lo que se lee no trae símbolos de markdown 
+  ✔ muestra la lectura con el broker reconocido y 4 filas (3 activos y el efectivo) 
+  ✔ los activos locales se pasan a símbolos de Yahoo (GGAL.BA, AAPL.BA) 
+  ✔ comprueba que cada símbolo cotiza 
+  ✔ marca la fila donde cantidad × precio no coincide con la valuación 
+  ✔ sin desborde horizontal en MD4-revision 
+  ✔ se puede destildar una fila (el botón cuenta 3) 
+  ✔ al confirmar se agregan las filas con lo corregido (AAPL.BA 12) y sin la destildada 
+  ✔ sin reconocedor propio, avisa que el audio va a Google antes de grabar 
+  ✔ graba mostrando la barra con "Escuchando…" y la ayuda 
+  ✔ mostró "Pasando tu voz a texto…" mientras procesaba 
+  ✔ el texto transcripto queda en el cuadro 
+  ✔ se mandó el audio con la instrucción de transcribir 
+  ✔ la transcripción va como tarea propia (no con el prompt del analista) 
+  ✔ [en] botones de adjuntar y dictar traducidos 
+  ✔ [pt] botones de adjuntar y dictar traducidos 
+
+RESULTADO (voz y adjuntos): 36/36 verificaciones OK
+ERRORES DE PÁGINA: []

@@ -11,6 +11,7 @@ import { AccessDeniedError, busyMessage, fetchMe, isServerMode, sendFeedback, Li
 import { chatExists, createChat, emptyData, getMeta, loadChat, newId, renameChat, saveChat, setAutoTitle, setUnread, subscribeChats,
   traceOf, uiOf, type ChatData, type ChatMeta, type StoredMsg, type TraceItem } from '../chats';
 import type { Ctx, TabId, View } from '../ctx';
+import { decorateFigures } from '../ui/figures';
 import { renderMarkdown } from '../markdown';
 import { modelLabel } from '../models';
 import { getSettings, subscribe } from '../store';
@@ -191,7 +192,9 @@ export function createChatView(ctx: Ctx): ChatView {
     box.innerHTML = `${who()}<div class="ai-body"></div>`;
     const body = $('.ai-body', box);
     for (const ui of m.ui ?? []) { const r = renderRich(ui, ctx); if (r) { body.append(r.el); riches.push(r); } }
-    body.append(h('div', { class: 'md', html: renderMarkdown(m.text) }));
+    const md = h('div', { class: 'md', html: renderMarkdown(m.text) });
+    decorateFigures(md);
+    body.append(md);
     const v = m.verification;
     let pills = '';
     // Nunca se muestran cifras sin respaldo: el agente las quita antes de responder y acá solo se avisa cuántas fueron.

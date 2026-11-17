@@ -59,9 +59,21 @@ function compareCard(ui: any): Rich {
   return { el, destroy: () => handle?.destroy(), mount: () => { handle = mountCompareChart(box, ui.lines, 220); } };
 }
 
+/** Una sola cotización: ficha protagonista con precio grande, variación y mini-gráfico. */
+function heroQuote(i: any, ctx: Ctx, title?: string): Rich {
+  const el = h('button', { class: `rich hero-q ${dirClass(i.changePct ?? null)}` });
+  el.innerHTML = `<div class="hq-top">${assetIcon(i.symbol, { style: 'width:36px;height:36px;border-radius:12px;font-size:11px' })}
+      <div class="hq-id"><b>${esc(i.symbol)}</b><span>${esc(i.name ?? title ?? '')}</span></div>${pillHtml(i.changePct)}</div>
+    <div class="hq-px num">${fmtPrice(i.price, i.currency ?? 'USD')}</div>
+    ${i.spark?.length > 1 ? `<div class="hq-spark">${sparkSvg(i.spark, { w: 300, h: 44 })}</div>` : ''}`;
+  el.onclick = () => ctx.openAsset(i.symbol, i.name, 'assistant');
+  return { el };
+}
+
 function quotesCard(ui: any, ctx: Ctx): Rich {
   const { el, body } = shell(ui.title ?? 'Cotizaciones', '', 'activity');
   const items: any[] = ui.items ?? [];
+  if (items.length === 1) return heroQuote(items[0], ctx, ui.title);
   if (items.some((i) => i.spark?.length > 1)) {
     const row = h('div', { class: 'scroll-x', style: 'margin:0 -14px;padding:2px 14px 4px' });
     items.forEach((i) => {

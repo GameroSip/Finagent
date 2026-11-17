@@ -1,4 +1,5 @@
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import '@fontsource-variable/inter/wght.css';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';
 import '@fontsource/ibm-plex-sans/600.css';
@@ -7,6 +8,7 @@ import './ui/theme.css';
 import './ui/components.css';
 import './ui/design.css';
 import './ui/intro.css';
+import './ui/premium.css';
 import { mountApp } from './app';
 import { ModelManager } from './models';
 import { startDomTranslation } from './i18n';

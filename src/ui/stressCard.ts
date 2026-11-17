@@ -16,6 +16,17 @@ export function setPlan(text: string): void {
 }
 
 const pct = (x: number) => `${(x * 100).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;   // siempre un decimal: en una tabla, 4,0 y 14,6 se comparan mejor que 4 y 14,6
+/** Dial semicircular de 3 tramos (verde, latón, rojo) con aguja; solo SVG + una transición de transform. */
+function dialSvg(n: number): string {
+  const cx = 44, cy = 44, r = 36, gap = 5, seg = (180 - gap * 2) / 3;
+  const pt = (deg: number) => [(cx + r * Math.cos(Math.PI - (deg * Math.PI) / 180)).toFixed(1), (cy - r * Math.sin(Math.PI - (deg * Math.PI) / 180)).toFixed(1)];
+  const arcs = [0, 1, 2].map((i) => {
+    const a = i * (seg + gap), b = a + seg, [x1, y1] = pt(a), [x2, y2] = pt(b);
+    return `<path class="dl-s s${i}${i < n ? ' lit' : ''}" d="M${x1} ${y1} A${r} ${r} 0 0 1 ${x2} ${y2}"/>`;
+  }).join('');
+  const rot = -90 + ((n - 0.5) / 3) * 180;
+  return `<svg viewBox="0 0 88 50" width="88" height="50">${arcs}<g class="dl-needle" style="transform:rotate(${rot.toFixed(0)}deg)"><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - 27}"/></g><circle cx="${cx}" cy="${cy}" r="3.4" class="dl-hub"/></svg>`;
+}
 const FILLED: Record<StressLevel, number> = { baja: 1, media: 2, alta: 3 };
 
 const signed = (x: number) => `${(x * 100).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero' })} %`;
@@ -48,7 +59,7 @@ export function stressHtml(r: StressResult): string {
     : `<button class="link-row" id="a-plan-edit"><span>${esc(t(T.plan.cta))}</span>${icon('arrowUpRight', 16)}</button><p class="stress-hint">${esc(t(T.plan.local))}</p>`;
   return `${head(`<span class="muted" style="font-size:12px">${esc(t('al cierre del {d}', { d: date }))}</span>`)}
     <div class="stress">
-      <div class="stress-top"><div class="stress-meter" aria-hidden="true">${[0, 1, 2].map((i) => `<i class="${i < FILLED[r.level] ? 'on' : ''}"></i>`).join('')}</div><div class="stress-level" id="a-stress-level" data-level="${r.level}">${esc(t(T.levels[r.level]))}</div></div>
+      <div class="stress-top"><div class="stress-meter dial ${r.level}" aria-hidden="true">${dialSvg(FILLED[r.level])}${[0, 1, 2].map((i) => `<i class="${i < FILLED[r.level] ? 'on' : ''}"></i>`).join('')}</div><div class="stress-level" id="a-stress-level" data-level="${r.level}">${esc(t(T.levels[r.level]))}</div></div>
       <p class="stress-sum">${esc(t(T.summary[r.level]))}</p>
       <div class="stress-sub">${esc(t(T.today))}</div><ul class="stress-cond">${conds}</ul>
       <div class="stress-sub">${esc(t(T.after))}</div>

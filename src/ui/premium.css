@@ -237,3 +237,12 @@
 /* Auditoría: la fila de efectos visuales no debe desbordar en pantallas de 320px */
 @media (max-width: 360px) { .set-row:has(#s-fx) { flex-wrap: wrap; } .set-row:has(#s-fx) > div:first-of-type { flex-basis: calc(100% - 50px); } .set-row:has(#s-fx) .seg { margin-left: 46px; } }
 .set-row .seg { max-width: 100%; }
+
+/* Pantalla de cuenta: Google es la acción principal (grande y clara); invitado queda como enlace chico */
+.pill-main { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.pill-main .g-logo { flex: none; }
+.pill-main:disabled { opacity: .6; }
+.pill-main em { font-style: normal; font-size: 10.5px; letter-spacing: .05em; padding: 2px 8px; border: 1px solid rgba(10,14,19,.3); border-radius: 999px; color: #3a4350; }
+.link-soft.link-small { font-size: 13px; padding: 8px 12px; color: var(--muted); }
+.link-soft.link-small:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.s-note { text-align: center; font-size: 12px; margin-top: 6px; }

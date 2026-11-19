@@ -243,6 +243,13 @@ describe('inicio de sesión con Google desde la app', () => {
     registerGoogleProvider(async () => { throw new Error('usuario canceló'); });
     const c = await signInWithGoogle().catch((e) => e);
     expect(c).toBeInstanceOf(GoogleError); expect(c.code).toBe('cancelled'); expect(googleMessage(c)).toContain('Cancelaste');
+    registerGoogleProvider(async () => { throw Object.assign(new Error('Google Sign-In cancelled by user'), { code: 'USER_CANCELLED' }); });
+    expect((await signInWithGoogle().catch((e) => e)).code).toBe('cancelled');
+    registerGoogleProvider(async () => { throw new Error('Google Sign-In failed: [16] Account reauth failed.'); });   // antes se mostraba como "cancelaste"
+    const real = await signInWithGoogle().catch((e) => e);
+    expect(real.code).toBe('provider'); expect(googleMessage(real)).toContain('Usuarios de prueba'); expect(googleMessage(real)).not.toContain('Cancelaste');
+    registerGoogleProvider(async () => { throw new Error('Google Sign-In failed: [28444] Developer console is not set up correctly'); });
+    expect(googleMessage(await signInWithGoogle().catch((e) => e))).toContain('SHA-1');
     registerGoogleProvider(async () => k.token('otra-app'));
     const bad = await signInWithGoogle().catch((e) => e);
     expect(bad.code).toBe('token'); expect(googleMessage(bad)).toContain('no pudo verificar');

@@ -101,7 +101,7 @@ export function busyMessage(e: ServerBusyError): string {
 }
 export function planCodeMessage(e: PlanCodeError): string {
   return t(({ code: 'Ese código no es válido. Revisá que lo hayas escrito completo (FA-XXXX-XXXX).', used: 'Ese código ya se usó el máximo de veces. Pedí uno nuevo.',
-    rate: 'Demasiados intentos. Esperá un rato e intentá de nuevo.', network: 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.',
+    rate: 'Demasiados intentos. Esperá un rato e intentá de nuevo.', provider: 'Google no pudo completar el inicio de sesión.', network: 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.',
     other: 'No pude validar el código. Intentá de nuevo en un momento.' } as const)[e.code]);
 }
 
@@ -246,10 +246,20 @@ let googleProvider: GoogleProvider | null = null;
 let serverGoogle = false;
 export const registerGoogleProvider = (p: GoogleProvider | null): void => { googleProvider = p; };
 export const googleAvailable = (): boolean => !!googleProvider && serverGoogle;
-export class GoogleError extends Error { constructor(public code: 'unavailable' | 'cancelled' | 'token' | 'rate' | 'network' | 'other') { super(code); this.name = 'GoogleError'; } }
+export class GoogleError extends Error { constructor(public code: 'unavailable' | 'cancelled' | 'token' | 'rate' | 'network' | 'provider' | 'other', public detail = '') { super(code); this.name = 'GoogleError'; } }
+/** Traduce el error técnico del plugin de Google a una causa que se pueda entender y arreglar. */
+export function googleCause(msg: string): string {
+  const m = msg.slice(0, 300);
+  if (/\[16\]|reauth/i.test(m)) return 'cuenta no autorizada: revisá que tu correo esté en "Usuarios de prueba" de Google o que la app esté en producción';
+  if (/28444|developer console|not set up correctly/i.test(m)) return 'credencial Android: revisá el paquete com.finagent.app y el SHA-1 en Google Cloud';
+  if (/no credentials|NoCredential/i.test(m)) return 'no hay una cuenta de Google en el teléfono';
+  if (/client id is not set/i.test(m)) return 'falta el ID de cliente web en esta versión de la app';
+  if (/sin idToken/i.test(m)) return 'Google no devolvió el token de identidad';
+  return m.replace(/^Google Sign-In failed:\s*/i, '').slice(0, 140) || 'error desconocido';
+}
 export function googleMessage(e: GoogleError): string {
   return t(({ unavailable: 'El inicio de sesión con Google todavía no está disponible.', cancelled: 'Cancelaste el inicio de sesión con Google.', token: 'Google no pudo verificar tu cuenta. Intentá de nuevo.',
-    rate: 'Demasiados intentos. Esperá un rato e intentá de nuevo.', network: 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.', other: 'No pude iniciar sesión con Google. Intentá de nuevo en un momento.' } as const)[e.code]);
+    rate: 'Demasiados intentos. Esperá un rato e intentá de nuevo.', network: 'No pude conectarme con FinAgent. Revisá tu conexión e intentá de nuevo.', provider: 'Google no pudo completar el inicio de sesión.', other: 'No pude iniciar sesión con Google. Intentá de nuevo en un momento.' } as const)[e.code] + (e.code === 'provider' && e.detail ? ` (${e.detail})` : ''));
 }
 /** Pregunta al servidor si tiene habilitado el inicio de sesión con Google. */
 export async function fetchServerFlags(): Promise<{ google: boolean }> {
@@ -259,7 +269,12 @@ export async function fetchServerFlags(): Promise<{ google: boolean }> {
 export async function signInWithGoogle(): Promise<Session> {
   if (!googleProvider) throw new GoogleError('unavailable');
   let idToken: string;
-  try { idToken = await googleProvider(); } catch { throw new GoogleError('cancelled'); }
+  try { idToken = await googleProvider(); }
+  catch (e) {   // solo es "cancelado" si la persona realmente cerró el selector; cualquier otra falla se muestra con su causa (antes todo se mostraba como "cancelaste")
+    const code = String((e as { code?: unknown })?.code ?? ''), msg = String((e as { message?: unknown })?.message ?? e ?? '');
+    if (code === 'USER_CANCELLED' || /cancel/i.test(msg) && !/fail|error/i.test(msg)) throw new GoogleError('cancelled');
+    throw new GoogleError('provider', googleCause(msg));
+  }
   let r: { status: number; json: any };
   try { r = await call('POST', '/v1/auth/google', { idToken }); } catch { throw new GoogleError('network'); }   // si ya hay sesión de invitado, viaja con ella: la cuenta pasa a ser la de Google
   if (r.status === 200 && r.json?.token) {

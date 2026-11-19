@@ -48,6 +48,16 @@ jobs:
           sed -i "s/REEMPLAZAR_POR_EL_ID_DE_D1/$ID/" wrangler.toml
           echo "Base de datos lista."
 
+      # El ID de cliente WEB de Google (no es secreto) sale de la misma variable que usa el APK: así app y servidor siempre coinciden.
+      - name: Habilitar el inicio de sesión con Google (si hay variable GOOGLE_WEB_CLIENT_ID)
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            sed -i "s#^\# GOOGLE_CLIENT_ID = .*#GOOGLE_CLIENT_ID = \"$GOOGLE_WEB_CLIENT_ID\"#" wrangler.toml
+            grep -q '^GOOGLE_CLIENT_ID' wrangler.toml && echo "Google habilitado en el servidor." || { echo "::error::No pude escribir GOOGLE_CLIENT_ID en wrangler.toml"; exit 1; }
+          else echo "::warning::No hay variable GOOGLE_WEB_CLIENT_ID: el inicio de sesión con Google queda deshabilitado en el servidor."; fi
+
       - name: Aplicar las migraciones de la base
         run: npx wrangler@4 d1 migrations apply finagent --remote
 

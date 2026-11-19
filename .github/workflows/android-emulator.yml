@@ -1,0 +1,77 @@
+name: Prueba en emulador Android
+
+# Instala el APK de desarrollo en un emulador Android REAL (WebView de Android, no Chromium de escritorio), recorre la app,
+# saca capturas de lo que realmente se muestra en pantalla y las deja en la rama "emulator-reports" para poder revisarlas.
+# No publica nada a usuarios: no toca main, el servidor ni el AAB.
+on:
+  workflow_dispatch:
+  push:
+    branches: [rediseno-premium]
+    paths: ['.github/workflows/android-emulator.yml', 'ci/emulator/**']
+
+permissions:
+  contents: write
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - run: npm run build
+      - name: Proyecto Android (igual que en build-apk)
+        run: |
+          npx cap add android
+          npx cap sync android
+          M=android/app/src/main/AndroidManifest.xml
+          for P in RECORD_AUDIO MODIFY_AUDIO_SETTINGS; do grep -q "android.permission.$P" $M || sed -i "s#<uses-permission android:name=\"android.permission.INTERNET\" />#&\n    <uses-permission android:name=\"android.permission.$P\" />#" $M; done
+      - name: Ícono y pantalla de inicio
+        continue-on-error: true
+        run: npx capacitor-assets generate --android --assetPath assets
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Compilar APK (debug)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Dependencias del conductor
+        working-directory: e2e
+        run: npm ci
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Emulador + recorrido
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell pm grant com.finagent.app android.permission.RECORD_AUDIO || true
+            adb logcat -c
+            node ci/emulator/drive.mjs emu-out
+      - name: Capturas como descarga
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: emulador-android, path: emu-out/, if-no-files-found: ignore }
+      - name: Publicar en la rama emulator-reports
+        if: always()
+        continue-on-error: true
+        env: { GH_TOKEN: '${{ github.token }}', REPO: '${{ github.repository }}', RUN_ID: '${{ github.run_id }}' }
+        run: |
+          [ -d emu-out ] || { echo "sin salida"; exit 0; }
+          git config --global user.name "FinAgent emulador"; git config --global user.email "e2e@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          rm -rf /tmp/pub && mkdir /tmp/pub && cd /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" emulator-reports > /dev/null 2>&1; then git clone -q --depth 1 --branch emulator-reports "$URL" .; else git init -q . && git checkout -q -b emulator-reports && git remote add origin "$URL"; fi
+          rm -rf ultima && mkdir ultima && cp "$GITHUB_WORKSPACE"/emu-out/* ultima/ && echo "ejecución ${RUN_ID}" > ultima/ejecucion.txt
+          git add -A && git commit -q -m "Emulador Android (ejecución ${RUN_ID})" && git push -q origin emulator-reports

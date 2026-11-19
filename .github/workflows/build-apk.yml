@@ -104,6 +104,7 @@ jobs:
       - name: Compilar la web para el APK
         env:
           VITE_API_BASE: ${{ vars.API_BASE }}
+          VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}   # ID de cliente WEB de Google: habilita "Continuar con Google" (ver server/README.md)
         run: |
           if [ -n "$VITE_API_BASE" ]; then echo "APK de la BETA: usa el servidor $VITE_API_BASE (sin clave de Gemini)"; else echo "APK de DESARROLLO: pide la clave de Gemini (no hay variable API_BASE)"; fi
           npm run build

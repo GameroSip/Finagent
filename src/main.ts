@@ -15,6 +15,7 @@ import { mountApp } from './app';
 import { ModelManager } from './models';
 import { startDomTranslation } from './i18n';
 import { ensureSession, isServerMode } from './server';
+import { installGoogleSignIn } from './googleNative';
 import { installIconLoader, setDomainResolver } from './ui/assetIcon';
 import { fetchInfo } from './yahoo';
 import { getSettings, subscribe } from './store';
@@ -47,6 +48,7 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ap
 root.append(h('div', { class: 'aurora' }));
 autoLowFx();
 installScenes();
+installGoogleSignIn();
 
 function start() {
   mountApp(root, models);

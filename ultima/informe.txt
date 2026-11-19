@@ -1,4 +1,7 @@
 Dispositivo: sdk_gphone64_x86_64 · Android 14 · Physical size: 1080x2400 · Physical density: 420
-FALLÓ EL RECORRIDO: No se pudo conectar al WebView (¿la app es depurable?)
+screencap falló: Command failed: adb exec-out screencap -p > emu-out/01-arranque-12s-pantalla.png
+FALLÓ EL RECORRIDO: No se pudo conectar al WebView (¿la app es depurable?) último error: Command failed: adb shell pidof com.finagent.app
+adb: device 'emulator-5554' not found
+
 screencap falló: Command failed: adb exec-out screencap -p > emu-out/99-fallo-pantalla.png
 error:

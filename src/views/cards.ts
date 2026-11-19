@@ -69,8 +69,8 @@ function heroQuote(i: any, ctx: Ctx, title?: string): Rich {
     <div class="hq-px num">${fmtPrice(i.price, i.currency ?? 'USD')}</div>
     ${i.spark?.length > 1 ? `<div class="hq-spark">${sparkSvg(i.spark, { w: 300, h: 44 })}</div>` : ''}`;
   el.onclick = () => ctx.openAsset(i.symbol, i.name, 'assistant');
-  let stopFx = () => {};
-  return { el, destroy: () => stopFx(), mount: () => { stopFx = mountParticles(el, { count: 16, rgb: i.changePct < 0 ? '226,101,90' : '61,180,136' }); const px = el.querySelector<HTMLElement>('.hq-px'); if (px && typeof i.price === 'number') countUp(px, i.price, (n) => fmtPrice(n, i.currency ?? 'USD')); } };
+  let stopFx = () => {}, mounted = false;
+  return { el, destroy: () => stopFx(), mount: () => { if (mounted) return; mounted = true; stopFx = mountParticles(el, { count: 16, rgb: i.changePct < 0 ? '226,101,90' : '61,180,136' }); const px = el.querySelector<HTMLElement>('.hq-px'); if (px && typeof i.price === 'number') countUp(px, i.price, (n) => fmtPrice(n, i.currency ?? 'USD')); } };
 }
 
 function quotesCard(ui: any, ctx: Ctx): Rich {

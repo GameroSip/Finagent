@@ -228,9 +228,12 @@ export function createChatView(ctx: Ctx): ChatView {
 
   function appendMsg(m: StoredMsg) {
     scroll.querySelector('.chat-empty')?.remove();
+    const before = riches.length;
     const node = m.role === 'user' ? userEl(m) : m.role === 'ai' ? aiEl(m) : errEl(m);
     scroll.append(node);
-    if (m.role === 'ai') requestAnimationFrame(() => riches.forEach((r) => r.mount?.()));
+    // Solo se "montan" los gráficos de ESTE mensaje: antes cada mensaje volvía a montar los de todos los anteriores (gráficos duplicados al reabrir un chat largo)
+    const mine = riches.slice(before);
+    if (m.role === 'ai' && mine.length) requestAnimationFrame(() => mine.forEach((r) => r.mount?.()));
   }
 
   /** "Regenerar" solo en la última respuesta, y solo si no hay otra en curso. */

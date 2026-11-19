@@ -64,7 +64,7 @@ function afterEnter() {
   window.addEventListener('unhandledrejection', () => { if (crashes++ < 5) track('error', { kind: 'other' }); });
   if (isServerMode()) setTimeout(() => { if (!hasDecided()) openConsentSheet(); else maybeAskNps(); }, 3000);
 }
-const enter = () => { start(); root.querySelector('.app')?.classList.add('screen-in', 'spring'); afterEnter(); };
+const enter = () => { start(); { const app = root.querySelector('.app'); app?.classList.add('screen-in', 'spring'); setTimeout(() => app?.classList.remove('spring'), 1800); } afterEnter(); };
 if (!introDone()) {
   mountIntro(root, { server: isServerMode(), onDone: enter, keyStep: !isServerMode() && !getSettings().apiKey ? (done) => mountOnboarding(root, models, done) : undefined });
 } else if (isServerMode() || getSettings().apiKey) {

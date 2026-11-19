@@ -85,20 +85,22 @@ function startWeb(lang: string, hooks: DictationHooks): Dictation {
   const R = SpeechCtor();
   const rec = new R();
   rec.lang = lang; rec.continuous = true; rec.interimResults = true;
-  let finals = '', interim = '', stopping = false, dead = false;
+  // `base` guarda lo dictado en sesiones anteriores del reconocedor: al reiniciarse, el navegador vuelve a contar los resultados desde cero.
+  let base = '', finals = '', interim = '', stopping = false, dead = false;
+  const all = () => join(base, join(finals, interim));
   rec.onresult = (e: any) => {
     let f = '', i = '';
     for (let k = 0; k < e.results.length; k++) { const r = e.results[k]; (r.isFinal ? (f += r[0].transcript) : (i += r[0].transcript)); }
-    finals = f; interim = i; hooks.onText(join(finals, interim)); hooks.onLevel(0.6);
+    finals = f; interim = i; hooks.onText(all()); hooks.onLevel(0.6);
   };
-  rec.onend = () => { if (stopping || dead) return; try { finals = join(finals, interim); interim = ''; rec.start(); } catch { dead = true; hooks.onAutoEnd({ text: finals }); } };
-  rec.onerror = (e: any) => { if (/not-allowed|service-not-allowed/.test(e?.error ?? '')) { dead = true; hooks.onAutoEnd({ text: join(finals, interim) }); } };
+  rec.onend = () => { if (stopping || dead) return; try { base = all(); finals = ''; interim = ''; rec.start(); } catch { dead = true; hooks.onAutoEnd({ text: base }); } };
+  rec.onerror = (e: any) => { if (/not-allowed|service-not-allowed/.test(e?.error ?? '')) { dead = true; hooks.onAutoEnd({ text: all() }); } };
   rec.start();
   return {
     engine: 'web',
     finish: () => new Promise((resolve) => {
       stopping = true;
-      const done = () => resolve({ text: join(finals, interim) });
+      const done = () => resolve({ text: all() });
       rec.onend = done; try { rec.stop(); } catch { done(); }
       setTimeout(done, 1200);
     }),

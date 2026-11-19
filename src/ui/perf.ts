@@ -6,11 +6,12 @@ export const fxLow = (): boolean => document.documentElement.classList.contains(
 export function setFx(v: Fx): void {
   try { if (v === 'auto') globalThis.localStorage?.removeItem(FX_KEY); else globalThis.localStorage?.setItem(FX_KEY, v); } catch { /* sin almacenamiento */ }
   document.documentElement.classList.toggle('lowfx', v === 'low');
-  if (v === 'auto') autoLowFx();
+  if (v === 'auto') autoLowFx(true);
 }
 
 // Modo ahorro automático: si el teléfono tarda en dibujar cuadros, se apaga el vidrio (clase .lowfx en <html>).
-export function autoLowFx(): void {
+export function autoLowFx(restart = false): void {
+  if (restart) document.documentElement.classList.remove('lowfx');   // volver a "Auto" empieza de cero
   const mode = getFx();
   if (mode !== 'auto') { document.documentElement.classList.toggle('lowfx', mode === 'low'); return; }
   try {

@@ -99,7 +99,7 @@ export const canRecord = (): boolean => typeof MediaRecorder !== 'undefined' && 
 const pickMime = (): string => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find((m) => MediaRecorder.isTypeSupported?.(m)) ?? '';
 
 export interface Recorder { stop(): Promise<Recording>; cancel(): void }
-/** Empieza a grabar; corta sola a los 60 s. `onAuto` avisa cuando cortó por tiempo. */
+/** Empieza a grabar; corta sola a los 120 s. `onAuto` avisa cuando cortó por tiempo. */
 export async function startRecording(onAuto: (r: Recording) => void, onLevel?: (v: number) => void): Promise<Recorder> {
   let stream: MediaStream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); } catch { throw new AttachError(t('No pude usar el micrófono: revisá el permiso de la app')); }

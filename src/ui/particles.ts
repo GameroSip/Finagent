@@ -12,13 +12,15 @@ export function mountParticles(host: HTMLElement, opts: { count?: number; rgb?: 
   const ctx = cv.getContext('2d');
   if (!ctx) { cv.remove(); return () => {}; }
   const rgb = opts.rgb ?? '214,178,106', n = opts.count ?? 34;
-  let w = 0, h = 0, ps: P[] = [], raf = 0, visible = true, dead = false;
+  let w = 0, h = 0, ps: P[] = [], raf = 0, visible = true, dead = false, seen = false;
+  let stop = () => {};
   const dpr = Math.min(globalThis.devicePixelRatio || 1, 2);
   const size = () => { w = host.clientWidth; h = host.clientHeight; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const seed = () => { ps = Array.from({ length: n }, () => ({ x: Math.random() * w, y: Math.random() * h, r: 0.6 + Math.random() * 1.8, vx: (Math.random() - 0.5) * 0.18, vy: -0.05 - Math.random() * 0.22, a: 0.18 + Math.random() * 0.5, ph: Math.random() * 6.28 })); };
   const frame = (t: number) => {
     if (dead) return;
     raf = 0;
+    if (host.isConnected) seen = true; else if (seen) { stop(); return; }   // el bloque ya no está en pantalla: se libera todo (sin fugas)
     if (!visible || document.hidden || fxLow()) return;
     ctx.clearRect(0, 0, w, h);
     for (const p of ps) {
@@ -36,11 +38,13 @@ export function mountParticles(host: HTMLElement, opts: { count?: number; rgb?: 
     raf = requestAnimationFrame(frame);
   };
   const kick = () => { if (!raf && !dead) raf = requestAnimationFrame(frame); };
+  const onVis = () => { if (!host.isConnected && seen) stop(); else kick(); };
   size(); seed();
   const io = new IntersectionObserver((e) => { visible = !!e[0]?.isIntersecting; if (visible) kick(); });
   io.observe(host);
   const ro = new ResizeObserver(() => { size(); seed(); }); ro.observe(host);
-  document.addEventListener('visibilitychange', kick);
+  document.addEventListener('visibilitychange', onVis);
+  stop = () => { dead = true; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); document.removeEventListener('visibilitychange', onVis); cv.remove(); };
   kick();
-  return () => { dead = true; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); document.removeEventListener('visibilitychange', kick); cv.remove(); };
+  return stop;
 }

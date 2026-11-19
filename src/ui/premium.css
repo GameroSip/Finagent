@@ -134,10 +134,9 @@
 @media (prefers-reduced-motion: reduce) { .dl-needle { animation: none; } }
 
 /* ---------- 8. Efectos (todos contenidos en su bloque; "Ahorro" los apaga) ---------- */
-.fx-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
-.chat-empty, #m-hero { position: relative; }
-.chat-empty > :not(.fx-particles), #m-hero > :not(.fx-particles) { position: relative; z-index: 1; }
-.hero-q > :not(.fx-particles) { position: relative; z-index: 1; }
+.fx-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
+/* El bloque forma su propio contexto de apilado: el canvas queda detrás del contenido sin tocar la posición de los hijos */
+.chat-empty, #m-hero { position: relative; isolation: isolate; }
 
 /* Borde con brillo que recorre la ficha de activo (solo en esa tarjeta) */
 .hero-q::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
@@ -147,10 +146,6 @@
 @property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 @keyframes spin-border { to { --ang: 360deg; } }
 
-/* Entrada escalonada de filas */
-.qrow2 { animation: rise .4s cubic-bezier(.2,.8,.2,1) both; }
-.qrow2:nth-child(2) { animation-delay: .04s; } .qrow2:nth-child(3) { animation-delay: .08s; } .qrow2:nth-child(4) { animation-delay: .12s; }
-.qrow2:nth-child(5) { animation-delay: .16s; } .qrow2:nth-child(6) { animation-delay: .2s; } .qrow2:nth-child(n+7) { animation-delay: .24s; }
 
 /* Pulso suave del indicador de variación y brillo al tocar */
 .pill.up, .pill.down { position: relative; }
@@ -159,12 +154,14 @@
 .hero-q.down .pill { animation-name: pulse-d; }
 @keyframes pulse-d { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 14px 0 var(--down-bg); } }
 .qrow2:active, .tab:active, .sug:active { background: var(--glass-bg); }
-.send:not(:disabled) { animation: glow 2.8s ease-in-out infinite; }
-@keyframes glow { 0%, 100% { box-shadow: 0 6px 18px rgba(214,178,106,.25); } 50% { box-shadow: 0 6px 26px rgba(214,178,106,.5); } }
+/* Brillo del botón enviar: solo opacidad de un pseudo-elemento (no repinta sombras en cada cuadro) */
+.send { position: relative; }
+.send:not(:disabled)::after { content: ''; position: absolute; inset: -3px; border-radius: inherit; pointer-events: none; box-shadow: 0 0 22px rgba(214,178,106,.6); opacity: 0; animation: glowo 2.8s ease-in-out infinite; }
+@keyframes glowo { 50% { opacity: 1; } }
 
-.lowfx .hero-q::after, .lowfx .hero-q .pill, .lowfx .qrow2, .lowfx .send { animation: none; }
+.lowfx .hero-q::after, .lowfx .hero-q .pill, .lowfx .send::after { animation: none; }
 .lowfx .fx-particles { display: none; }
-@media (prefers-reduced-motion: reduce) { .hero-q::after, .hero-q .pill, .qrow2, .send { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .hero-q::after, .hero-q .pill, .send::after { animation: none; } }
 
 /* ================= 9. Introducción inmersiva (estilo banca privada) ================= */
 /* La intro es siempre nocturna, también con el tema claro */
@@ -186,10 +183,7 @@
 @keyframes sweep { to { transform: translateX(120%); } }
 
 /* Pantallas: fondo fotográfico + titulares enormes */
-.intro { background: #05080C; }
-.intro::before { content: ''; position: fixed; inset: 0; background: var(--sc-glass) center/cover no-repeat; opacity: .5; pointer-events: none; }
-.intro::after { content: ''; position: fixed; inset: 0; background: linear-gradient(180deg, rgba(5,8,12,.2), rgba(5,8,12,.85) 70%); pointer-events: none; }
-.intro > .screen { position: relative; z-index: 1; }
+.intro { background: linear-gradient(180deg, rgba(5,8,12,.35), rgba(5,8,12,.88) 70%), var(--sc-glass) center/cover no-repeat, #05080C; }   /* sin capas fijas aparte: evita cuadros duplicados en WebView */
 .s-main h1, .slide h2 { font-family: var(--f-display); }
 .s-giant { font-size: clamp(34px, 10vw, 44px) !important; font-weight: 800 !important; letter-spacing: -.045em !important; line-height: 1.02 !important; }
 .tour { background: none; }
@@ -237,3 +231,5 @@
 
 .lowfx .launch-photo, .lowfx .launch-tag, .lowfx .stage-canvas, .lowfx .launch-stage::after, .lowfx .slide.active .notif, .lowfx .app.spring * { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .launch-photo, .launch-tag, .stage-canvas, .launch-stage::after, .slide.active .notif { animation: none; } }
+
+.send.stop::after { display: none; }

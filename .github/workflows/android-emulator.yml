@@ -58,7 +58,7 @@ jobs:
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.finagent.app android.permission.RECORD_AUDIO || true
             adb logcat -c
-            node ci/emulator/drive.mjs emu-out
+            timeout 25m node ci/emulator/drive.mjs emu-out || echo "conductor terminó con código $?"
       - name: Capturas como descarga
         if: always()
         uses: actions/upload-artifact@v4

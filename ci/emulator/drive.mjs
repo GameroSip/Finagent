@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import puppeteer from '../../e2e/node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js';
 
 const OUT = process.argv[2] || 'emu-out'; fs.mkdirSync(OUT, { recursive: true });
-const sh = (c) => execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const sh = (c, ms = 40000) => execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: ms, maxBuffer: 64 * 1024 * 1024 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PKG = 'com.finagent.app';
 const report = []; const say = (s) => { console.log(s); report.push(s); };
@@ -14,15 +14,17 @@ const report = []; const say = (s) => { console.log(s); report.push(s); };
 function screencap(name) { try { sh(`adb exec-out screencap -p > ${OUT}/${name}-pantalla.png`); } catch (e) { say('screencap falló: ' + e.message.slice(0, 80)); } }
 function startApp() { sh(`adb shell am start -n ${PKG}/.MainActivity`); }
 async function connect() {
-  for (let i = 0; i < 30; i++) {
+  let last = '';
+  for (let i = 0; i < 40; i++) {
     try {
       const pid = sh(`adb shell pidof ${PKG}`).trim().split(/\s+/)[0];
       const sock = sh(`adb shell cat /proc/net/unix`).split('\n').map((l) => l.match(/@(webview_devtools_remote_\d+)/)?.[1]).filter(Boolean).find((s) => !pid || s.endsWith(pid)) || '';
-      if (sock) { sh(`adb forward tcp:9222 localabstract:${sock}`); const b = await puppeteer.connect({ browserURL: 'http://127.0.0.1:9222', defaultViewport: null }); return b; }
-    } catch { /* reintenta */ }
-    await sleep(1500);
+      if (sock) { sh(`adb forward tcp:9222 localabstract:${sock}`); const b = await Promise.race([puppeteer.connect({ browserURL: 'http://127.0.0.1:9222', defaultViewport: null }), sleep(20000).then(() => { throw new Error('connect: tiempo agotado'); })]); return b; }
+      if (i % 8 === 7) say(`(conectando… intento ${i + 1}; app viva: ${sh(`adb shell pidof ${PKG}`).trim() || 'NO'}; sockets: ${sh('adb shell cat /proc/net/unix').split('\n').filter((l) => /devtools|webview/i.test(l)).map((l) => l.split(' ').pop()).join(',') || 'ninguno'})`);
+    } catch (e) { last = String(e.message || e).slice(0, 160); }
+    await sleep(3000);
   }
-  throw new Error('No se pudo conectar al WebView (¿la app es depurable?)');
+  throw new Error('No se pudo conectar al WebView (¿la app es depurable?) último error: ' + last);
 }
 const page = async (b) => { for (let i = 0; i < 20; i++) { const ps = await b.pages(); const p = ps.find((x) => /localhost|capacitor/.test(x.url())) || ps[0]; if (p) return p; await sleep(500); } throw new Error('sin página'); };
 
@@ -52,7 +54,7 @@ const tab = (p, id) => p.evaluate((i) => (document.querySelector(`[data-tab="${i
 
 try {
   say(`Dispositivo: ${sh('adb shell getprop ro.product.model').trim()} · Android ${sh('adb shell getprop ro.build.version.release').trim()} · ${sh('adb shell wm size').trim()} · ${sh('adb shell wm density').trim()}`);
-  startApp(); await sleep(2500); screencap('00-arranque-2s'); await sleep(2500); screencap('01-arranque-5s');
+  startApp(); await sleep(4000); screencap('00-arranque-4s'); await sleep(8000); screencap('01-arranque-12s');
   let b = await connect(); let p = await page(b);
   const errs = []; p.on('pageerror', (e) => errs.push('pageerror: ' + e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 140)); });
   await snap(p, '02-primera-apertura'); await audit(p, 'primera apertura');

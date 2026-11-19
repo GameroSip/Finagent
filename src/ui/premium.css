@@ -233,3 +233,7 @@
 @media (prefers-reduced-motion: reduce) { .launch-photo, .launch-tag, .stage-canvas, .launch-stage::after, .slide.active .notif { animation: none; } }
 
 .send.stop::after { display: none; }
+
+/* Auditoría: la fila de efectos visuales no debe desbordar en pantallas de 320px */
+@media (max-width: 360px) { .set-row:has(#s-fx) { flex-wrap: wrap; } .set-row:has(#s-fx) > div:first-of-type { flex-basis: calc(100% - 50px); } .set-row:has(#s-fx) .seg { margin-left: 46px; } }
+.set-row .seg { max-width: 100%; }

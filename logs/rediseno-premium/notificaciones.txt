@@ -1,0 +1,35 @@
+  ✔ 412x915-dark: Ajustes tiene la sección de notificaciones 
+  ✔ 412x915-dark: interruptores por categoría (análisis y alertas prendidos; termómetro apagado; dólar "próximamente" sin Firebase) 
+  ✔ 412x915-dark: horario de silencio por defecto 23 a 8 
+  ✔ 412x915-dark: nada de la sección se sale de la pantalla 
+  ✔ 412x915-dark: en el navegador avisa que funciona en la app instalada 
+  ✔ sin desborde horizontal en N1-ajustes-412x915-dark 
+  ✔ 412x915-dark: el horario de silencio se guarda 
+  ✔ 412x915-dark: apagar el silencio oculta las horas 
+  ✔ 412x915-dark: "Probar notificación" responde 
+  ✔ 412x915-dark: la hoja de alerta muestra el precio actual 
+  ✔ 412x915-dark: "supera" con un precio menor al actual se rechaza con un motivo 
+  ✔ sin desborde horizontal en N2-alerta-412x915-dark 
+  ✔ 412x915-dark: se crea la alerta "se mueve 3,5 %" (en el teléfono) 
+  ✔ 412x915-dark: Ajustes cuenta 1 alerta 
+  ✔ sin desborde horizontal en N3-lista-412x915-dark 
+  ✔ 412x915-dark: borrar la alerta 
+  ✔ 320x568-light: Ajustes tiene la sección de notificaciones 
+  ✔ 320x568-light: interruptores por categoría (análisis y alertas prendidos; termómetro apagado; dólar "próximamente" sin Firebase) 
+  ✔ 320x568-light: horario de silencio por defecto 23 a 8 
+  ✔ 320x568-light: nada de la sección se sale de la pantalla 
+  ✔ 320x568-light: en el navegador avisa que funciona en la app instalada 
+  ✔ sin desborde horizontal en N1-ajustes-320x568-light 
+  ✔ 320x568-light: el horario de silencio se guarda 
+  ✔ 320x568-light: apagar el silencio oculta las horas 
+  ✔ 320x568-light: "Probar notificación" responde 
+  ✔ 320x568-light: la hoja de alerta muestra el precio actual 
+  ✔ 320x568-light: "supera" con un precio menor al actual se rechaza con un motivo 
+  ✔ sin desborde horizontal en N2-alerta-320x568-light 
+  ✔ 320x568-light: se crea la alerta "se mueve 3,5 %" (en el teléfono) 
+  ✔ 320x568-light: Ajustes cuenta 1 alerta 
+  ✔ sin desborde horizontal en N3-lista-320x568-light 
+  ✔ 320x568-light: borrar la alerta 
+
+RESULTADO (notificaciones): 32/32 verificaciones OK
+ERRORES DE PÁGINA: []

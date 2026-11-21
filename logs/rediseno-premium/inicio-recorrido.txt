@@ -1,0 +1,111 @@
+  ✔ 412x915-dark: el inicio tiene las 5 tarjetas (chat, market, radar, portfolio, calc) 
+  ✔ 412x915-dark: nada del menú se sale de la pantalla 
+  ✔ 412x915-dark: el menú muestra cotizaciones ya cargadas 
+  ✔ 412x915-dark: el termómetro calcula un nivel o avisa que no hay datos 
+  ✔ sin desborde horizontal en H1-inicio-412x915-dark 
+  ✔ 412x915-dark: el recorrido NO se lanza solo en pruebas automatizadas 
+  ✔ 412x915-dark: "Repetir recorrido" vuelve al inicio y abre el recorrido 
+  ✔ 412x915-dark paso 1: contador 01 / 05 sobre "chat" 
+  ✔ 412x915-dark paso 1: el recorte coincide con la tarjeta enfocada 
+  ✔ 412x915-dark paso 1: la explicación entra entera en la pantalla 
+  ✔ 412x915-dark paso 1: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso1-412x915-dark 
+  ✔ 412x915-dark paso 2: contador 02 / 05 sobre "market" 
+  ✔ 412x915-dark paso 2: el recorte coincide con la tarjeta enfocada 
+  ✔ 412x915-dark paso 2: la explicación entra entera en la pantalla 
+  ✔ 412x915-dark paso 2: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso2-412x915-dark 
+  ✔ 412x915-dark: la flecha izquierda vuelve al paso anterior 
+  ✔ 412x915-dark paso 3: contador 03 / 05 sobre "radar" 
+  ✔ 412x915-dark paso 3: el recorte coincide con la tarjeta enfocada 
+  ✔ 412x915-dark paso 3: la explicación entra entera en la pantalla 
+  ✔ 412x915-dark paso 3: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso3-412x915-dark 
+  ✔ 412x915-dark: deslizar a la izquierda avanza 
+  ✔ sin desborde horizontal en H2-paso4-412x915-dark 
+  ✔ 412x915-dark paso 5: contador 05 / 05 sobre "calc" 
+  ✔ 412x915-dark paso 5: el recorte coincide con la tarjeta enfocada 
+  ✔ 412x915-dark paso 5: la explicación entra entera en la pantalla 
+  ✔ 412x915-dark paso 5: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso5-412x915-dark 
+  ✔ 412x915-dark: "Empezar" cierra el recorrido, limpia el resaltado y guarda que ya se vio 
+  ✔ 412x915-dark: Escape cierra el recorrido 
+  ✔ 412x915-dark: la tarjeta Calculadora abre la calculadora 
+  ✔ 412x915-dark: la tarjeta Mi cartera va a Cartera 
+  ✔ 412x915-dark: la tarjeta Analista va al chat con el cursor en el campo 
+  ✔ 360x740-light: el inicio tiene las 5 tarjetas (chat, market, radar, portfolio, calc) 
+  ✔ 360x740-light: nada del menú se sale de la pantalla 
+  ✔ 360x740-light: el menú muestra cotizaciones ya cargadas 
+  ✔ 360x740-light: el termómetro calcula un nivel o avisa que no hay datos 
+  ✔ sin desborde horizontal en H1-inicio-360x740-light 
+  ✔ 360x740-light: el recorrido NO se lanza solo en pruebas automatizadas 
+  ✔ 360x740-light: "Repetir recorrido" vuelve al inicio y abre el recorrido 
+  ✔ 360x740-light paso 1: contador 01 / 05 sobre "chat" 
+  ✔ 360x740-light paso 1: el recorte coincide con la tarjeta enfocada 
+  ✔ 360x740-light paso 1: la explicación entra entera en la pantalla 
+  ✔ 360x740-light paso 1: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso1-360x740-light 
+  ✔ 360x740-light paso 2: contador 02 / 05 sobre "market" 
+  ✔ 360x740-light paso 2: el recorte coincide con la tarjeta enfocada 
+  ✔ 360x740-light paso 2: la explicación entra entera en la pantalla 
+  ✔ 360x740-light paso 2: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso2-360x740-light 
+  ✔ 360x740-light: la flecha izquierda vuelve al paso anterior 
+  ✔ 360x740-light paso 3: contador 03 / 05 sobre "radar" 
+  ✔ 360x740-light paso 3: el recorte coincide con la tarjeta enfocada 
+  ✔ 360x740-light paso 3: la explicación entra entera en la pantalla 
+  ✔ 360x740-light paso 3: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso3-360x740-light 
+  ✔ 360x740-light: deslizar a la izquierda avanza 
+  ✔ sin desborde horizontal en H2-paso4-360x740-light 
+  ✔ 360x740-light paso 5: contador 05 / 05 sobre "calc" 
+  ✔ 360x740-light paso 5: el recorte coincide con la tarjeta enfocada 
+  ✔ 360x740-light paso 5: la explicación entra entera en la pantalla 
+  ✔ 360x740-light paso 5: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso5-360x740-light 
+  ✔ 360x740-light: "Empezar" cierra el recorrido, limpia el resaltado y guarda que ya se vio 
+  ✔ 360x740-light: Escape cierra el recorrido 
+  ✔ 360x740-light: la tarjeta Calculadora abre la calculadora 
+  ✔ 360x740-light: la tarjeta Mi cartera va a Cartera 
+  ✔ 360x740-light: la tarjeta Analista va al chat con el cursor en el campo 
+  ✔ 320x568-dark: el inicio tiene las 5 tarjetas (chat, market, radar, portfolio, calc) 
+  ✔ 320x568-dark: nada del menú se sale de la pantalla 
+  ✔ 320x568-dark: el menú muestra cotizaciones ya cargadas 
+  ✔ 320x568-dark: el termómetro calcula un nivel o avisa que no hay datos 
+  ✔ sin desborde horizontal en H1-inicio-320x568-dark 
+  ✔ 320x568-dark: el recorrido NO se lanza solo en pruebas automatizadas 
+  ✔ 320x568-dark: "Repetir recorrido" vuelve al inicio y abre el recorrido 
+  ✔ 320x568-dark paso 1: contador 01 / 05 sobre "chat" 
+  ✔ 320x568-dark paso 1: el recorte coincide con la tarjeta enfocada 
+  ✔ 320x568-dark paso 1: la explicación entra entera en la pantalla 
+  ✔ 320x568-dark paso 1: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso1-320x568-dark 
+  ✔ 320x568-dark paso 2: contador 02 / 05 sobre "market" 
+  ✔ 320x568-dark paso 2: el recorte coincide con la tarjeta enfocada 
+  ✔ 320x568-dark paso 2: la explicación entra entera en la pantalla 
+  ✔ 320x568-dark paso 2: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso2-320x568-dark 
+  ✔ 320x568-dark: la flecha izquierda vuelve al paso anterior 
+  ✔ 320x568-dark paso 3: contador 03 / 05 sobre "radar" 
+  ✔ 320x568-dark paso 3: el recorte coincide con la tarjeta enfocada 
+  ✔ 320x568-dark paso 3: la explicación entra entera en la pantalla 
+  ✔ 320x568-dark paso 3: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso3-320x568-dark 
+  ✔ 320x568-dark: deslizar a la izquierda avanza 
+  ✔ sin desborde horizontal en H2-paso4-320x568-dark 
+  ✔ 320x568-dark paso 5: contador 05 / 05 sobre "calc" 
+  ✔ 320x568-dark paso 5: el recorte coincide con la tarjeta enfocada 
+  ✔ 320x568-dark paso 5: la explicación entra entera en la pantalla 
+  ✔ 320x568-dark paso 5: 2 o 3 cosas concretas y botones correctos 
+  ✔ sin desborde horizontal en H2-paso5-320x568-dark 
+  ✔ 320x568-dark: "Empezar" cierra el recorrido, limpia el resaltado y guarda que ya se vio 
+  ✔ 320x568-dark: Escape cierra el recorrido 
+  ✔ 320x568-dark: la tarjeta Calculadora abre la calculadora 
+  ✔ 320x568-dark: la tarjeta Mi cartera va a Cartera 
+  ✔ 320x568-dark: la tarjeta Analista va al chat con el cursor en el campo 
+  ✔ con ?skipTour=1 no se lanza 
+  ✔ sin automatización se lanza solo la primera vez 
+  ✔ "Saltar" lo guarda: al volver a abrir no aparece 
+
+RESULTADO (inicio y recorrido): 108/108 verificaciones OK
+ERRORES DE PÁGINA: []

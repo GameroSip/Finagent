@@ -15,6 +15,7 @@ import { icon } from '../ui/icons';
 import { mountParticles } from '../ui/particles';
 import { sparkSvg } from '../ui/spark';
 import { locale, t } from '../i18n';
+import { createBento } from './home';
 
 const STALE_MS = 2 * 60_000;
 const INVERTED = new Set(['^VIX']); // si el VIX sube, es una mala señal: se pinta al revés
@@ -56,6 +57,7 @@ export function createMarketView(ctx: Ctx): View {
         <button class="icon-btn" id="m-search" aria-label="Buscar">${icon('search', 19)}</button>
       </div>
     </div>
+    <div id="m-bento"></div>
     <div id="m-upsell"></div>
     <div id="m-hero"></div>
     <div class="section"><div class="section-head"><h2>${icon('activity', 19)} Índices y activos clave</h2></div><div class="qlist" id="m-indices"></div></div>
@@ -73,6 +75,8 @@ export function createMarketView(ctx: Ctx): View {
     <p class="muted" style="font-size:11.5px;text-align:center;margin-top:28px;line-height:1.5">Datos de Yahoo Finance, DolarAPI, ArgentinaDatos, Google News y alternative.me.<br>Pueden tener demora. Información educativa, no es asesoramiento financiero.</p>`;
 
   const q = <T extends HTMLElement>(id: string) => $<T>(`#${id}`, el);
+  const bento = createBento(ctx);
+  q('m-bento').replaceWith(bento.el);
 
   // ------------------------------------------------------------ render por sección
   let stopHeroFx = () => {};
@@ -117,6 +121,7 @@ export function createMarketView(ctx: Ctx): View {
     if (d.rp) rows.push(krow(t('Riesgo país'), `${t('al')} ${fmtDate(d.rp.fecha)}`, `${fmtNum(d.rp.valor, 0)} <small class="muted">pb</small>`));
     const m = d.inf?.mensual, a = d.inf?.interanual;
     if (m || a) rows.push(krow(t('Inflación'), a ? `${fmtNum(a.valor, 1)}% ${t('interanual')}` : (m?.fecha ?? ''), `${m ? fmtNum(m.valor, 1) + '%' : '—'} <small class="muted">${esc(t('mens.'))}</small>`));
+    bento.setDolar(d.dol?.find((x) => x.casa === 'blue')?.venta ?? null);
     box.innerHTML = rows.length ? `<div class="qlist">${rows.join('')}</div>` : errorBox('No se pudieron cargar los datos de Argentina.', 'ar');
     const tm = d.dol?.map((x) => x.fecha).filter(Boolean).sort().pop();
     q('m-ar-time').textContent = tm ? timeAgo(tm) : '';
@@ -191,7 +196,7 @@ export function createMarketView(ctx: Ctx): View {
       return l;
     }, (l) => renderCards('m-world', l), () => { q('m-world').innerHTML = errorBox('No se pudieron cargar estos mercados.', 'world'); }, force, () => g === worldGroup);
   };
-  const loadIndices = (force: boolean) => load('indices', fetchIndicesOk, (l) => { renderHero(l); renderIndices(l); },
+  const loadIndices = (force: boolean) => load('indices', fetchIndicesOk, (l) => { renderHero(l); renderIndices(l); bento.setQuotes(l); },
     () => { q('m-indices').innerHTML = errorBox('No se pudieron cargar los índices.', 'idx'); }, force);
   const loadAr = (force: boolean) => load('argentina', async () => {
     const [dol, rp, inf] = await Promise.all([fetchDolares().then(withBrecha, () => null), fetchRiesgoPais().catch(() => null), fetchInflacion().catch(() => null)]);
@@ -252,5 +257,5 @@ export function createMarketView(ctx: Ctx): View {
   };
   refresh();
   setTimeout(() => void weeklyNudge(), 1500);
-  return { el, onShow: () => { if (Date.now() - lastRefresh > STALE_MS) refresh(); void weeklyNudge(); } };
+  return { el, onShow: () => { bento.refresh(); if (Date.now() - lastRefresh > STALE_MS) refresh(); void weeklyNudge(); } };
 }

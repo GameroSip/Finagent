@@ -15,6 +15,7 @@ import { createSettingsView } from './views/settings';
 import { createWatchView } from './views/watchlist';
 import { createPortfolioView } from './views/portfolio';
 import { track } from './analytics';
+import { closeTour } from './tour';
 
 const TABS: Array<{ id: TabId; label: string; ic: IconName }> = [
   { id: 'market', label: 'Mercados', ic: 'activity' }, { id: 'chat', label: 'Asistente', ic: 'messageSquare' },
@@ -78,7 +79,7 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
 
   if (Capacitor.isNativePlatform()) {
     void CapApp.addListener('backButton', () => {
-      if (closeTopSheet()) return;
+      if (closeTour() || closeTopSheet()) return;
       const top = topOverlay();
       if (top) top.close();
       else if (tab !== 'market') setTab('market');

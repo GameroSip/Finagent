@@ -17,7 +17,7 @@ export function setPlan(text: string): void {
 
 const pct = (x: number) => `${(x * 100).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;   // siempre un decimal: en una tabla, 4,0 y 14,6 se comparan mejor que 4 y 14,6
 /** Dial semicircular de 3 tramos (verde, latón, rojo) con aguja; solo SVG + una transición de transform. */
-function dialSvg(n: number): string {
+export function dialSvg(n: number): string {
   const cx = 44, cy = 44, r = 36, gap = 5, seg = (180 - gap * 2) / 3;
   const pt = (deg: number) => [(cx + r * Math.cos(Math.PI - (deg * Math.PI) / 180)).toFixed(1), (cy - r * Math.sin(Math.PI - (deg * Math.PI) / 180)).toFixed(1)];
   const arcs = [0, 1, 2].map((i) => {
@@ -27,7 +27,7 @@ function dialSvg(n: number): string {
   const rot = -90 + ((n - 0.5) / 3) * 180;
   return `<svg viewBox="0 0 88 50" width="88" height="50">${arcs}<g class="dl-needle" style="transform:rotate(${rot.toFixed(0)}deg)"><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - 27}"/></g><circle cx="${cx}" cy="${cy}" r="3.4" class="dl-hub"/></svg>`;
 }
-const FILLED: Record<StressLevel, number> = { baja: 1, media: 2, alta: 3 };
+export const FILLED: Record<StressLevel, number> = { baja: 1, media: 2, alta: 3 };
 
 const signed = (x: number) => `${(x * 100).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero' })} %`;
 

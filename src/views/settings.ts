@@ -22,6 +22,7 @@ import { actionSheet, confirmSheet, openSheet } from '../ui/sheet';
 import { t } from '../i18n';
 import { analyticsOn, setAnalytics, track } from '../analytics';
 import { openFeedback, openWishlist } from './feedback';
+import { startHomeTour } from '../tour';
 
 
 
@@ -76,6 +77,7 @@ export function createSettingsView(ctx: Ctx): View {
       </div></div>`}
 
       <div class="set-group"><div class="set-title">Apariencia</div><div class="card set-card">
+        <button class="set-row" id="s-tour"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Repetir recorrido interactivo</div><div class="set-sub">Te muestra de nuevo qué hay en el inicio</div></div></button>
         <button class="set-row" id="s-lang"><span class="set-ic">${icon('globe', 18)}</span><div class="set-main" style="flex:1;text-align:left">Idioma</div><span class="val" data-notrans>${esc(LANGS.find((l) => l.id === getLang())!.native)}</span></button>
         <label class="set-row" id="s-sound"><span class="set-ic">${icon('volume2', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Sonidos</div><div class="set-sub">Efecto de sonido al abrir la app</div></div><input type="checkbox" class="tgl" id="s-sound-t" ${soundOn() ? 'checked' : ''}></label>
         <div class="set-row"><span class="set-ic">${icon('moon', 18)}</span><div class="set-main" style="flex:1">Tema</div>
@@ -186,6 +188,7 @@ export function createSettingsView(ctx: Ctx): View {
       saveSettings({ theme: b.dataset.t as Theme }); track('setting', { key: 'theme', value: b.dataset.t as Theme });
       $('#s-theme', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     });
+    $('#s-tour', el).onclick = () => { void startHomeTour({ force: true }); };
     $('#s-fx', el).addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;
       setFx(b.dataset.fx as Fx);

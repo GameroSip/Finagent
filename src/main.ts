@@ -9,6 +9,7 @@ import './ui/components.css';
 import './ui/design.css';
 import './ui/intro.css';
 import './ui/premium.css';
+import './ui/home.css';
 import { autoLowFx } from './ui/perf';
 import { installScenes } from './ui/scenes';
 import { mountApp } from './app';
@@ -16,6 +17,7 @@ import { ModelManager } from './models';
 import { startDomTranslation } from './i18n';
 import { ensureSession, isServerMode } from './server';
 import { installGoogleSignIn } from './googleNative';
+import { maybeStartHomeTour } from './tour';
 import { installIconLoader, setDomainResolver } from './ui/assetIcon';
 import { fetchInfo } from './yahoo';
 import { getSettings, subscribe } from './store';
@@ -64,7 +66,9 @@ function afterEnter() {
   let crashes = 0;
   window.addEventListener('error', () => { if (crashes++ < 5) track('error', { kind: 'render' }); });
   window.addEventListener('unhandledrejection', () => { if (crashes++ < 5) track('error', { kind: 'other' }); });
-  if (isServerMode()) setTimeout(() => { if (!hasDecided()) openConsentSheet(); else maybeAskNps(); }, 3000);
+  // primero el recorrido del menú (una sola vez); el consentimiento de estadísticas y la encuesta esperan a que termine, para no taparse
+  const tour = maybeStartHomeTour();
+  if (isServerMode()) setTimeout(() => { void tour.then(() => { if (!hasDecided()) openConsentSheet(); else maybeAskNps(); }); }, 3000);
 }
 const enter = () => { start(); { const app = root.querySelector('.app'); app?.classList.add('screen-in', 'spring'); setTimeout(() => app?.classList.remove('spring'), 1800); } afterEnter(); };
 if (!introDone()) {

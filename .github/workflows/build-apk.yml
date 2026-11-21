@@ -79,7 +79,8 @@ jobs:
           node run-stress.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/termometro.txt; c=${PIPESTATUS[0]}
           node run-portfolio.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/cartera.txt; d=${PIPESTATUS[0]}
           node run-media.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/voz.txt; e=${PIPESTATUS[0]}
-          exit $((a + b + c + d + e))
+          node run-home.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/inicio-recorrido.txt; f=${PIPESTATUS[0]}
+          exit $((a + b + c + d + e + f))
 
       - name: Publicar el texto de las pruebas en la rama e2e-reports
         if: always()

@@ -8,6 +8,8 @@ import { FREE_FOREVER } from '../src/planPitch';
 import { betaTexts } from '../src/betaTexts';
 import { stressTexts } from '../src/stress';
 import { FLOW, VS } from '../src/views/about';
+import { homeTexts } from '../src/views/home';
+import { tourTexts } from '../src/tour';
 
 afterEach(() => setLang('es'));
 const walk = (d: string): string[] => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? (f === 'i18n' ? [] : walk(p)) : p.endsWith('.ts') ? [p] : []; });
@@ -31,6 +33,7 @@ function tKeys(): Array<[string, string]> {
 function contentKeys(): string[] {
   const k: string[] = [...Object.values(ABOUT).flat(), ...stressTexts(), ...FREE_FOREVER, ...FLOW.flatMap((f) => [f.title, f.text]), ...VS.flat()];
   for (const s of TOUR) k.push(s.title, s.text, ...(s.bullets ?? []));
+  k.push(...homeTexts(), ...tourTexts());
   const tools = readFileSync('src/views/chartTools.ts', 'utf8');
   for (const m of tools.matchAll(/(?:label|desc):\s*'((?:[^'\\]|\\.)*)'/g)) k.push(m[1].replace(/\\'/g, "'"));
   for (const m of tools.matchAll(/return '((?:[^'\\]|\\.)*)'/g)) k.push(m[1]);                       // motivos de "no disponible"

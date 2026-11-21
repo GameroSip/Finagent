@@ -66,7 +66,7 @@ try {
 
   // Semilla: ya pasó la introducción, tiene clave y cartera → recorrer la app como un usuario habitual
   await p.evaluate(() => {
-    localStorage.setItem('finagent.intro.v1', '1'); localStorage.setItem('finagent.lang.v1', 'es'); localStorage.setItem('finagent.analytics.v1', '0');
+    localStorage.setItem('finagent.intro.v1', '1'); localStorage.setItem('finagent.lang.v1', 'es'); localStorage.setItem('finagent_home_tour_v1', '1'); localStorage.setItem('finagent.analytics.v1', '0');
     localStorage.setItem('finagent.settings.v2', JSON.stringify({ apiKey: 'AIzaFAKE_KEY_FOR_LAYOUT_ONLY_0000000000000', theme: 'auto' }));
     localStorage.setItem('finagent.portfolio.v1', JSON.stringify([{ id: 'a', kind: 'asset', symbol: 'AAPL', qty: 12, cost: 150 }, { id: 'b', kind: 'asset', symbol: 'GGAL.BA', qty: 1500.5, cost: 4200 }, { id: 'c', kind: 'asset', symbol: 'BTC-USD', qty: 0.0345, cost: null }, { id: 'd', kind: 'cash', symbol: 'ARS', qty: 1234567.89, cost: null }]));
     localStorage.setItem('finagent.watch.v1', JSON.stringify(['AAPL', 'MSFT', 'BTC-USD', 'GGAL.BA']));

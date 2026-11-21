@@ -19,6 +19,7 @@ const MAX_KNOWN_NUMBERS = 3000; // cifras de herramientas que se recuerdan por c
 export { SYSTEM_PROMPT } from './prompt';
 import { SYSTEM_PROMPT } from './prompt';
 import { TASKS, type Task } from './tasks';
+import { emitAgentActivity } from './agentActivity';
 
 export interface ToolCallRecord { name: string; args: Record<string, any>; result: ToolResult; ui?: any }
 /** Métricas de una respuesta (para evaluar al modelo; la app no las muestra). */
@@ -277,6 +278,13 @@ export class FinancialAgent {
   }
 
   async ask(question: string, hooks: Hooks = {}, attach?: Attachment): Promise<AgentResult> {
+    // Avisa cuándo empieza y termina una respuesta (lo usan las notificaciones si la persona sale de la app mientras se analiza).
+    emitAgentActivity('start', question);
+    try { const r = await this.askTurn(question, hooks, attach); emitAgentActivity('done', question); return r; }
+    catch (e) { emitAgentActivity(e instanceof AbortedError ? 'aborted' : 'fail', question); throw e; }
+  }
+
+  private async askTurn(question: string, hooks: Hooks, attach?: Attachment): Promise<AgentResult> {
     this.aborted = false;
     this.modelCalls = 0;
     this.turn = this.takePending();
@@ -296,6 +304,7 @@ export class FinancialAgent {
       let { answer, truncated } = await this.run(calls, hooks);
       const verify = () => verifyAnswer(answer, [...calls.map((c) => c.result), this.priorNumbers], question);
       const list = (v: Verification) => v.unverified.slice(0, 8).map((u) => u.text).join(', ');
+      emitAgentActivity('verifying', question);
       let verification = verify();
       const draft = { checked: verification.checked, unverified: verification.unverified.map((u) => u.text) };
       let corrected = false, rewritten = false;

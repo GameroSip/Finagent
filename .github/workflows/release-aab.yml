@@ -54,17 +54,20 @@ jobs:
         run: npx vitest run
 
       - name: Compilar la web (versión con servidor)
-        run: npm run build
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then export VITE_FCM=1; fi
+          npm run build
 
       - name: Generar proyecto Android
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}   # opcional: con él, el APK recibe los avisos push del servidor (ver server/README.md)
         run: |
+          bash scripts/android-patch.sh prepare
           npx cap add android
           npx cap sync android
-          M=android/app/src/main/AndroidManifest.xml
-          for P in RECORD_AUDIO MODIFY_AUDIO_SETTINGS; do grep -q "android.permission.$P" $M || sed -i "s#<uses-permission android:name=\"android.permission.INTERNET\" />#&\n    <uses-permission android:name=\"android.permission.$P\" />#" $M; done
-          # Android 11+: sin esto la app no "ve" el servicio de reconocimiento de voz del teléfono y el dictado cae al respaldo
-          grep -q "android.speech.RecognitionService" $M || sed -i 's#</manifest>#    <queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n</manifest>#' $M
-          grep -c "RECORD_AUDIO" $M | grep -q 1 || { echo "Falta el permiso del micrófono en el manifiesto"; cat $M; exit 1; }
+          bash scripts/android-patch.sh patch   # permisos (micrófono, notificaciones), ícono de notificación y Firebase
 
       - name: Ícono y pantalla de inicio
         run: npx capacitor-assets generate --android --assetPath assets

@@ -69,7 +69,7 @@ jobs:
           if-no-files-found: ignore
 
       # Herramientas del gráfico (Fibonacci, sesiones, perfil de volumen…) e íconos de los activos, en un Chromium real.
-      - name: Pruebas en navegador real (gráficos, íconos, termómetro, cartera y voz)
+      - name: Pruebas en navegador real (gráficos, íconos, termómetro, cartera, voz, inicio y notificaciones)
         continue-on-error: true
         run: |
           mkdir -p e2e-log
@@ -80,7 +80,8 @@ jobs:
           node run-portfolio.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/cartera.txt; d=${PIPESTATUS[0]}
           node run-media.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/voz.txt; e=${PIPESTATUS[0]}
           node run-home.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/inicio-recorrido.txt; f=${PIPESTATUS[0]}
-          exit $((a + b + c + d + e + f))
+          node run-notify.mjs ../dist ../e2e-shots 2>&1 | tee ../e2e-log/notificaciones.txt; g=${PIPESTATUS[0]}
+          exit $((a + b + c + d + e + f + g))
 
       - name: Publicar el texto de las pruebas en la rama e2e-reports
         if: always()
@@ -106,19 +107,20 @@ jobs:
         env:
           VITE_API_BASE: ${{ vars.API_BASE }}
           VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}   # ID de cliente WEB de Google: habilita "Continuar con Google" (ver server/README.md)
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then export VITE_FCM=1; echo "Con push del servidor (Firebase)."; fi
           if [ -n "$VITE_API_BASE" ]; then echo "APK de la BETA: usa el servidor $VITE_API_BASE (sin clave de Gemini)"; else echo "APK de DESARROLLO: pide la clave de Gemini (no hay variable API_BASE)"; fi
           npm run build
 
       - name: Generar proyecto Android
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}   # opcional: con él, el APK recibe los avisos push del servidor (ver server/README.md)
         run: |
+          bash scripts/android-patch.sh prepare
           npx cap add android
           npx cap sync android
-          M=android/app/src/main/AndroidManifest.xml
-          for P in RECORD_AUDIO MODIFY_AUDIO_SETTINGS; do grep -q "android.permission.$P" $M || sed -i "s#<uses-permission android:name=\"android.permission.INTERNET\" />#&\n    <uses-permission android:name=\"android.permission.$P\" />#" $M; done
-          # Android 11+: sin esto la app no "ve" el servicio de reconocimiento de voz del teléfono y el dictado cae al respaldo
-          grep -q "android.speech.RecognitionService" $M || sed -i 's#</manifest>#    <queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n</manifest>#' $M
-          grep -c "RECORD_AUDIO" $M | grep -q 1 || { echo "Falta el permiso del micrófono en el manifiesto"; cat $M; exit 1; }
+          bash scripts/android-patch.sh patch   # permisos (micrófono, notificaciones), ícono de notificación y Firebase
 
       - name: Ícono y pantalla de inicio
         continue-on-error: true   # si fallara, el APK se compila igual con el ícono por defecto

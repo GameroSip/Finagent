@@ -9,6 +9,10 @@ database_name = "finagent"
 database_id = "REEMPLAZAR_POR_EL_ID_DE_D1"   # el workflow lo completa solo
 migrations_dir = "server/migrations"
 
+# Avisos push por tópicos (server/push.ts): cada 15 minutos. Sin el secreto FCM_SERVICE_ACCOUNT no hace nada.
+[triggers]
+crons = ["*/15 * * * *"]
+
 [vars]
 # Nivel de la clave de Gemini: "free" (gratuito) o "paid" (de pago). Cambia lo que la app le dice al usuario sobre sus datos y sobre la capacidad.
 GEMINI_TIER = "free"
@@ -19,3 +23,4 @@ MAX_NEW_USERS_PER_DAY = "300"  # cuentas automáticas nuevas por día
 NEW_ACCOUNTS_PER_IP_DAY = "30"  # cuentas nuevas por dirección IP y día (las operadoras móviles comparten IP entre muchos clientes: con 5 se bloquearía a gente real)
 # GOOGLE_CLIENT_ID = "TU-ID.apps.googleusercontent.com"   # habilita el inicio de sesión con Google en el servidor (ver server/README.md)
 DAILY_BUDGET_USD = "5"         # tope de gasto diario en dólares (importa con el nivel de pago): al llegar, el servidor deja de llamar a Gemini hasta el día siguiente
+# PUSH_DOLAR_PCT = "2"   # variación mínima del dólar (%) desde el último aviso para mandar otro

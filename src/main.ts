@@ -18,6 +18,9 @@ import { startDomTranslation } from './i18n';
 import { ensureSession, isServerMode } from './server';
 import { installGoogleSignIn } from './googleNative';
 import { maybeStartHomeTour } from './tour';
+import { installNotifications } from './notifications';
+import { installNotifySoftAsk } from './views/notifyUi';
+import './ui/notify.css';
 import { installIconLoader, setDomainResolver } from './ui/assetIcon';
 import { fetchInfo } from './yahoo';
 import { getSettings, subscribe } from './store';
@@ -62,6 +65,7 @@ function start() {
 // Con servidor (beta) la cuenta se crea sola o con Google; sin servidor (desarrollo) al final se pide la clave de Gemini.
 /** Estadísticas de la beta: una sesión por apertura; a quien ya usaba la app se le pregunta una sola vez; y la encuesta de recomendación cuando corresponde. */
 function afterEnter() {
+  installNotifications(); installNotifySoftAsk();   // canales y escuchas; el permiso se pide recién cuando la persona activa algo
   installLifecycle(); noteOpenDay(); trackAppOpen();
   let crashes = 0;
   window.addEventListener('error', () => { if (crashes++ < 5) track('error', { kind: 'render' }); });

@@ -1,0 +1,10 @@
+/* Notificaciones: horario de silencio y alertas de precio. Superficies opacas (sin backdrop-filter: en el WebView de Android dejan restos al desplazarse). */
+.nq-hours { gap: 10px; flex-wrap: wrap; padding-top: 0; }
+.nq-sel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.nq-sel select { padding: 7px 10px; background: var(--surface-2); color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.na-kinds { margin-top: 6px; }
+.na-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.na-rule { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.na-sym { font-weight: 700; font-size: 13px; }
+.na-txt { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.na-foot { font-size: 12px; margin-top: 12px; line-height: 1.45; }

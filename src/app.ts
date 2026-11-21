@@ -16,6 +16,7 @@ import { createWatchView } from './views/watchlist';
 import { createPortfolioView } from './views/portfolio';
 import { track } from './analytics';
 import { closeTour } from './tour';
+import { setLinkHandler } from './notifications';
 
 const TABS: Array<{ id: TabId; label: string; ic: IconName }> = [
   { id: 'market', label: 'Mercados', ic: 'activity' }, { id: 'chat', label: 'Asistente', ic: 'messageSquare' },
@@ -87,4 +88,14 @@ export function mountApp(root: HTMLElement, models: ModelManager): void {
     });
   }
   setTab('market');
+  // Tocar una notificación lleva directo a su pantalla (si la app estaba cerrada, el enlace espera a que esté lista).
+  setLinkHandler((l) => {
+    closeTour(); while (closeTopSheet()) { /* cierra hojas abiertas */ }
+    closeAll();
+    if (l.to === 'chat') setTab('chat');
+    else if (l.to === 'settings') setTab('settings');
+    else if (l.to === 'market') setTab('market');
+    else if (l.to === 'radar') { setTab('market'); ctx.openAsset('SPY', 'S&P 500 (SPY)', 'market'); }
+    else { setTab('market'); ctx.openAsset(l.symbol, l.name, 'market'); }
+  });
 }

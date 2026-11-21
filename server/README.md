@@ -83,3 +83,14 @@ Probado: 285 tests, la app completa contra el servidor, 40 verificaciones en un 
 ## Desarrollo local
 `npm run server:dev` levanta el servidor en `http://localhost:8787` con un Gemini **falso** (no gasta cupo; token de administrador `dev-admin`).
 Con `GEMINI_API_KEY=… npm run server:dev` usa Gemini real. `npm run test:e2e-server` corre la app en un navegador real contra un servidor simulado.
+
+## Avisos push (opcional): dólar, miedo y codicia y resumen diario
+La app ya trae notificaciones **locales** (análisis listo, alertas de precio, termómetro de tensión) que no necesitan nada de esto.
+Para los avisos que manda el **servidor** (dólar, miedo y codicia cripto, resumen diario) hace falta Firebase:
+1. En [console.firebase.google.com](https://console.firebase.google.com) → *Agregar proyecto* → elegí **el mismo proyecto de Google Cloud** que usás para el inicio de sesión con Google.
+2. *Agregar app → Android*, paquete `com.finagent.app` (el SHA-1 es opcional acá). Descargá `google-services.json`.
+3. GitHub → *Settings → Secrets and variables → Actions → New repository secret*: `GOOGLE_SERVICES_JSON` = el contenido completo de ese archivo. Con él, el workflow del APK instala el plugin de Firebase y la app se suscribe a los tópicos.
+4. Firebase → ⚙ *Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada*. Secreto `FCM_SERVICE_ACCOUNT` = el contenido del JSON descargado. (Verificá en Google Cloud que esté habilitada la *Firebase Cloud Messaging API*.)
+5. Volvé a desplegar el servidor (*Actions → Servidor (Cloudflare)*): aplica la migración `0003_push.sql` y carga el secreto. El Cron Trigger (`wrangler.toml → [triggers]`) corre cada 15 minutos; sin el secreto no hace nada.
+
+Cómo funciona sin datos personales: la app se suscribe a tópicos públicos por categoría, idioma y **hora UTC** (`macro_dolar_es_h13`), solo a las horas fuera del horario de silencio de la persona. El servidor manda cada aviso al tópico de la hora en curso y nunca sabe quién está suscripto. Antes de enviar, cada texto pasa por los mismos controles de cumplimiento que la app (`assertSafe` en `server/push.ts`): si un aviso prometiera "tiempo real" o sonara a recomendación, no sale.

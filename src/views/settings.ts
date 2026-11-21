@@ -23,6 +23,7 @@ import { t } from '../i18n';
 import { analyticsOn, setAnalytics, track } from '../analytics';
 import { openFeedback, openWishlist } from './feedback';
 import { startHomeTour } from '../tour';
+import { bindNotifySettings, notifySettingsHtml } from './notifyUi';
 
 
 
@@ -75,6 +76,8 @@ export function createSettingsView(ctx: Ctx): View {
       <div class="set-group"><div class="set-title">Cuenta</div><div class="card set-card">
         <div class="set-row"><span class="set-ic">${icon('keyRound', 18)}</span><div style="flex:1"><div class="set-main">Clave de Gemini</div><div class="set-sub num">${masked()}</div></div><button class="btn btn-ghost btn-sm" id="s-key">Cambiar</button></div>
       </div></div>`}
+
+      ${notifySettingsHtml()}
 
       <div class="set-group"><div class="set-title">Apariencia</div><div class="card set-card">
         <button class="set-row" id="s-tour"><span class="set-ic">${icon('sparkles', 18)}</span><div style="flex:1;text-align:left"><div class="set-main">Repetir recorrido interactivo</div><div class="set-sub">Te muestra de nuevo qué hay en el inicio</div></div></button>
@@ -188,6 +191,7 @@ export function createSettingsView(ctx: Ctx): View {
       saveSettings({ theme: b.dataset.t as Theme }); track('setting', { key: 'theme', value: b.dataset.t as Theme });
       $('#s-theme', el).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     });
+    bindNotifySettings(el, render);
     $('#s-tour', el).onclick = () => { void startHomeTour({ force: true }); };
     $('#s-fx', el).addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;

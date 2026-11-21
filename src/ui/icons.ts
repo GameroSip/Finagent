@@ -63,8 +63,11 @@ import radar from 'lucide-static/icons/radar.svg?raw';
 import fileText from 'lucide-static/icons/file-text.svg?raw';
 import camera from 'lucide-static/icons/camera.svg?raw';
 import chevronRight from 'lucide-static/icons/chevron-right.svg?raw';
+import bell from 'lucide-static/icons/bell.svg?raw';
+import bellRing from 'lucide-static/icons/bell-ring.svg?raw';
+import moonStar from 'lucide-static/icons/moon-star.svg?raw';
 
-const ICONS = { activity, arrowDown, arrowUp, arrowUpRight, bitcoin, candles, lineChart, check, checkCircle, chevronLeft, clock, dollar,
+const ICONS = { bell, bellRing, moonStar, activity, arrowDown, arrowUp, arrowUpRight, bitcoin, candles, lineChart, check, checkCircle, chevronLeft, clock, dollar,
   externalLink, flame, gauge, globe, house, info, keyRound, landmark, layers, lock, monitor, moon, newspaper, plus, refresh, scale,
   search, send, settings, shield, sparkles, star, sun, trash, trendDown, trendUp, warn, x, zap,
   copy, ellipsis, menu, messageSquare, pencil, rotateCcw, square, squarePen, sliders, crown, gem, badgeCheck, volume2, paperclip, mic, thumbsUp, thumbsDown, flag, calculator, radar, fileText, camera, chevronRight } as const;
